@@ -4,21 +4,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
-import { ClientRoughNotation } from "~/components/ui/client-rough-notation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-// "auto" = detect bg type by sampling edge pixels (recommended for all)
-type BgMode = "white" | "black" | "auto" | "none";
-type RemoveBgConfig = { mode: BgMode; tol?: number; fringeTol?: number };
+type BgMode = "white" | "black" | "none";
 type Dir = "left" | "right";
 
 interface Section {
   character: string;
-  /** Short codename shown in the top-left HUD card */
-  codename: string;
   removeBg: BgMode;
-  bgCfg?: RemoveBgConfig;
   from: Dir;
   accent: string;
   /** RGBA color atmosphere layered on top of the single bg image */
@@ -26,8 +20,6 @@ interface Section {
   eyebrow: string;
   heading: string;
   body: string;
-  /** ChaiPoll-style handwritten callout — no numbers */
-  note: string;
   cta?: string;
 }
 
@@ -57,88 +49,72 @@ const ENTRIES: Entry[] = [
 const SECTIONS: Section[] = [
   {
     character: "/images/ben10/humungousaur.png",
-    codename: "Humungousaur",
     removeBg: "white",
     from: "left",
-    accent: "#f97316",
-    atmosphere: "rgba(20,8,0,0.55)",
-    eyebrow: "Built to Crush",
-    heading: "Forms That\nHit Like a Beast",
-    body: "Drag. Drop. Dominate. ChaiForm crushes every conversion goal — no code, pure brute force.",
-    note: "no code needed",
+    accent: "#4ade80",
+    atmosphere: "rgba(0,14,0,0.74)",
+    eyebrow: "Feature 01",
+    heading: "Build Forms\nThat Hit Hard",
+    body: "Drag, drop, dominate. Craft powerful forms in minutes — zero code, pure impact.",
   },
   {
     character: "/images/ben10/xlr8.png",
-    codename: "XLR8",
     removeBg: "white",
     from: "right",
     accent: "#22d3ee",
-    atmosphere: "rgba(0,8,18,0.55)",
-    eyebrow: "Faster Than Now",
-    heading: "Responses At\nLight Speed",
-    body: "Submissions land before your coffee cools. Real-time everything — zero lag, zero refresh.",
-    note: "real-time stream",
+    atmosphere: "rgba(0,6,18,0.74)",
+    eyebrow: "Feature 02",
+    heading: "Responses at\nAlien Speed",
+    body: "Real-time submissions. Zero latency. Your data arrives before the dust settles.",
   },
   {
     character: "/images/ben10/heatblast.png",
-    codename: "Heatblast",
     removeBg: "white",
     from: "left",
-    accent: "#fbbf24",
-    atmosphere: "rgba(22,8,0,0.55)",
-    eyebrow: "Burn The Charts",
-    heading: "Insights That\nSet Things Ablaze",
-    body: "Every answer becomes signal. Live analytics that ignite decisions — watch your funnel burn bright.",
-    note: "burn the charts",
+    accent: "#fb923c",
+    atmosphere: "rgba(18,5,0,0.72)",
+    eyebrow: "Feature 03",
+    heading: "Analytics That\nBurn Bright",
+    body: "Every submission becomes actionable intelligence. See patterns. Act fast.",
   },
   {
-    character: "/images/ben10/diamondhead.png?v=3",
-    codename: "Diamondhead",
-    removeBg: "none",
+    character: "/images/ben10/diamondhead.png",
+    removeBg: "black",
     from: "right",
     accent: "#2dd4bf",
-    atmosphere: "rgba(0,14,12,0.55)",
-    eyebrow: "Unbreakable",
-    heading: "Forms Forged\nIn Pure Diamond",
-    body: "Rock-solid validation. Bulletproof submissions. Every response captured — none lost in the dust.",
-    note: "unbreakable",
+    atmosphere: "rgba(0,14,14,0.72)",
+    eyebrow: "Feature 04",
+    heading: "Forms Built\nLike Diamond",
+    body: "Unbreakable structure. Pristine UX. Every response captured perfectly.",
   },
   {
     character: "/images/ben10/big-chill.png",
-    codename: "Big Chill",
     removeBg: "white",
     from: "left",
-    accent: "#a5b4fc",
-    atmosphere: "rgba(8,4,28,0.55)",
-    eyebrow: "Beyond Limits",
-    heading: "Cold-Blooded\nScale, On Demand",
-    body: "Unlimited forms. Unlimited responses. Glide through traffic spikes like they aren't even there.",
-    note: "infinite scale",
+    accent: "#818cf8",
+    atmosphere: "rgba(8,0,22,0.72)",
+    eyebrow: "Feature 05",
+    heading: "Soar Beyond\nEvery Limit",
+    body: "Unlimited forms. Unlimited responses. Scale without boundaries.",
   },
   {
-    character: "/images/ben10/ben-young.png?v=7",
-    codename: "Ben Tennyson",
-    removeBg: "none",
+    character: "/images/ben10/ben-young.png",
+    removeBg: "black",
     from: "right",
     accent: "#4ade80",
-    atmosphere: "rgba(0,18,6,0.55)",
+    atmosphere: "rgba(0,16,4,0.68)",
     eyebrow: "It's Hero Time",
-    heading: "Now It's\nYour Turn",
-    body: "Tap the Omnitrix. Free forever. Your forms, your rules, your data — start building like a hero.",
-    note: "your turn now",
+    heading: "You Are the\nHero Now",
+    body: "Start building for free. Your forms. Your rules. Your data — always yours.",
     cta: "Start Building Free →",
   },
 ];
 
 // ─── Canvas background remover ────────────────────────────────────────────────
 
-function removeBgCanvas(
-  src: string,
-  mode: "white" | "black" | "auto",
-): Promise<string> {
+function removeBgCanvas(src: string, mode: "white" | "black"): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
     img.onload = () => {
       const w = img.naturalWidth, h = img.naturalHeight;
       const canvas = document.createElement("canvas");
@@ -149,7 +125,7 @@ function removeBgCanvas(
       const d = id.data;
 
       const isBg = (pi: number) => {
-        const r = d[pi]! / 255, g = d[pi + 1]! / 255, b = d[pi + 2]! / 255;
+        const r = d[pi] / 255, g = d[pi + 1] / 255, b = d[pi + 2] / 255;
         const avg = (r + g + b) / 3, sat = Math.max(r, g, b) - Math.min(r, g, b);
         return mode === "black" ? avg < 0.18 && sat < 0.22 : avg > 0.55 && sat < 0.28;
       };
@@ -175,7 +151,7 @@ function removeBgCanvas(
           for (let x = 0; x < w; x++) {
             const i = (y * w + x) * 4;
             if (d[i + 3] === 0) continue;
-            const r = d[i]! / 255, g = d[i + 1]! / 255, b = d[i + 2]! / 255;
+            const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
             const avg = (r + g + b) / 3, sat = Math.max(r, g, b) - Math.min(r, g, b);
             const fringe = mode === "black" ? avg < 0.32 && sat < 0.22 : avg > 0.42 && sat < 0.32;
             if (!fringe) continue;
@@ -192,84 +168,42 @@ function removeBgCanvas(
       ctx.putImageData(id, 0, 0);
       canvas.toBlob((b) => resolve(b ? URL.createObjectURL(b) : src), "image/png");
     };
-    img.onerror = () => resolve(src);
     img.src = src;
   });
 }
 
 // ─── Character image ──────────────────────────────────────────────────────────
 
-function CharacterImg({ src, removeBg, bgCfg, accent }: { src: string; removeBg: BgMode; bgCfg?: RemoveBgConfig; accent: string }) {
+function CharacterImg({ src, removeBg, accent }: { src: string; removeBg: BgMode; accent: string }) {
   const [finalSrc, setFinalSrc] = useState(src);
-  const [ready, setReady] = useState(removeBg === "none");
   const blobRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (removeBg === "none") {
-      setFinalSrc(src);
-      setReady(false);
-      const img = new Image();
-      img.onload = () => setReady(true);
-      img.onerror = () => setReady(true);
-      img.src = src;
-      return;
-    }
-
-    setReady(false);
+    if (removeBg === "none") return;
     let cancelled = false;
-    const cfg = bgCfg ?? { mode: removeBg };
-    removeBgCanvas(
-      src,
-      cfg.mode === "none" || cfg.mode === "auto" ? "white" : cfg.mode,
-    ).then((url) => {
+    removeBgCanvas(src, removeBg).then((url) => {
       if (cancelled) { URL.revokeObjectURL(url); return; }
       if (blobRef.current) URL.revokeObjectURL(blobRef.current);
       blobRef.current = url;
       setFinalSrc(url);
-      setReady(true);
     });
     return () => { cancelled = true; };
-  }, [src, removeBg, bgCfg]);
+  }, [src, removeBg]);
 
   useEffect(() => () => { if (blobRef.current) URL.revokeObjectURL(blobRef.current); }, []);
 
   return (
-    <div className="relative flex items-center justify-center">
-      {/* Stage spotlight directly behind alien */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{
-          width: "min(560px, 60vw)",
-          height: "min(560px, 60vw)",
-          background: `radial-gradient(circle, ${accent}cc 0%, ${accent}66 22%, ${accent}1f 48%, transparent 72%)`,
-          filter: "blur(50px)",
-        }}
-      />
-      {/* Tight inner halo */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{
-          width: "min(320px, 36vw)",
-          height: "min(320px, 36vw)",
-          background: `radial-gradient(circle, ${accent}55 0%, transparent 65%)`,
-          filter: "blur(20px)",
-        }}
-      />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={finalSrc}
-        alt=""
-        draggable={false}
-        className="relative z-10 max-h-[72vh] w-auto max-w-full select-none object-contain transition-opacity duration-300"
-        style={{
-          opacity: ready ? 1 : 0,
-          filter: `drop-shadow(0 0 28px ${accent}) drop-shadow(0 0 80px ${accent}cc) drop-shadow(0 0 180px ${accent}66) drop-shadow(0 18px 60px rgba(0,0,0,0.95))`,
-          willChange: "transform, opacity",
-        }}
-      />
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={finalSrc}
+      alt=""
+      draggable={false}
+      className="max-h-[72vh] w-auto max-w-full select-none object-contain"
+      style={{
+        filter: `drop-shadow(0 0 80px ${accent}bb) drop-shadow(0 0 180px ${accent}33) drop-shadow(0 10px 40px rgba(0,0,0,0.95))`,
+        willChange: "transform",
+      }}
+    />
   );
 }
 
@@ -280,23 +214,10 @@ export function Ben10Scroll() {
   const progressRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Preload every character asset so scroll never hits an empty frame
-  useEffect(() => {
-    SECTIONS.forEach((sec) => {
-      const img = new Image();
-      img.src = sec.character;
-    });
-  }, []);
-
   useLayoutEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
 
-    const lenis = new Lenis({
-      lerp: 0.08,
-      smoothWheel: true,
-      wheelMultiplier: 0.9,
-      touchMultiplier: 1.4,
-    });
+    const lenis = new Lenis({ lerp: 0.065, smoothWheel: true });
     document.documentElement.classList.add("lenis", "lenis-smooth");
     lenis.on("scroll", ScrollTrigger.update);
     const onTick = (t: number) => lenis.raf(t * 1000);
@@ -324,101 +245,91 @@ export function Ben10Scroll() {
       const body     = section.querySelector<HTMLElement>(".b10s-body");
       const cta      = section.querySelector<HTMLElement>(".b10s-cta");
       const bigNum   = section.querySelector<HTMLElement>(".b10s-bignum");
-      const noteEl   = section.querySelector<HTMLElement>(".b10s-note");
-      const hudCard   = section.querySelector<HTMLElement>(".b10s-hud");
 
       if (!bg || !atm || !charWrap) return;
 
-      const e = ENTRIES[i];
+      const e   = ENTRIES[i];
       const sec = SECTIONS[i];
-      if (!e || !sec) return;
       const tl  = gsap.timeline({ paused: true });
 
-      tl.fromTo(bg, { scale: 1.08, yPercent: -3 }, { scale: 1.0, yPercent: 4, ease: "none" }, 0);
+      // ── Background: cinematic zoom-out + vertical parallax ─────────────────
+      // Always in motion — gives depth even during "hold" phase
+      tl.fromTo(bg, { scale: 1.14, yPercent: -6 }, { scale: 1.0, yPercent: 6, ease: "none" }, 0);
 
+      // ── Atmosphere overlay: fade in quickly, hold, fade out ─────────────────
+      tl.fromTo(atm, { opacity: 0 }, { opacity: 1, duration: 0.12, ease: "power2.out" }, 0);
+      tl.to(atm, { opacity: 0, duration: 0.12, ease: "power2.in" }, 0.88);
+
+      // ── Character: UNIQUE entry per section ─────────────────────────────────
       tl.fromTo(
         charWrap,
         { xPercent: e.x, yPercent: e.y, rotation: e.r, scale: e.s, opacity: 0 },
         { xPercent: 0, yPercent: 0, rotation: 0, scale: 1, opacity: 1, duration: e.dur, ease: e.ease },
-        0,
+        0.07,
       );
 
-      tl.fromTo(atm, { opacity: 0 }, { opacity: 1, duration: 0.18, ease: "power2.out" }, 0.04);
-      tl.to(atm, { opacity: 0, duration: 0.14, ease: "power2.in" }, 0.86);
-
-      // Subtle float during hold
-      const floatStart = e.dur + 0.04;
-      if (floatStart < 0.72) {
-        tl.to(charWrap, { yPercent: -3, ease: "none", duration: 0.72 - floatStart }, floatStart);
+      // Subtle float during hold — always something moving
+      const floatStart = 0.07 + e.dur + 0.02;
+      if (floatStart < 0.70) {
+        tl.to(charWrap, { yPercent: -4, ease: "none", duration: 0.70 - floatStart }, floatStart);
       }
 
-      // ── Text: premium mask reveal ────────────────────────────────────────
+      // ── Text: premium mask reveal (overflow:hidden + translateY) ────────────
       if (eyebrow) {
         tl.fromTo(
           eyebrow,
           { opacity: 0, x: sec.from === "left" ? -12 : 12 },
           { opacity: 1, x: 0, duration: 0.22, ease: "power2.out" },
-          0.08,
+          0.12,
         );
       }
+      // Each heading line rises from below a clipping mask
       headings.forEach((h, j) => {
-        tl.fromTo(h, { yPercent: 115 }, { yPercent: 0, duration: 0.32, ease: "power3.out" }, 0.12 + j * 0.08);
+        tl.fromTo(h, { yPercent: 115 }, { yPercent: 0, duration: 0.34, ease: "power3.out" }, 0.17 + j * 0.09);
       });
       if (body) {
-        tl.fromTo(body, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.26, ease: "power2.out" }, 0.24);
-      }
-      if (noteEl) {
-        tl.fromTo(
-          noteEl,
-          { opacity: 0, y: 10 },
-          { opacity: 1, y: 0, duration: 0.28, ease: "power3.out" },
-          0.28,
-        );
+        tl.fromTo(body, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }, 0.30);
       }
       if (cta) {
         tl.fromTo(
           cta,
           { opacity: 0, y: 16, scale: 0.93 },
-          { opacity: 1, y: 0, scale: 1, duration: 0.26, ease: "back.out(1.2)" },
-          0.42,
+          { opacity: 1, y: 0, scale: 1, duration: 0.28, ease: "back.out(1.2)" },
+          0.38,
         );
       }
 
+      // Big background number
       if (bigNum) {
-        tl.fromTo(bigNum, { opacity: 0, scale: 1.18 }, { opacity: 1, scale: 1, duration: 0.45, ease: "expo.out" }, 0.06);
-      }
-      if (hudCard) {
-        tl.fromTo(hudCard, { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.04);
+        tl.fromTo(bigNum, { opacity: 0, scale: 1.22 }, { opacity: 1, scale: 1, duration: 0.55, ease: "expo.out" }, 0.07);
       }
 
-      // ── EXIT: char leaves in OPPOSITE direction ───────────────────────────
+      // ── EXIT: char leaves in OPPOSITE direction (through-movement feel) ─────
       const exitX = sec.from === "left" ? 90 : -90;
-      const exitY = i === SECTIONS.length - 1 ? -28 : 0;
+      const exitY = i === SECTIONS.length - 1 ? -28 : 0; // Ben rises off-screen
 
       tl.to(
         charWrap,
-        { xPercent: exitX, yPercent: exitY, opacity: 0, scale: 0.9, duration: 0.22, ease: "power2.in" },
-        0.78,
+        { xPercent: exitX, yPercent: exitY, opacity: 0, scale: 0.88, duration: 0.28, ease: "power2.in" },
+        0.72,
       );
-      if (eyebrow) tl.to(eyebrow, { opacity: 0, duration: 0.16 }, 0.78);
+      if (eyebrow) tl.to(eyebrow, { opacity: 0, duration: 0.18 }, 0.72);
       headings.forEach((h, j) => {
-        tl.to(h, { yPercent: -115, duration: 0.22, ease: "power2.in" }, 0.78 + j * 0.03);
+        tl.to(h, { yPercent: -115, duration: 0.24, ease: "power2.in" }, 0.72 + j * 0.04);
       });
-      if (body) tl.to(body, { opacity: 0, y: -10, duration: 0.15 }, 0.79);
-      if (noteEl) tl.to(noteEl, { opacity: 0, y: -8, duration: 0.15 }, 0.79);
-      if (cta) tl.to(cta, { opacity: 0, duration: 0.14 }, 0.79);
-      if (bigNum) tl.to(bigNum, { opacity: 0, scale: 0.86, duration: 0.18 }, 0.79);
-      if (hudCard) tl.to(hudCard, { opacity: 0, y: -10, duration: 0.18 }, 0.79);
+      if (body) tl.to(body, { opacity: 0, y: -10, duration: 0.17 }, 0.73);
+      if (cta) tl.to(cta, { opacity: 0, duration: 0.16 }, 0.73);
+      if (bigNum) tl.to(bigNum, { opacity: 0, scale: 0.84, duration: 0.2 }, 0.73);
 
-      // Start animating BEFORE section pins — character already visible on arrival
+      // ── Attach to scroll ─────────────────────────────────────────────────────
       gsap.to(tl, {
         time: tl.duration(),
         ease: "none",
         scrollTrigger: {
           trigger: section,
-          start: "top bottom",
-          end: "bottom top",
-          scrub: 0.85,
+          start: "top top",
+          end: "bottom bottom",
+          scrub: 1.3,
         },
       });
     });
@@ -429,6 +340,7 @@ export function Ben10Scroll() {
       lenis.destroy();
       ScrollTrigger.getAll().forEach((t) => t.kill());
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -436,7 +348,7 @@ export function Ben10Scroll() {
       {/* Progress bar */}
       <div
         aria-hidden
-        className="fixed top-0 left-0 right-0 z-60 h-[2px] pointer-events-none"
+        className="fixed top-0 left-0 right-0 z-[60] h-[2px] pointer-events-none"
         style={{ background: "rgba(255,255,255,0.04)" }}
       >
         <div
@@ -454,52 +366,28 @@ export function Ben10Scroll() {
           <div
             key={i}
             className="b10s relative"
-            style={{ height: "220vh" }}
+            style={{ height: "270vh" }}
           >
             {/* ── Sticky panel ──────────────────────────────────────────────── */}
             <div className="sticky top-0 h-screen w-full overflow-hidden bg-black">
 
-              {/* ── Pure black backdrop + per-alien atmospheric glow ─────── */}
-              {/* No bg image — just black, with the alien's accent radiating  */}
-              {/* behind them to create the "shadows around hero" feel.        */}
-              <div className="b10s-bg absolute inset-0 origin-center">
-                {/* Primary aura — large soft orb behind character */}
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: `radial-gradient(ellipse 70% 70% at ${sec.from === "left" ? "28%" : "72%"} 50%, ${sec.accent}55 0%, ${sec.accent}1f 28%, transparent 60%)`,
-                  }}
-                />
-                {/* Secondary glow — opposite corner for depth */}
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: `radial-gradient(ellipse 50% 45% at ${sec.from === "left" ? "92%" : "8%"} 85%, ${sec.accent}33 0%, transparent 55%)`,
-                  }}
-                />
-                {/* Slow breathing accent ring */}
-                <div
-                  className="b10s-pulse absolute left-1/2 top-1/2 aspect-square w-[55vw] -translate-x-1/2 -translate-y-1/2 rounded-full"
-                  style={{
-                    background: `radial-gradient(circle, ${sec.accent}14 0%, transparent 70%)`,
-                    filter: "blur(60px)",
-                  }}
-                />
-              </div>
+              {/* ── SINGLE background image — no more jarring bg swaps ─────── */}
+              {/* The atmosphere overlay provides the per-section color identity */}
+              <div
+                className="b10s-bg absolute inset-0 bg-cover bg-center origin-center"
+                style={{ backgroundImage: "url(/images/ben10/bg-hero.png)" }}
+              />
 
-              {/* Color atmosphere — light tint that fades in during hold */}
+              {/* Color atmosphere per section */}
               <div
                 className="b10s-atm absolute inset-0"
-                style={{
-                  background: `radial-gradient(ellipse 90% 90% at 50% 50%, transparent 55%, ${sec.atmosphere} 100%)`,
-                  opacity: 0,
-                }}
+                style={{ background: sec.atmosphere, opacity: 0 }}
               />
 
               {/* Film grain — cinematic texture */}
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-0 z-2 opacity-[0.04]"
+                className="pointer-events-none absolute inset-0 z-[2] opacity-[0.032]"
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
                   backgroundSize: "200px 200px",
@@ -519,7 +407,7 @@ export function Ben10Scroll() {
                     className="b10s-char"
                     style={{ opacity: 0, willChange: "transform, opacity" }}
                   >
-                    <CharacterImg src={sec.character} removeBg={sec.removeBg} bgCfg={sec.bgCfg} accent={sec.accent} />
+                    <CharacterImg src={sec.character} removeBg={sec.removeBg} accent={sec.accent} />
                   </div>
                 </div>
 
@@ -552,31 +440,22 @@ export function Ben10Scroll() {
                   ))}
 
                   <p
-                    className="b10s-body max-w-[440px] leading-[1.78] text-white/45"
+                    className="b10s-body max-w-[400px] leading-[1.78] text-white/42"
                     style={{ fontSize: "clamp(0.88rem,1.3vw,1.05rem)", opacity: 0 }}
                   >
                     {sec.body}
                   </p>
 
-                  <SectionNote text={sec.note} accent={sec.accent} />
-
                   {sec.cta && (
-                    <div className="b10s-cta mt-4 flex items-center gap-5" style={{ opacity: 0 }}>
+                    <div className="b10s-cta mt-2 flex items-center gap-5" style={{ opacity: 0 }}>
                       <a
                         href="/sign-up"
-                        className="group relative overflow-hidden cursor-pointer rounded-full px-8 py-3.5 text-sm font-black tracking-[0.14em] text-black uppercase transition-all duration-200 hover:scale-105 hover:brightness-110 active:scale-95"
-                        style={{
-                          background: sec.accent,
-                          boxShadow: `0 14px 38px -10px ${sec.accent}, 0 0 0 1px ${sec.accent}80`,
-                        }}
+                        className="rounded-full px-8 py-3.5 text-sm font-black tracking-[0.14em] text-black uppercase transition-all duration-200 hover:scale-105 hover:brightness-110 active:scale-95"
+                        style={{ background: sec.accent }}
                       >
-                        <span className="relative z-10">{sec.cta}</span>
-                        <span
-                          aria-hidden
-                          className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-white/40 opacity-0 transition-all duration-700 group-hover:left-[120%] group-hover:opacity-100"
-                        />
+                        {sec.cta}
                       </a>
-                      <span className="font-mono text-[10px] tracking-[0.28em] text-white/30 uppercase">
+                      <span className="font-mono text-[10px] tracking-[0.28em] text-white/22 uppercase">
                         Free plan · No credit card
                       </span>
                     </div>
@@ -621,57 +500,6 @@ export function Ben10Scroll() {
                 </span>
               </div>
 
-              {/* ── Top-left alien HUD card ──────────────────────────────── */}
-              <div
-                className="b10s-hud pointer-events-none absolute top-6 left-7 z-20 flex items-center gap-3"
-                style={{ opacity: 0 }}
-              >
-                <span
-                  className="relative flex size-2 items-center justify-center"
-                  aria-hidden
-                >
-                  <span
-                    className="absolute inline-flex size-full animate-ping rounded-full opacity-75"
-                    style={{ background: sec.accent }}
-                  />
-                  <span
-                    className="relative inline-flex size-2 rounded-full"
-                    style={{ background: sec.accent, boxShadow: `0 0 8px ${sec.accent}` }}
-                  />
-                </span>
-                <div className="flex flex-col leading-tight">
-                  <span
-                    className="font-mono text-[9px] tracking-[0.32em] uppercase"
-                    style={{ color: `${sec.accent}cc` }}
-                  >
-                    Alien&nbsp;{String(i + 1).padStart(2, "0")} / {String(SECTIONS.length).padStart(2, "0")}
-                  </span>
-                  <span className="font-display text-[11px] font-black tracking-[0.2em] text-white uppercase">
-                    {sec.codename}
-                  </span>
-                </div>
-              </div>
-
-              {/* ── Decorative corner brackets ───────────────────────────── */}
-              <svg
-                aria-hidden
-                className="pointer-events-none absolute top-5 right-6 z-10 size-4"
-                viewBox="0 0 16 16"
-                fill="none"
-                style={{ color: `${sec.accent}aa` }}
-              >
-                <path d="M9 1 H15 V7" stroke="currentColor" strokeWidth="1.25" />
-              </svg>
-              <svg
-                aria-hidden
-                className="pointer-events-none absolute bottom-5 left-6 z-10 size-4"
-                viewBox="0 0 16 16"
-                fill="none"
-                style={{ color: `${sec.accent}aa` }}
-              >
-                <path d="M1 9 V15 H7" stroke="currentColor" strokeWidth="1.25" />
-              </svg>
-
               {/* ── Nav dots ─────────────────────────────────────────────── */}
               <div
                 aria-hidden
@@ -695,17 +523,5 @@ export function Ben10Scroll() {
         ))}
       </div>
     </>
-  );
-}
-
-function SectionNote({ text, accent }: { text: string; accent: string }) {
-  return (
-    <div className="b10s-note mt-4" style={{ opacity: 0 }}>
-      <ClientRoughNotation type="underline" show color={accent} strokeWidth={1.5} padding={4}>
-        <span className="font-annotate text-[1.25rem] text-white/75 lg:text-[1.35rem]">
-          {text}
-        </span>
-      </ClientRoughNotation>
-    </div>
   );
 }

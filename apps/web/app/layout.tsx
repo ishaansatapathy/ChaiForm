@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { caveat, exo2, orbitron, shadowsIntoLight } from "~/lib/fonts";
 import { GlobalProviders } from "~/providers/global";
 
 const geistSans = localFont({
@@ -26,7 +27,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable}`}
+        className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${exo2.variable} ${shadowsIntoLight.variable} ${caveat.variable}`}
       >
         <GlobalProviders>{children}</GlobalProviders>
       </body>
