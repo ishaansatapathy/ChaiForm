@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
 
-import { HeroAnnotations } from "~/components/home/hero-annotations";
 import { HeroSmokeCursor } from "~/components/home/hero-smoke-cursor";
 
 interface HeroSectionProps {
@@ -98,7 +97,6 @@ export function HeroSection({ onScrollDown }: HeroSectionProps) {
       />
 
       <HeroSmokeCursor containerRef={rootRef} />
-      <HeroAnnotations />
 
       <div
         aria-hidden
