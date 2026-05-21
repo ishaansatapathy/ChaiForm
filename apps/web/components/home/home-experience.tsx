@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Ben10Scroll } from "~/components/home/ben10-scroll";
-import { CustomCursor } from "~/components/home/custom-cursor";
 import { HeroSection } from "~/components/home/hero-section";
 import { LoadingScreen } from "~/components/home/loading-screen";
 
@@ -35,14 +34,10 @@ export function HomeExperience() {
   }
 
   return (
-    <>
-      <CustomCursor />
-      <main className="bg-black">
-        <HeroSection onScrollDown={handleScrollDown} />
-        {/* Anchor point for scroll-down */}
-        <div ref={scrollRef} />
-        <Ben10Scroll />
-      </main>
-    </>
+    <main className="bg-black">
+      <HeroSection onScrollDown={handleScrollDown} />
+      <div ref={scrollRef} />
+      <Ben10Scroll />
+    </main>
   );
 }

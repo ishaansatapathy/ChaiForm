@@ -30,7 +30,6 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
     if (!video || !wrapper || !videoBox || !text) return;
 
     const startedAt = Date.now();
-    let maxTimer: ReturnType<typeof window.setTimeout> | undefined;
 
     // Animate progress bar as video plays
     const onTimeUpdate = () => {
@@ -81,7 +80,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
       window.setTimeout(finish, LOADING_MIN_MS);
     });
 
-    maxTimer = window.setTimeout(finish, LOADING_MAX_MS);
+    const maxTimer = window.setTimeout(finish, LOADING_MAX_MS);
 
     // Entrance animation — text slides up
     gsap.fromTo(
@@ -91,7 +90,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
     );
 
     return () => {
-      if (maxTimer) window.clearTimeout(maxTimer);
+      window.clearTimeout(maxTimer);
       video.removeEventListener("ended", tryFinish);
       video.removeEventListener("timeupdate", onTimeUpdate);
     };
