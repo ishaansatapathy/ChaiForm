@@ -24,7 +24,7 @@ export default function DashboardPage() {
     <section className="relative py-4">
       <div className="animate-in fade-in slide-in-from-bottom-4 mb-12 duration-700">
         <p className="font-mono mb-2 text-[10px] tracking-[0.35em] text-lime-400/80 uppercase">
-          // system online · creator mode
+          {"// system online · creator mode"}
         </p>
         <h2 className="font-display text-3xl font-black tracking-tight text-white md:text-4xl">
           Welcome back, {user?.fullName?.split(" ")[0] ?? "Hero"}

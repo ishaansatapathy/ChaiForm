@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import gsap from "gsap";
 
 import { rubikDirt } from "~/lib/fonts";
@@ -69,14 +69,17 @@ export function HeroSection() {
           1.5,
         );
 
-      gsap.to(scrollRef.current!.querySelector(".scroll-line"), {
-        scaleY: 0.3,
-        transformOrigin: "top center",
-        repeat: -1,
-        yoyo: true,
-        duration: 1.1,
-        ease: "sine.inOut",
-      });
+      const scrollLine = scrollRef.current?.querySelector(".scroll-line");
+      if (scrollLine) {
+        gsap.to(scrollLine, {
+          scaleY: 0.3,
+          transformOrigin: "top center",
+          repeat: -1,
+          yoyo: true,
+          duration: 1.1,
+          ease: "sine.inOut",
+        });
+      }
     }, rootRef.current!);
 
     return () => ctx.revert();
@@ -177,7 +180,7 @@ export function HeroSection() {
         >
           <span className="h-1.5 w-1.5 rounded-full bg-lime-400 shadow-[0_0_8px_#4ade80]" />
           <span className="font-accent text-[10px] font-medium tracking-[0.38em] text-lime-400/90 uppercase">
-            CHAIFORM // DNA TRANSFORMATION SYSTEM
+            {"CHAIFORM // DNA TRANSFORMATION SYSTEM"}
           </span>
         </div>
  
@@ -186,7 +189,7 @@ export function HeroSection() {
           className="font-mono -mb-1 flex items-center gap-2 text-[10px] tracking-[0.32em] text-white/40 uppercase"
         >
           <span className="inline-block h-px w-5 bg-lime-400/70" />
-          SYSTEM PROTOCOL 0.1 // INIT
+          {"SYSTEM PROTOCOL 0.1 // INIT"}
         </p>
  
         <h1
@@ -328,7 +331,7 @@ function HeroEmbers() {
               "--dx": `${e.dx}px`,
               "--dy": `${e.dy}px`,
               "--ember-color": "rgba(140, 255, 170, 0.85)",
-            } as React.CSSProperties
+            } as CSSProperties
           }
         />
       ))}
