@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { TRPCClientError } from "@repo/trpc/client";
@@ -26,7 +27,7 @@ function AppBackground() {
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { data: user, isLoading, isError, error } = trpc.auth.me.useQuery(undefined, {
     retry: false,

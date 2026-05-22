@@ -12,6 +12,11 @@ import type { RouterInputs } from "@repo/trpc/client";
 
 type CreateFormFields = RouterInputs["forms"]["create"]["fields"];
 
+const INITIAL_DRAFT_FIELDS: DraftField[] = [
+  { id: "00000000-0000-4000-8000-000000000001", label: "Full name", type: "text", required: true },
+  { id: "00000000-0000-4000-8000-000000000002", label: "Email address", type: "email", required: true },
+];
+
 export default function CreateFormPage() {
   const router = useRouter();
   const createForm = trpc.forms.create.useMutation({
@@ -25,10 +30,7 @@ export default function CreateFormPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"public" | "unlisted" | "draft">("public");
-  const [fields, setFields] = useState<DraftField[]>([
-    { id: crypto.randomUUID(), label: "Full name", type: "text", required: true },
-    { id: crypto.randomUUID(), label: "Email address", type: "email", required: true },
-  ]);
+  const [fields, setFields] = useState<DraftField[]>(INITIAL_DRAFT_FIELDS);
 
   const handlePublish = () => {
     if (!title.trim()) {

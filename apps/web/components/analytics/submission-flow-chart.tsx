@@ -8,6 +8,7 @@ import {
   MiniMap,
   Position,
   ReactFlow,
+  ReactFlowProvider,
   type Edge,
   type Node,
   type NodeProps,
@@ -129,27 +130,29 @@ export function SubmissionFlowChart({ answers, participantLabel }: SubmissionFlo
         </p>
       )}
       <div className="h-[520px] overflow-hidden rounded-[32px] border border-white/10 bg-black/30">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
-          proOptions={{ hideAttribution: true }}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          panOnScroll
-          zoomOnScroll
-        >
-          <Background color="#4ade80" gap={20} size={1} style={{ opacity: 0.08 }} />
-          <Controls className="!border-white/10 !bg-black/60 !shadow-none [&>button]:!border-white/10 [&>button]:!bg-black/40 [&>button]:!fill-white/70" />
-          <MiniMap
-            nodeColor="#4ade80"
-            maskColor="rgba(0,0,0,0.75)"
-            className="!border-white/10 !bg-black/50"
-          />
-        </ReactFlow>
+        <ReactFlowProvider>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            proOptions={{ hideAttribution: true }}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            panOnScroll
+            zoomOnScroll
+          >
+            <Background color="#4ade80" gap={20} size={1} style={{ opacity: 0.08 }} />
+            <Controls className="!border-white/10 !bg-black/60 !shadow-none [&>button]:!border-white/10 [&>button]:!bg-black/40 [&>button]:!fill-white/70" />
+            <MiniMap
+              nodeColor="#4ade80"
+              maskColor="rgba(0,0,0,0.75)"
+              className="!border-white/10 !bg-black/50"
+            />
+          </ReactFlow>
+        </ReactFlowProvider>
       </div>
     </div>
   );

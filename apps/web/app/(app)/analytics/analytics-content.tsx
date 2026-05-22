@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -22,6 +22,11 @@ import { trpc } from "~/trpc/client";
 export default function AnalyticsContent() {
   const searchParams = useSearchParams();
   const initialFormId = searchParams.get("form") ?? undefined;
+  const [chartsMounted, setChartsMounted] = useState(false);
+
+  useEffect(() => {
+    setChartsMounted(true);
+  }, []);
 
   const { data: formsPage, isLoading: formsLoading } = trpc.forms.list.useQuery({ limit: 100 });
   const forms = formsPage?.items ?? [];
@@ -171,7 +176,7 @@ export default function AnalyticsContent() {
           <div className="app-surface rounded-3xl p-6">
             <h3 className="font-display mb-4 text-lg font-bold text-white">Submissions over time</h3>
             <div className="h-56">
-              {!overTime ? (
+              {!chartsMounted || !overTime ? (
                 <ChartSkeleton />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -195,7 +200,7 @@ export default function AnalyticsContent() {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h3 className="font-display text-lg font-bold text-white">Field breakdown</h3>
                 <select
-                  value={activeFieldId}
+                  value={activeFieldId ?? ""}
                   onChange={(e) => setSelectedFieldId(e.target.value)}
                   className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none"
                 >
@@ -207,7 +212,7 @@ export default function AnalyticsContent() {
                 </select>
               </div>
 
-              {!fieldBreakdown ? (
+              {!chartsMounted || !fieldBreakdown ? (
                 <ChartSkeleton />
               ) : (
                 <div className="space-y-4">
