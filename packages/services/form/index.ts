@@ -1,0 +1,461 @@
+import { randomUUID } from "node:crypto";
+
+import { and, asc, db, desc, eq, lt, sql } from "@repo/database";
+import {
+  formFieldsTable,
+  formsTable,
+  submissionResponsesTable,
+  submissionsTable,
+  type FieldConfigJson,
+  type FormFieldJson,
+} from "@repo/database/schema";
+import type { SubmissionAnswerJson } from "@repo/database/schema";
+
+import type {
+  CreateFormInput,
+  FormField,
+  FormFieldInput,
+  PaginationInput,
+  SubmitFormInput,
+  UpdateFormInput,
+} from "./model";
+import { createUniqueSlug, slugifyTitle } from "./slug";
+import { validateSubmissionAnswers } from "./validation";
+
+export class FormError extends Error {
+  constructor(
+    public readonly code: "NOT_FOUND" | "FORBIDDEN" | "BAD_REQUEST",
+    message: string,
+  ) {
+    super(message);
+    this.name = "FormError";
+  }
+}
+
+function toIso(value: Date | null | undefined) {
+  return value ? value.toISOString() : null;
+}
+
+function completionRate(submissions: number, views: number) {
+  if (views <= 0) return submissions > 0 ? 100 : 0;
+  return Number(((submissions / views) * 100).toFixed(1));
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
+  const base = {
+    id: row.id,
+    label: row.label,
+    required: row.required,
+  };
+  const config = (row.config as FieldConfigJson | null) ?? undefined;
+
+  switch (row.type) {
+    case "select":
+      return {
+        ...base,
+        type: "select",
+        config: {
+          options: config?.options?.length ? config.options : ["Option 1"],
+          placeholder: config?.placeholder,
+        },
+      };
+    case "rating":
+      return {
+        ...base,
+        type: "rating",
+        config: { maxRating: config?.maxRating ?? 5 },
+      };
+    case "text":
+    case "email":
+    case "number":
+    case "date":
+      return {
+        ...base,
+        type: row.type,
+        config: config?.placeholder ? { placeholder: config.placeholder } : undefined,
+      };
+    default:
+      return { ...base, type: "text" };
+  }
+}
+
+function defaultConfig(type: FormFieldInput["type"]): FieldConfigJson | undefined {
+  if (type === "select") return { options: ["Option 1", "Option 2"] };
+  if (type === "rating") return { maxRating: 5 };
+  return undefined;
+}
+
+class FormService {
+  private normalizeInputFields(fields: FormFieldInput[], preserveIds = false): FormField[] {
+    return fields.map((field) => ({
+      ...field,
+      id: preserveIds && isUuid(field.id) ? field.id : randomUUID(),
+      config: field.config ?? defaultConfig(field.type),
+    })) as FormField[];
+  }
+
+  private async backfillLegacyFields(formId: string, legacyFields: FormFieldJson[]) {
+    if (legacyFields.length === 0) return;
+
+    const normalized = legacyFields.map((field, index) => ({
+      id: isUuid(field.id) ? field.id : randomUUID(),
+      formId,
+      label: field.label,
+      type: field.type,
+      required: field.required,
+      sortOrder: index,
+      config: defaultConfig(field.type) ?? {},
+    }));
+
+    await db.insert(formFieldsTable).values(normalized);
+  }
+
+  private async loadFields(formId: string, legacyFields: FormFieldJson[]) {
+    let rows = await db
+      .select()
+      .from(formFieldsTable)
+      .where(eq(formFieldsTable.formId, formId))
+      .orderBy(asc(formFieldsTable.sortOrder));
+
+    if (rows.length === 0 && legacyFields.length > 0) {
+      await this.backfillLegacyFields(formId, legacyFields);
+      rows = await db
+        .select()
+        .from(formFieldsTable)
+        .where(eq(formFieldsTable.formId, formId))
+        .orderBy(asc(formFieldsTable.sortOrder));
+    }
+
+    return rows.map(mapFieldRow);
+  }
+
+  private async insertFields(formId: string, fields: FormField[]) {
+    if (fields.length === 0) return;
+
+    await db.insert(formFieldsTable).values(
+      fields.map((field, index) => ({
+        id: field.id,
+        formId,
+        label: field.label,
+        type: field.type,
+        required: field.required,
+        sortOrder: index,
+        config: field.config ?? {},
+      })),
+    );
+  }
+
+  private async mapForm(
+    row: typeof formsTable.$inferSelect,
+    submissionCount = 0,
+  ) {
+    const fields = await this.loadFields(row.id, row.fields as FormFieldJson[]);
+
+    return {
+      id: row.id,
+      slug: row.slug ?? null,
+      title: row.title,
+      description: row.description ?? null,
+      visibility: row.visibility,
+      fields,
+      submissionCount,
+      viewCount: row.viewCount ?? 0,
+      completionRate: completionRate(submissionCount, row.viewCount ?? 0),
+      createdAt: toIso(row.createdAt),
+      updatedAt: toIso(row.updatedAt),
+    };
+  }
+
+  async createForm(userId: string, input: CreateFormInput) {
+    const fields = this.normalizeInputFields(input.fields, true);
+    const slug = await createUniqueSlug(input.title);
+
+    const [created] = await db
+      .insert(formsTable)
+      .values({
+        userId,
+        title: input.title.trim(),
+        description: input.description?.trim() || null,
+        visibility: input.visibility,
+        slug,
+        fields: [],
+        viewCount: 0,
+      })
+      .returning();
+
+    if (!created) throw new FormError("BAD_REQUEST", "Unable to create form");
+
+    await this.insertFields(created.id, fields);
+
+    return this.mapForm(created, 0);
+  }
+
+  async updateForm(userId: string, input: UpdateFormInput) {
+    const existing = await this.getOwnedForm(userId, input.formId);
+    const fields = input.fields ? this.normalizeInputFields(input.fields, true) : undefined;
+
+    let slug = existing.slug;
+    if (input.slug) {
+      slug = await createUniqueSlug(input.slug, input.formId);
+    } else if (input.title && input.title.trim() !== existing.title) {
+      slug = await createUniqueSlug(input.title.trim(), input.formId);
+    }
+
+    const [updated] = await db
+      .update(formsTable)
+      .set({
+        title: input.title?.trim() ?? existing.title,
+        description: input.description !== undefined ? input.description.trim() || null : existing.description,
+        visibility: input.visibility ?? existing.visibility,
+        slug,
+        updatedAt: new Date(),
+      })
+      .where(eq(formsTable.id, input.formId))
+      .returning();
+
+    if (!updated) throw new FormError("BAD_REQUEST", "Unable to update form");
+
+    if (fields) {
+      await db.delete(formFieldsTable).where(eq(formFieldsTable.formId, input.formId));
+      await this.insertFields(input.formId, fields);
+    }
+
+    const [countRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(submissionsTable)
+      .where(eq(submissionsTable.formId, input.formId));
+
+    return this.mapForm(updated, countRow?.count ?? 0);
+  }
+
+  async deleteForm(userId: string, formId: string) {
+    await this.getOwnedForm(userId, formId);
+    await db.delete(formsTable).where(eq(formsTable.id, formId));
+    return { success: true as const };
+  }
+
+  async getFormById(userId: string, formId: string) {
+    const row = await this.getOwnedForm(userId, formId);
+
+    const [countRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(submissionsTable)
+      .where(eq(submissionsTable.formId, formId));
+
+    return this.mapForm(row, countRow?.count ?? 0);
+  }
+
+  async listForms(userId: string, pagination: PaginationInput = { limit: 20 }) {
+    const limit = pagination.limit ?? 20;
+
+    const conditions = [eq(formsTable.userId, userId)];
+    if (pagination.cursor) {
+      const [cursorRow] = await db
+        .select({ createdAt: formsTable.createdAt })
+        .from(formsTable)
+        .where(eq(formsTable.id, pagination.cursor))
+        .limit(1);
+      if (cursorRow?.createdAt) {
+        conditions.push(lt(formsTable.createdAt, cursorRow.createdAt));
+      }
+    }
+
+    const rows = await db
+      .select({
+        form: formsTable,
+        submissionCount: sql<number>`count(${submissionsTable.id})::int`,
+      })
+      .from(formsTable)
+      .leftJoin(submissionsTable, eq(submissionsTable.formId, formsTable.id))
+      .where(and(...conditions))
+      .groupBy(formsTable.id)
+      .orderBy(desc(formsTable.createdAt))
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const items = await Promise.all(
+      pageRows.map((row) => this.mapForm(row.form, row.submissionCount ?? 0)),
+    );
+
+    return {
+      items,
+      nextCursor: hasMore ? (pageRows[pageRows.length - 1]?.form.id ?? null) : null,
+    };
+  }
+
+  async recordView(formId: string) {
+    const [row] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    if (!row || row.visibility === "draft") {
+      throw new FormError("NOT_FOUND", "Form not found");
+    }
+
+    await db
+      .update(formsTable)
+      .set({ viewCount: (row.viewCount ?? 0) + 1 })
+      .where(eq(formsTable.id, formId));
+
+    return { success: true as const };
+  }
+
+  async getPublicForm(formId: string) {
+    const [row] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    if (!row) throw new FormError("NOT_FOUND", "Form not found");
+    if (row.visibility === "draft") throw new FormError("NOT_FOUND", "Form not available");
+
+    const fields = await this.loadFields(row.id, row.fields as FormFieldJson[]);
+
+    return {
+      id: row.id,
+      slug: row.slug ?? null,
+      title: row.title,
+      description: row.description ?? null,
+      fields,
+    };
+  }
+
+  async getPublicFormBySlug(slug: string) {
+    const [row] = await db.select().from(formsTable).where(eq(formsTable.slug, slug)).limit(1);
+    if (!row) throw new FormError("NOT_FOUND", "Form not found");
+    if (row.visibility === "draft") throw new FormError("NOT_FOUND", "Form not available");
+
+    const fields = await this.loadFields(row.id, row.fields as FormFieldJson[]);
+
+    return {
+      id: row.id,
+      slug: row.slug ?? null,
+      title: row.title,
+      description: row.description ?? null,
+      fields,
+    };
+  }
+
+  private async getOwnedForm(userId: string, formId: string) {
+    const [row] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    if (!row) throw new FormError("NOT_FOUND", "Form not found");
+    if (row.userId !== userId) throw new FormError("FORBIDDEN", "Not allowed");
+    return row;
+  }
+
+  async submitForm(input: SubmitFormInput) {
+    const form = await this.getPublicForm(input.formId);
+    let validated: Record<string, string>;
+
+    try {
+      validated = validateSubmissionAnswers(form.fields, input.answers);
+    } catch (error) {
+      throw new FormError("BAD_REQUEST", error instanceof Error ? error.message : "Invalid submission");
+    }
+
+    const answers: SubmissionAnswerJson[] = form.fields.map((field) => ({
+      fieldId: field.id,
+      label: field.label,
+      type: field.type,
+      value: validated[field.id] ?? "",
+    }));
+
+    const [created] = await db
+      .insert(submissionsTable)
+      .values({
+        formId: form.id,
+        answers,
+      })
+      .returning();
+
+    if (!created) throw new FormError("BAD_REQUEST", "Unable to save submission");
+
+    const responseRows = answers
+      .filter((answer) => answer.value.length > 0)
+      .map((answer) => ({
+        submissionId: created.id,
+        fieldId: answer.fieldId,
+        value: answer.value,
+      }));
+
+    if (responseRows.length > 0) {
+      await db.insert(submissionResponsesTable).values(responseRows);
+    }
+
+    return {
+      id: created.id,
+      formId: created.formId,
+      formTitle: form.title,
+      answers: created.answers as SubmissionAnswerJson[],
+      submittedAt: toIso(created.submittedAt),
+    };
+  }
+
+  async listSubmissions(userId: string, formId: string, pagination: PaginationInput = { limit: 20 }) {
+    await this.getOwnedForm(userId, formId);
+    const limit = pagination.limit ?? 20;
+
+    const conditions = [eq(submissionsTable.formId, formId)];
+    if (pagination.cursor) {
+      const [cursorRow] = await db
+        .select({ submittedAt: submissionsTable.submittedAt })
+        .from(submissionsTable)
+        .where(eq(submissionsTable.id, pagination.cursor))
+        .limit(1);
+      if (cursorRow?.submittedAt) {
+        conditions.push(lt(submissionsTable.submittedAt, cursorRow.submittedAt));
+      }
+    }
+
+    const rows = await db
+      .select({
+        submission: submissionsTable,
+        formTitle: formsTable.title,
+      })
+      .from(submissionsTable)
+      .innerJoin(formsTable, eq(formsTable.id, submissionsTable.formId))
+      .where(and(...conditions))
+      .orderBy(desc(submissionsTable.submittedAt))
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+    const items = pageRows.map((row) => ({
+      id: row.submission.id,
+      formId: row.submission.formId,
+      formTitle: row.formTitle,
+      answers: row.submission.answers as SubmissionAnswerJson[],
+      submittedAt: toIso(row.submission.submittedAt),
+    }));
+
+    return {
+      items,
+      nextCursor: hasMore ? (pageRows[pageRows.length - 1]?.submission.id ?? null) : null,
+    };
+  }
+
+  async getSubmission(userId: string, submissionId: string) {
+    const [row] = await db
+      .select({
+        submission: submissionsTable,
+        formTitle: formsTable.title,
+        ownerId: formsTable.userId,
+      })
+      .from(submissionsTable)
+      .innerJoin(formsTable, eq(formsTable.id, submissionsTable.formId))
+      .where(eq(submissionsTable.id, submissionId))
+      .limit(1);
+
+    if (!row) throw new FormError("NOT_FOUND", "Submission not found");
+    if (row.ownerId !== userId) throw new FormError("FORBIDDEN", "Not allowed");
+
+    return {
+      id: row.submission.id,
+      formId: row.submission.formId,
+      formTitle: row.formTitle,
+      answers: row.submission.answers as SubmissionAnswerJson[],
+      submittedAt: toIso(row.submission.submittedAt),
+    };
+  }
+}
+
+export default FormService;

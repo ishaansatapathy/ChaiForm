@@ -1,7 +1,4 @@
-import { db } from "@repo/database";
-import { usersTable } from "@repo/database/schema";
-import { env } from "../env";
-import { googleOAuth2Client } from "../clients/google-oauth";
+import { isGoogleOAuthConfigured, generateGoogleAuthUrl } from "../clients/google-oauth";
 import { GetAuthenticationMethodOutputSchema } from "./model";
 
 class UserService {
@@ -10,10 +7,8 @@ class UserService {
   > {
     const supportedAuthenticationProviders: GetAuthenticationMethodOutputSchema[] = [];
 
-    const isGoogleConfigured = !!(env.GOOGLE_OAUTH_CLIENT_ID && env.GOOGLE_OAUTH_CLIENT_SECRET);
-
-    if (isGoogleConfigured) {
-      const url = googleOAuth2Client.generateAuthUrl();
+    if (isGoogleOAuthConfigured()) {
+      const url = generateGoogleAuthUrl("/dashboard");
       supportedAuthenticationProviders.push({
         provider: "GOOGLE_OAUTH",
         displayName: "Google",

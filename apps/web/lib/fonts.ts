@@ -1,4 +1,12 @@
-import { Caveat, Exo_2, Orbitron, Shadows_Into_Light } from "next/font/google";
+import { Caveat, Exo_2, Orbitron, Rubik_Dirt, Shadows_Into_Light } from "next/font/google";
+
+/** BRAVE GATES-style heavy rough brush — hero headline */
+export const rubikDirt = Rubik_Dirt({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-brush",
+  display: "swap",
+});
 
 export const orbitron = Orbitron({
   subsets: ["latin"],

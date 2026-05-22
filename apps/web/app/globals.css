@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "@fontsource/orbitron/700.css";
 
+html {
+  scroll-behavior: auto;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -130,20 +134,6 @@
   }
 }
 
-/* Lenis smooth scroll */
-html.lenis,
-html.lenis body {
-  height: auto;
-}
-
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
-
-.lenis.lenis-smooth [data-lenis-prevent] {
-  overscroll-behavior: contain;
-}
-
 .font-display {
   font-family: var(--font-orbitron), "Orbitron", ui-sans-serif, system-ui, sans-serif;
 }
@@ -158,6 +148,10 @@ html.lenis body {
 
 .font-annotate {
   font-family: var(--font-annotate), "Caveat", cursive;
+}
+
+.font-brush {
+  font-family: var(--font-brush), "Rubik Dirt", sans-serif;
 }
 
 /* === Auth card — flat ChaiPoll style (no glass / scanline) ================== */
@@ -359,3 +353,360 @@ html.lenis body {
 .chev-3 {
   animation: chev-pulse 1.6s ease-in-out 0.36s infinite;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CINEMATIC SYSTEM — transformation / activation FX
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* === Hex grid overlay (mid-layer depth) ===================================== */
+.fx-hexgrid {
+  background-image:
+    linear-gradient(60deg, rgba(74, 222, 128, 0.055) 1px, transparent 1px),
+    linear-gradient(-60deg, rgba(74, 222, 128, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(74, 222, 128, 0.055) 1px, transparent 1px);
+  background-size: 56px 96px;
+  background-position: 0 0, 0 0, 0 0;
+  mix-blend-mode: screen;
+}
+
+/* === Slow scan line drifting down =========================================== */
+@keyframes fx-scan-drift {
+  0% {
+    transform: translateY(-15%);
+    opacity: 0;
+  }
+  10%,
+  90% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(115%);
+    opacity: 0;
+  }
+}
+.fx-scan-line {
+  position: absolute;
+  inset-inline: 0;
+  height: 220px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(74, 222, 128, 0.07) 30%,
+    rgba(74, 222, 128, 0.18) 50%,
+    rgba(74, 222, 128, 0.07) 70%,
+    transparent 100%
+  );
+  filter: blur(2px);
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation: fx-scan-drift 7.5s linear infinite;
+}
+
+/* === UI line flicker (mid-layer detail) ===================================== */
+@keyframes fx-flicker {
+  0%,
+  92%,
+  100% {
+    opacity: var(--flicker-lo, 0.18);
+  }
+  93%,
+  95% {
+    opacity: 0;
+  }
+  94% {
+    opacity: var(--flicker-hi, 0.65);
+  }
+}
+.fx-flicker {
+  animation: fx-flicker 4.2s steps(1, end) infinite;
+}
+
+/* === Pin-point ember drift (replaces .omni-particle for sections) =========== */
+@keyframes fx-ember-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.9);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--dx, 12px), var(--dy, -220px), 0) scale(1.05);
+    opacity: 0;
+  }
+}
+.fx-ember {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 9999px;
+  background: var(--ember-color, rgba(74, 222, 128, 0.9));
+  box-shadow: 0 0 10px var(--ember-color, rgba(74, 222, 128, 0.7));
+  animation: fx-ember-drift linear infinite;
+  pointer-events: none;
+}
+
+/* === Breathing energy band (hero footer) ==================================== */
+@keyframes fx-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scaleX(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+.fx-breathe {
+  animation: fx-breathe 3.4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* === Ground impact dust (looped at character feet) ========================== */
+@keyframes fx-dust-rise {
+  0% {
+    transform: translate3d(var(--dust-x, 0), 0, 0) scale(0.4);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate3d(calc(var(--dust-x, 0px) + var(--dust-dx, 0px)), -90px, 0)
+      scale(1.4);
+    opacity: 0;
+  }
+}
+.fx-dust {
+  position: absolute;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.06) 45%,
+    transparent 75%
+  );
+  filter: blur(4px);
+  pointer-events: none;
+  animation: fx-dust-rise ease-out infinite;
+}
+
+/* === Energy flash (transition gate) ========================================= */
+@keyframes fx-flash {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* === Scan sweep (transition gate) =========================================== */
+@keyframes fx-scan-sweep-down {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+/* === Glitch slice tearing (transition gate) ================================= */
+@keyframes fx-glitch-x {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+.fx-glitch {
+  animation: fx-glitch-x 0.35s steps(3, end) infinite;
+}
+
+/* === Radial burst (transition gate) ========================================= */
+@keyframes fx-burst {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+  }
+  60% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(28);
+    opacity: 0;
+  }
+}
+
+/* === Ground crack reveal ==================================================== */
+@keyframes fx-crack-reveal {
+  0% {
+    stroke-dashoffset: 380;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0.8;
+  }
+}
+.fx-crack path {
+  stroke-dasharray: 380;
+  stroke-dashoffset: 380;
+}
+.fx-crack.is-live path {
+  animation: fx-crack-reveal 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* === Power-up indicator bar (hero footer) =================================== */
+.fx-power-bar {
+  position: relative;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(74, 222, 128, 0.18) 12%,
+    rgba(74, 222, 128, 0.55) 50%,
+    rgba(74, 222, 128, 0.18) 88%,
+    transparent 100%
+  );
+  filter: blur(0.4px);
+}
+.fx-power-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.8) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: fx-power-scan 3.6s ease-in-out infinite;
+}
+@keyframes fx-power-scan {
+  0%,
+  20% {
+    transform: translateX(-100%);
+  }
+  80%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* === Brush smear underline (decorative, raw look) =========================== */
+.fx-smear {
+  position: relative;
+  display: inline-block;
+}
+.fx-smear::after {
+  content: "";
+  position: absolute;
+  left: -6%;
+  right: -6%;
+  bottom: -0.12em;
+  height: 0.22em;
+  background: var(--smear-color, #4ade80);
+  clip-path: polygon(
+    0% 60%, 4% 30%, 9% 70%, 14% 25%, 22% 80%, 31% 40%, 42% 75%, 55% 35%,
+    68% 70%, 80% 30%, 92% 65%, 100% 45%, 100% 100%, 0% 100%
+  );
+  opacity: 0.85;
+  transform: rotate(-1deg);
+}
+
+/* === App dashboard surfaces (ChaiPoll-style) ================================ */
+.app-surface {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.01);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+  transition: border-color 0.25s ease;
+}
+.app-surface:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* === Cinematic Glitch & Tilts ============================================= */
+@keyframes glitch-text {
+  0% {
+    text-shadow: 2px -2px 0px #ff0050, -2px 2px 0px #00c8ff;
+  }
+  20% {
+    text-shadow: -2px 2px 0px #ff0050, 2px -2px 0px #00c8ff;
+  }
+  40% {
+    text-shadow: 3px 1px 0px #ff0050, -3px -1px 0px #00c8ff;
+  }
+  60% {
+    text-shadow: -1px -3px 0px #ff0050, 1px 3px 0px #00c8ff;
+  }
+  80% {
+    text-shadow: 2px 2px 0px #ff0050, -2px -2px 0px #00c8ff;
+  }
+  100% {
+    text-shadow: -2px -2px 0px #ff0050, 2px 2px 0px #00c8ff;
+  }
+}
+.glitch-active {
+  animation: glitch-text 0.18s steps(2) infinite;
+}
+
+@keyframes glitch-border {
+  0%, 100% { border-color: rgba(74, 222, 128, 0.4); box-shadow: 0 0 10px rgba(74, 222, 128, 0.2); }
+  25% { border-color: rgba(255, 0, 80, 0.6); box-shadow: 0 0 14px rgba(255, 0, 80, 0.3); }
+  50% { border-color: rgba(0, 200, 255, 0.6); box-shadow: 0 0 14px rgba(0, 200, 255, 0.3); }
+  75% { border-color: rgba(74, 222, 128, 0.8); box-shadow: 0 0 20px rgba(74, 222, 128, 0.4); }
+}
+.border-glitch {
+  animation: glitch-border 0.25s steps(2) infinite;
+}
+
+@keyframes energy-spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.95); opacity: 0.7; }
+  50% { transform: translate(-50%, -50%) rotate(180deg) scale(1.15); opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(360deg) scale(0.95); opacity: 0.7; }
+}
+.energy-aura-spin {
+  animation: energy-spin 14s ease-in-out infinite;
+}
+
+.rough-tilt-left {
+  transform: rotate(-1.5deg);
+}
+.rough-tilt-right {
+  transform: rotate(1.2deg);
+}
+.rough-skew-left {
+  transform: skewX(-3deg);
+}
+.rough-skew-right {
+  transform: skewX(2.5deg);
+}
+
+

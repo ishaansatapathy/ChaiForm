@@ -1,0 +1,178 @@
+import { z } from "zod";
+
+import FormService, { FormError } from "@repo/services/form";
+import {
+  createFormInputSchema,
+  formOutputSchema,
+  paginatedFormsOutputSchema,
+  paginatedSubmissionsOutputSchema,
+  paginationInputSchema,
+  publicFormOutputSchema,
+  submissionOutputSchema,
+  submitFormInputSchema,
+  updateFormInputSchema,
+} from "@repo/services/form/model";
+import { TRPCError } from "@trpc/server";
+
+import { zodUndefinedModel } from "../../schema";
+import { protectedProcedure, publicProcedure, router } from "../../trpc";
+import { generatePath } from "../../utils/path-generator";
+
+const formService = new FormService();
+const TAGS = ["Forms"];
+const getPath = generatePath("/forms");
+
+function mapFormError(error: unknown): never {
+  if (error instanceof FormError) {
+    const codeMap = {
+      NOT_FOUND: "NOT_FOUND",
+      FORBIDDEN: "FORBIDDEN",
+      BAD_REQUEST: "BAD_REQUEST",
+    } as const;
+    throw new TRPCError({ code: codeMap[error.code], message: error.message });
+  }
+  throw error;
+}
+
+export const formsRouter = router({
+  create: protectedProcedure
+    .meta({ openapi: { method: "POST", path: getPath("/"), tags: TAGS, protect: true } })
+    .input(createFormInputSchema)
+    .output(formOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await formService.createForm(ctx.user.id, input);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  update: protectedProcedure
+    .meta({ openapi: { method: "PATCH", path: getPath("/{formId}"), tags: TAGS, protect: true } })
+    .input(updateFormInputSchema)
+    .output(formOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await formService.updateForm(ctx.user.id, input);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  delete: protectedProcedure
+    .meta({ openapi: { method: "DELETE", path: getPath("/{formId}"), tags: TAGS, protect: true } })
+    .input(z.object({ formId: z.string().uuid() }))
+    .output(z.object({ success: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await formService.deleteForm(ctx.user.id, input.formId);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  getById: protectedProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/{formId}"), tags: TAGS, protect: true } })
+    .input(z.object({ formId: z.string().uuid() }))
+    .output(formOutputSchema)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await formService.getFormById(ctx.user.id, input.formId);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  list: protectedProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/"), tags: TAGS, protect: true } })
+    .input(paginationInputSchema.optional())
+    .output(paginatedFormsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await formService.listForms(ctx.user.id, input ?? { limit: 20 });
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  getPublic: publicProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/public/{formId}"), tags: TAGS } })
+    .input(z.object({ formId: z.string().uuid() }))
+    .output(publicFormOutputSchema)
+    .query(async ({ input }) => {
+      try {
+        return await formService.getPublicForm(input.formId);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  getPublicBySlug: publicProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/public/slug/{slug}"), tags: TAGS } })
+    .input(z.object({ slug: z.string().min(1) }))
+    .output(publicFormOutputSchema)
+    .query(async ({ input }) => {
+      try {
+        return await formService.getPublicFormBySlug(input.slug);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  recordView: publicProcedure
+    .meta({ openapi: { method: "POST", path: getPath("/views"), tags: TAGS } })
+    .input(z.object({ formId: z.string().uuid() }))
+    .output(z.object({ success: z.literal(true) }))
+    .mutation(async ({ input }) => {
+      try {
+        return await formService.recordView(input.formId);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  submit: publicProcedure
+    .meta({ openapi: { method: "POST", path: getPath("/submit"), tags: TAGS } })
+    .input(submitFormInputSchema)
+    .output(submissionOutputSchema)
+    .mutation(async ({ input }) => {
+      try {
+        return await formService.submitForm(input);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  listSubmissions: protectedProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/{formId}/submissions"), tags: TAGS, protect: true } })
+    .input(
+      z.object({
+        formId: z.string().uuid(),
+        limit: z.number().int().min(1).max(100).default(20).optional(),
+        cursor: z.string().uuid().optional(),
+      }),
+    )
+    .output(paginatedSubmissionsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await formService.listSubmissions(ctx.user.id, input.formId, {
+          limit: input.limit ?? 20,
+          cursor: input.cursor,
+        });
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  getSubmission: protectedProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/submissions/{submissionId}"), tags: TAGS, protect: true } })
+    .input(z.object({ submissionId: z.string().uuid() }))
+    .output(submissionOutputSchema)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await formService.getSubmission(ctx.user.id, input.submissionId);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+});

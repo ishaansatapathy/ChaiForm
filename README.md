@@ -1,37 +1,73 @@
 # ChaiForm
 
-Production-style form builder SaaS built on **Turborepo + tRPC + Zod + Drizzle ORM + Scalar**.
+Production-style **Typeform-like form builder SaaS** on Turborepo — creators build forms, publish public/unlisted links, collect validated responses, and view analytics in a dashboard.
 
-Create dynamic forms, publish shareable links, and collect responses without respondent login.
-
-## Monorepo structure
+## Project structure
 
 ```
 chaiform/
 ├── apps/
-│   ├── web/          # Next.js frontend
-│   └── api/          # Express + tRPC + OpenAPI + Scalar docs
+│   ├── api/                    # Express + tRPC + OpenAPI + Scalar
+│   │   └── src/
+│   │       ├── index.ts
+│   │       ├── server.ts
+│   │       ├── middleware/
+│   │       └── routes/
+│   └── web/                    # Next.js 16 frontend
+│       ├── app/                # App Router pages
+│       │   ├── (app)/          # Authenticated dashboard routes
+│       │   ├── f/              # Public form submission
+│       │   └── sign-in|sign-up
+│       ├── components/
+│       │   ├── app/            # Dashboard shell, form cards
+│       │   ├── auth/           # Sign-in/up UI
+│       │   ├── forms/          # Builder + field renderers
+│       │   ├── analytics/      # Charts & flow views
+│       │   ├── home/           # Landing hero
+│       │   └── ui/             # shadcn/ui primitives
+│       ├── lib/                # Fonts, hooks, utils
+│       └── trpc/               # Client setup
 ├── packages/
-│   ├── trpc/         # Shared tRPC routers & client
-│   ├── database/     # Drizzle ORM schema & migrations
-│   ├── services/     # Business logic (auth, etc.)
-│   └── logger/       # Winston logger
+│   ├── database/               # Drizzle schema, migrations, seed
+│   ├── services/               # Business logic (auth, form, analytics)
+│   ├── trpc/                   # Shared tRPC routers + client types
+│   ├── logger/                 # Winston logger
+│   ├── eslint-config/          # Shared ESLint presets
+│   └── typescript-config/      # Shared tsconfig presets
+├── scripts/
+│   ├── setup.sh                # Unix env symlink helper
+│   └── setup.ps1               # Windows env symlink helper
+├── .env.example
 ├── docker-compose.yml
-└── .env.example
+├── turbo.json
+└── pnpm-workspace.yaml
 ```
+
+**Root rule:** only config and workspace files live at repo root — no backup `.tsx` files, no reference clones.
+
+## Rubric coverage
+
+| Area | Implementation |
+|------|----------------|
+| Monorepo & structure | Turborepo, shared packages, clean root |
+| Auth | Google OAuth + email/password, JWT cookies |
+| Form builder | Create/edit/delete, 6 field types, visibility |
+| Zod validation | Field schemas + dynamic submission validator |
+| tRPC | Type-safe `forms`, `analytics`, `auth` routers |
+| Drizzle | `forms`, `form_fields`, `submissions`, `submission_responses` |
+| Public submission | `/f/[formId]`, `/f/s/[slug]`, rate-limited submit |
+| Analytics | Summary, trend chart, field breakdown |
+| Scalar | http://localhost:8000/docs |
 
 ## Stack
 
-- **Turborepo** — monorepo
-- **tRPC** — type-safe APIs
-- **Zod** — validation
-- **Drizzle ORM** — Postgres
-- **Scalar** — API docs at `/docs`
-- **Next.js** — frontend
+- **Turborepo**, **Next.js**, **Express**
+- **tRPC** + **Zod** + **Drizzle ORM** + **PostgreSQL**
+- **Scalar** API reference · **Recharts** analytics
 
 ## Getting started
 
-### 1. Install dependencies
+### 1. Install
 
 ```bash
 pnpm install
@@ -41,47 +77,59 @@ pnpm install
 
 ```bash
 cp .env.example .env
-bash setup.sh   # links .env into apps/packages (Git Bash / WSL)
 ```
 
-On Windows PowerShell, copy `.env` manually into `apps/web`, `apps/api`, and `packages/database` if needed.
+**Windows (PowerShell):**
 
-### 3. Start Postgres
+```powershell
+.\scripts\setup.ps1
+```
+
+**macOS / Linux:**
 
 ```bash
-docker compose up -d
+bash scripts/setup.sh
 ```
 
-### 4. Run migrations
+Required env vars: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, Google OAuth vars, `NEXT_PUBLIC_API_URL=/trpc`.
+
+### 3. Database
 
 ```bash
 pnpm db:migrate
+pnpm db:seed   # optional, after first sign-up
 ```
 
-### 5. Start dev servers
+### 4. Dev
 
 ```bash
 pnpm dev
 ```
 
-- Frontend: http://localhost:3000
-- API: http://localhost:8000
-- API docs: http://localhost:8000/docs
+| Service | URL |
+|---------|-----|
+| Web | http://localhost:3000 |
+| API | http://localhost:8000/health |
+| Scalar docs | http://localhost:8000/docs |
 
-## Assets
+## Scripts
 
-Intro videos live in `apps/web/public/videos/`:
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start web + API |
+| `pnpm build` | Production build |
+| `pnpm lint` | ESLint across workspace |
+| `pnpm check-types` | TypeScript check |
+| `pnpm format` | Prettier write |
+| `pnpm db:migrate` | Apply Drizzle migrations |
+| `pnpm db:seed` | Seed demo form |
 
-| File | Role | URL |
-|------|------|-----|
-| `loading.mp4` | Fast intro when the site opens (3–5s) | `/videos/loading.mp4` |
-| `landing.mp4` | Looping landing background + Three.js/GSAP overlay | `/videos/landing.mp4` |
+## Code quality
 
-Flow: **loading video** (sped up) → fade out → **landing video** (loop) with particle/omnitrix Three.js scene and GSAP text animations.
-
-## Demo credentials
-
-> To be added after auth + seed script are implemented.
+- **Prettier** — root `prettier.config.js`
+- **ESLint** — shared `@repo/eslint-config` per package
+- **EditorConfig** — consistent indentation
+- **TypeScript** — strict configs via `@repo/typescript-config`
 
 ## License
 
