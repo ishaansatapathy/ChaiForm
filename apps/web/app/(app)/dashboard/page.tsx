@@ -76,10 +76,21 @@ export default function DashboardPage() {
         {isLoading ? (
           <p className="text-white/40">Loading forms…</p>
         ) : forms.length === 0 ? (
-          <div className="text-center">
-            <p className="text-white/50">No forms yet.</p>
-            <Link href="/forms/new" className="font-annotate mt-3 inline-block text-xl text-lime-400">
-              Create your first form →
+          <div className="app-surface mx-auto max-w-xl rounded-3xl border border-white/10 p-10 text-center">
+            <p className="font-display text-2xl font-bold text-white">No forms yet</p>
+            <p className="mt-3 text-sm leading-relaxed text-white/50">
+              Create your first form, or load demo data after signing up:
+            </p>
+            <code className="mt-4 block rounded-xl bg-black/40 px-4 py-3 font-mono text-xs text-lime-400/90">
+              pnpm db:seed
+            </code>
+            <p className="mt-2 text-xs text-white/35">Set SEED_USER_EMAIL in .env to your account email.</p>
+            <Link
+              href="/forms/new"
+              className="btn-omni font-display mt-8 inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-black tracking-wide uppercase"
+            >
+              <Plus size={16} />
+              Create your first form
             </Link>
           </div>
         ) : (

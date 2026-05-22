@@ -6,9 +6,8 @@ import {
   formsTable,
   submissionResponsesTable,
   submissionsTable,
-  type FieldConfigJson,
-  type FormFieldJson,
 } from "@repo/database/schema";
+import type { FieldConfigJson } from "@repo/database/schema";
 import type { SubmissionAnswerJson } from "@repo/database/schema";
 
 import type {
@@ -19,7 +18,7 @@ import type {
   SubmitFormInput,
   UpdateFormInput,
 } from "./model";
-import { createUniqueSlug, slugifyTitle } from "./slug";
+import { createUniqueSlug } from "./slug";
 import { validateSubmissionAnswers } from "./validation";
 
 export class FormError extends Error {
@@ -98,37 +97,12 @@ class FormService {
     })) as FormField[];
   }
 
-  private async backfillLegacyFields(formId: string, legacyFields: FormFieldJson[]) {
-    if (legacyFields.length === 0) return;
-
-    const normalized = legacyFields.map((field, index) => ({
-      id: isUuid(field.id) ? field.id : randomUUID(),
-      formId,
-      label: field.label,
-      type: field.type,
-      required: field.required,
-      sortOrder: index,
-      config: defaultConfig(field.type) ?? {},
-    }));
-
-    await db.insert(formFieldsTable).values(normalized);
-  }
-
-  private async loadFields(formId: string, legacyFields: FormFieldJson[]) {
-    let rows = await db
+  private async loadFields(formId: string) {
+    const rows = await db
       .select()
       .from(formFieldsTable)
       .where(eq(formFieldsTable.formId, formId))
       .orderBy(asc(formFieldsTable.sortOrder));
-
-    if (rows.length === 0 && legacyFields.length > 0) {
-      await this.backfillLegacyFields(formId, legacyFields);
-      rows = await db
-        .select()
-        .from(formFieldsTable)
-        .where(eq(formFieldsTable.formId, formId))
-        .orderBy(asc(formFieldsTable.sortOrder));
-    }
 
     return rows.map(mapFieldRow);
   }
@@ -153,7 +127,7 @@ class FormService {
     row: typeof formsTable.$inferSelect,
     submissionCount = 0,
   ) {
-    const fields = await this.loadFields(row.id, row.fields as FormFieldJson[]);
+    const fields = await this.loadFields(row.id);
 
     return {
       id: row.id,
@@ -182,7 +156,6 @@ class FormService {
         description: input.description?.trim() || null,
         visibility: input.visibility,
         slug,
-        fields: [],
         viewCount: 0,
       })
       .returning();
@@ -307,7 +280,7 @@ class FormService {
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
     if (row.visibility === "draft") throw new FormError("NOT_FOUND", "Form not available");
 
-    const fields = await this.loadFields(row.id, row.fields as FormFieldJson[]);
+    const fields = await this.loadFields(row.id);
 
     return {
       id: row.id,
@@ -323,7 +296,7 @@ class FormService {
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
     if (row.visibility === "draft") throw new FormError("NOT_FOUND", "Form not available");
 
-    const fields = await this.loadFields(row.id, row.fields as FormFieldJson[]);
+    const fields = await this.loadFields(row.id);
 
     return {
       id: row.id,
