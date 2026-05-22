@@ -14,25 +14,65 @@ function GoogleIcon() {
 }
 
 export function SocialButtons() {
-  const { data: providers, isLoading } = trpc.auth.getSupportedAuthenticationProviders.useQuery();
+  const {
+    data: providers,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = trpc.auth.getSupportedAuthenticationProviders.useQuery(undefined, {
+    retry: 1,
+  });
 
   const google = providers?.find((p) => p.provider === "GOOGLE_OAUTH");
+  const canUseGoogle = Boolean(google?.authUrl);
 
   const handleGoogle = () => {
-    if (google?.authUrl) window.location.href = google.authUrl;
+    if (!google?.authUrl) return;
+    window.location.assign(google.authUrl);
   };
 
+  const hint =
+    isLoading
+      ? "Connecting to auth server…"
+      : isError
+        ? "API unreachable — start backend on port 8000"
+        : !canUseGoogle
+          ? "Google sign-in not configured on API"
+          : null;
+
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <button
         type="button"
         onClick={handleGoogle}
-        disabled={isLoading || !google?.authUrl}
+        disabled={isLoading || !canUseGoogle}
         className="group flex w-full items-center justify-center gap-3 rounded-2xl border border-white/6 bg-[#141414] py-3.5 text-[11px] font-bold text-white/70 transition-colors hover:bg-[#1a1a1a] hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
       >
         <GoogleIcon />
         <span>{google?.displayText ?? "Continue with Google"}</span>
       </button>
+
+      {hint && (
+        <p className="font-mono text-center text-[9px] tracking-[0.12em] text-amber-400/80 uppercase">
+          {hint}
+          {isError && (
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="ml-2 underline hover:text-amber-300"
+            >
+              retry
+            </button>
+          )}
+        </p>
+      )}
+
+      {isError && process.env.NODE_ENV === "development" && (
+        <p className="font-mono text-center text-[8px] text-white/25">
+          {error.message}
+        </p>
+      )}
     </div>
   );
 }

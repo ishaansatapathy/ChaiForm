@@ -7,6 +7,9 @@ import {
   text,
 } from "drizzle-orm/pg-core";
 
+export const authProviderEnum = ["local", "google"] as const;
+export type AuthProvider = (typeof authProviderEnum)[number];
+
 export const usersTable = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
 
@@ -14,6 +17,19 @@ export const usersTable = pgTable("users", {
 
   email: varchar("email", { length: 255 }).notNull().unique(),
   emailVerified: boolean("email_verified").default(false),
+
+  passwordHash: text("password_hash"),
+  authProvider: varchar("auth_provider", { length: 20 }).$type<AuthProvider>().default("local").notNull(),
+  providerId: varchar("provider_id", { length: 255 }),
+
+  verificationToken: varchar("verification_token", { length: 64 }),
+  resetPasswordToken: varchar("reset_password_token", { length: 64 }),
+  resetPasswordOtp: varchar("reset_password_otp", { length: 6 }),
+  resetPasswordExpire: timestamp("reset_password_expire"),
+
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  twoFactorOtp: varchar("two_factor_otp", { length: 6 }),
+  twoFactorOtpExpire: timestamp("two_factor_otp_expire"),
 
   profileImageUrl: text("profile_image_url"),
 

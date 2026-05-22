@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { AuthCard } from "~/components/auth/auth-card";
+import { AuthErrorToast } from "~/components/auth/auth-error-toast";
 import { HudFrame } from "~/components/auth/hud-frame";
 
 type AuthShellProps = {
@@ -40,6 +41,7 @@ export function AuthShell({ mode }: AuthShellProps) {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-black font-sans selection:bg-lime-400 selection:text-black">
+      <AuthErrorToast path={mode === "sign-in" ? "/sign-in" : "/sign-up"} />
       {/* Background image */}
       <Image
         src="/images/ben10/bg-signup.png"
