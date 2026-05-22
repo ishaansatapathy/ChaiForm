@@ -185,6 +185,22 @@ class AnalyticsService {
       recentValues: values.slice(0, 8),
     };
   }
+
+  async getAllFieldStats(userId: string, formId: string) {
+    await this.assertFormOwnership(userId, formId);
+
+    const fields = await db
+      .select()
+      .from(formFieldsTable)
+      .where(eq(formFieldsTable.formId, formId))
+      .orderBy(formFieldsTable.sortOrder);
+
+    const stats = await Promise.all(
+      fields.map((field) => this.getFieldBreakdown(userId, formId, field.id)),
+    );
+
+    return { fields: stats };
+  }
 }
 
 export default AnalyticsService;

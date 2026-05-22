@@ -97,8 +97,10 @@ Required env vars: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, Google OA
 
 ```bash
 pnpm db:migrate
-pnpm db:seed   # optional, after first sign-up
+pnpm db:seed   # optional — after sign-up; seeds demo form + 6 submissions + views
 ```
+
+Set `SEED_USER_EMAIL` in `.env` to the email you signed up with (defaults to `demo@chaiform.dev`).
 
 ### 4. Dev
 
@@ -122,7 +124,7 @@ pnpm dev
 | `pnpm check-types` | TypeScript check |
 | `pnpm format` | Prettier write |
 | `pnpm db:migrate` | Apply Drizzle migrations |
-| `pnpm db:seed` | Seed demo form |
+| `pnpm db:seed` | Seed demo form with sample submissions and analytics data |
 
 ## Code quality
 

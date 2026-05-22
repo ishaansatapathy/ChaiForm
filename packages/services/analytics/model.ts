@@ -55,3 +55,11 @@ export const fieldBreakdownOutputSchema = z.object({
   ),
   recentValues: z.array(z.string()),
 });
+
+export const allFieldStatsInputSchema = z.object({
+  formId: z.string().uuid(),
+});
+
+export const allFieldStatsOutputSchema = z.object({
+  fields: z.array(fieldBreakdownOutputSchema),
+});

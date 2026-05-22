@@ -2,6 +2,8 @@ import FormService, { FormError } from "@repo/services/form";
 import { formFieldSchema } from "@repo/services/form/model";
 import AnalyticsService from "@repo/services/analytics";
 import {
+  allFieldStatsInputSchema,
+  allFieldStatsOutputSchema,
   analyticsSummaryInputSchema,
   analyticsSummaryOutputSchema,
   fieldBreakdownInputSchema,
@@ -64,6 +66,18 @@ export const analyticsRouter = router({
     .query(async ({ ctx, input }) => {
       try {
         return await analyticsService.getFieldBreakdown(ctx.user.id, input.formId, input.fieldId);
+      } catch (error) {
+        mapError(error);
+      }
+    }),
+
+  allFieldStats: protectedProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/all-field-stats"), tags: TAGS, protect: true } })
+    .input(allFieldStatsInputSchema)
+    .output(allFieldStatsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await analyticsService.getAllFieldStats(ctx.user.id, input.formId);
       } catch (error) {
         mapError(error);
       }
