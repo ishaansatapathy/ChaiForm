@@ -42,6 +42,10 @@ export const verifyEmailInputSchema = z.object({
   token: z.string().min(1),
 });
 
+export const resendVerificationEmailInputSchema = z.object({
+  email: z.string().trim().email("Invalid email"),
+});
+
 export function assertSignUpPasswordsMatch(input: z.infer<typeof signUpInputSchema>) {
   if (input.password !== input.confirmPassword) {
     throw new Error("Passwords do not match");
@@ -62,3 +66,4 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordInputSchema>;
 export type Verify2FAInput = z.infer<typeof verify2FAInputSchema>;
 export type Toggle2FAInput = z.infer<typeof toggle2FAInputSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailInputSchema>;
+export type ResendVerificationEmailInput = z.infer<typeof resendVerificationEmailInputSchema>;

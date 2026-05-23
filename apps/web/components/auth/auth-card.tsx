@@ -69,6 +69,11 @@ export function AuthCard({ mode }: AuthCardProps) {
           return;
         }
 
+        if (!result.user.emailVerified) {
+          router.push(`/check-email?email=${encodeURIComponent(result.user.email)}`);
+          return;
+        }
+
         toast.success("Signed in successfully");
         router.push("/dashboard");
         return;
@@ -81,10 +86,14 @@ export function AuthCard({ mode }: AuthCardProps) {
         confirmPassword: formData.confirmPassword,
       });
 
-      toast.success("Account created — check your email to verify");
-      router.push("/dashboard");
+      toast.success("Account created — verify your email to continue");
+      router.push(`/check-email?email=${encodeURIComponent(formData.email)}`);
     } catch (err) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      if (message.toLowerCase().includes("verify your email") && formData.email) {
+        router.push(`/check-email?email=${encodeURIComponent(formData.email)}`);
+      }
     } finally {
       setLoading(false);
     }

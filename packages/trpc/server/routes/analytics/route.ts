@@ -14,7 +14,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { protectedProcedure, router } from "../../trpc";
+import { router, verifiedProcedure } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
 
 const analyticsService = new AnalyticsService();
@@ -35,7 +35,7 @@ function mapError(error: unknown): never {
 }
 
 export const analyticsRouter = router({
-  summary: protectedProcedure
+  summary: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/summary"), tags: TAGS, protect: true } })
     .input(analyticsSummaryInputSchema)
     .output(analyticsSummaryOutputSchema)
@@ -47,7 +47,7 @@ export const analyticsRouter = router({
       }
     }),
 
-  submissionsOverTime: protectedProcedure
+  submissionsOverTime: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/submissions-over-time"), tags: TAGS, protect: true } })
     .input(submissionsOverTimeInputSchema)
     .output(submissionsOverTimeOutputSchema)
@@ -59,7 +59,7 @@ export const analyticsRouter = router({
       }
     }),
 
-  fieldBreakdown: protectedProcedure
+  fieldBreakdown: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/field-breakdown"), tags: TAGS, protect: true } })
     .input(fieldBreakdownInputSchema)
     .output(fieldBreakdownOutputSchema)
@@ -71,7 +71,7 @@ export const analyticsRouter = router({
       }
     }),
 
-  allFieldStats: protectedProcedure
+  allFieldStats: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/all-field-stats"), tags: TAGS, protect: true } })
     .input(allFieldStatsInputSchema)
     .output(allFieldStatsOutputSchema)
@@ -83,7 +83,7 @@ export const analyticsRouter = router({
       }
     }),
 
-  listFormFields: protectedProcedure
+  listFormFields: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/form-fields"), tags: TAGS, protect: true } })
     .input(z.object({ formId: z.string().uuid() }))
     .output(z.object({ fields: z.array(formFieldSchema) }))

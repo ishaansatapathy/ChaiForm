@@ -12,6 +12,7 @@ import { AuthError, toAuthError } from "./errors";
 import type {
   ForgotPasswordInput,
   ResetPasswordInput,
+  ResendVerificationEmailInput,
   SignInInput,
   SignUpInput,
   Verify2FAInput,
@@ -25,9 +26,11 @@ import {
   verifyRefreshToken,
 } from "./jwt";
 import { hashPassword, verifyPassword } from "./password";
-import type { AuthUser, SignInOutput } from "./model";
+import type { AuthUser, SignInOutput, SignUpOutput } from "./model";
 
 const GENERIC_RECOVERY_MESSAGE = "If an account exists for that email, we sent reset instructions.";
+const GENERIC_VERIFY_MESSAGE =
+  "If an account exists and is not yet verified, we sent a new verification link.";
 
 function sanitizeEmail(email: string) {
   return email.toLowerCase().trim();
@@ -46,6 +49,20 @@ function toPublicUser(user: SelectUser): AuthUser {
 
 function generateOtp() {
   return crypto.randomInt(100_000, 1_000_000).toString();
+}
+
+function assertEmailVerified(user: SelectUser) {
+  if (!user.emailVerified) {
+    throw new AuthError(
+      "FORBIDDEN",
+      "Please verify your email before signing in. Check your inbox for the verification link.",
+    );
+  }
+}
+
+function issueVerifiedSession(res: Response, user: SelectUser) {
+  assertEmailVerified(user);
+  issueAuthCookies(res, user.id);
 }
 
 class AuthService {
@@ -68,11 +85,19 @@ class AuthService {
     const accessToken = req.cookies?.jwt as string | undefined;
     const refreshToken = req.cookies?.jwt_refresh as string | undefined;
 
+    const rejectUnverified = (user: SelectUser | null) => {
+      if (user && !user.emailVerified) {
+        if (res) clearAuthCookies(res);
+        return null;
+      }
+      return user ? toPublicUser(user) : null;
+    };
+
     if (accessToken) {
       try {
         const decoded = verifyAccessToken(accessToken);
         const user = await this.findUserById(decoded.userId);
-        if (user) return toPublicUser(user);
+        return rejectUnverified(user);
       } catch {
         // access token expired — try refresh below
       }
@@ -82,11 +107,15 @@ class AuthService {
       try {
         const decoded = verifyRefreshToken(refreshToken);
         const user = await this.findUserById(decoded.userId);
-        if (user) {
-          issueAuthCookies(res, user.id);
-          return toPublicUser(user);
+        if (!user) return null;
+        if (!user.emailVerified) {
+          clearAuthCookies(res);
+          return null;
         }
+        issueAuthCookies(res, user.id);
+        return toPublicUser(user);
       } catch {
+        if (res) clearAuthCookies(res);
         return null;
       }
     }
@@ -94,7 +123,7 @@ class AuthService {
     return null;
   }
 
-  public async signUp(input: SignUpInput, res: Response): Promise<AuthUser> {
+  public async signUp(input: SignUpInput, _res: Response): Promise<SignUpOutput> {
     const sanitizedEmail = sanitizeEmail(input.email);
     const existing = await this.findUserByEmail(sanitizedEmail);
     if (existing) {
@@ -128,8 +157,10 @@ class AuthService {
       text: `Verify your account: ${verifyUrl}`,
     });
 
-    issueAuthCookies(res, user.id);
-    return toPublicUser(user);
+    return {
+      message: "Account created. Check your email to verify before signing in.",
+      email: user.email,
+    };
   }
 
   public async signIn(input: SignInInput, res: Response): Promise<SignInOutput> {
@@ -139,6 +170,8 @@ class AuthService {
     if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
       throw new AuthError("UNAUTHORIZED", "Invalid email or password");
     }
+
+    assertEmailVerified(user);
 
     if (user.twoFactorEnabled) {
       const otp = generateOtp();
@@ -163,7 +196,7 @@ class AuthService {
       };
     }
 
-    issueAuthCookies(res, user.id);
+    issueVerifiedSession(res, user);
     return {
       twoFactorRequired: false,
       user: toPublicUser(user),
@@ -190,12 +223,14 @@ class AuthService {
       throw new AuthError("UNAUTHORIZED", "Invalid or expired 2FA code");
     }
 
+    assertEmailVerified(user);
+
     await db
       .update(usersTable)
       .set({ twoFactorOtp: null, twoFactorOtpExpire: null })
       .where(eq(usersTable.id, user.id));
 
-    issueAuthCookies(res, user.id);
+    issueVerifiedSession(res, user);
     return toPublicUser(user);
   }
 
@@ -217,9 +252,11 @@ class AuthService {
         throw new AuthError("UNAUTHORIZED", "User not found");
       }
 
+      assertEmailVerified(user);
       issueAuthCookies(res, user.id);
       return toPublicUser(user);
     } catch (error) {
+      clearAuthCookies(res);
       logger.error("Refresh token error", { message: error instanceof Error ? error.message : error });
       throw new AuthError("UNAUTHORIZED", "Invalid or expired refresh token");
     }
@@ -324,7 +361,7 @@ class AuthService {
     return { message: "Password reset successfully." };
   }
 
-  public async verifyEmail(input: VerifyEmailInput): Promise<{ message: string }> {
+  public async verifyEmail(input: VerifyEmailInput, res: Response): Promise<AuthUser> {
     const [user] = await db
       .select()
       .from(usersTable)
@@ -335,12 +372,43 @@ class AuthService {
       throw new AuthError("BAD_REQUEST", "Invalid or expired verification link.");
     }
 
-    await db
+    const [updated] = await db
       .update(usersTable)
       .set({ emailVerified: true, verificationToken: null })
+      .where(eq(usersTable.id, user.id))
+      .returning();
+
+    if (!updated) {
+      throw new AuthError("INTERNAL", "Unable to verify email. Please try again.");
+    }
+
+    issueAuthCookies(res, updated.id);
+    return toPublicUser(updated);
+  }
+
+  public async resendVerificationEmail(
+    input: ResendVerificationEmailInput,
+  ): Promise<{ message: string }> {
+    const user = await this.findUserByEmail(input.email);
+    if (!user || user.emailVerified) {
+      return { message: GENERIC_VERIFY_MESSAGE };
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    await db
+      .update(usersTable)
+      .set({ verificationToken })
       .where(eq(usersTable.id, user.id));
 
-    return { message: "Email verified successfully!" };
+    const verifyUrl = `${env.CLIENT_URL}/verify-email/${verificationToken}`;
+    await sendEmail({
+      email: user.email,
+      subject: "Verify Your ChaiForm Account",
+      html: `<p>Verify your email: <a href="${verifyUrl}">${verifyUrl}</a></p>`,
+      text: `Verify your account: ${verifyUrl}`,
+    });
+
+    return { message: GENERIC_VERIFY_MESSAGE };
   }
 
   public async resendVerification(userId: string): Promise<{ message: string }> {
@@ -442,6 +510,11 @@ class AuthService {
 
       if (!user) {
         throw new AuthError("INTERNAL", "Unable to sign in with Google");
+      }
+
+      if (!user.emailVerified) {
+        clearAuthCookies(res);
+        return `${env.CLIENT_URL}/check-email?email=${encodeURIComponent(user.email)}`;
       }
 
       issueAuthCookies(res, user.id);

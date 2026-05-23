@@ -25,6 +25,16 @@ export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
   });
 });
 
+export const verifiedProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.user.emailVerified) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Email verification required. Check your inbox for the verification link.",
+    });
+  }
+  return next({ ctx });
+});
+
 export function mapAuthError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
 
