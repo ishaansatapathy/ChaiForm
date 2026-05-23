@@ -2,10 +2,12 @@ import {
   authUserSchema,
   messageOutputSchema,
   signInOutputSchema,
+  signUpOutputSchema,
 } from "@repo/services/auth/model";
 import {
   forgotPasswordInputSchema,
   resetPasswordInputSchema,
+  resendVerificationEmailInputSchema,
   signInInputSchema,
   signUpInputSchema,
   toggle2FAInputSchema,
@@ -19,7 +21,7 @@ import { TRPCError } from "@trpc/server";
 import { z, zodUndefinedModel } from "../../schema";
 import { userService, authService } from "../../services";
 import { getAuthenticationMethodOutputSchema } from "@repo/services/user/model";
-import { mapAuthError, protectedProcedure, publicProcedure, router } from "../../trpc";
+import { mapAuthError, protectedProcedure, publicProcedure, router, verifiedProcedure } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
 
 const TAGS = ["Authentication"];
@@ -35,7 +37,7 @@ export const authRouter = router({
   signUp: publicProcedure
     .meta({ openapi: { method: "POST", path: getPath("/sign-up"), tags: TAGS } })
     .input(signUpInputSchema)
-    .output(authUserSchema)
+    .output(signUpOutputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
         if (input.password !== input.confirmPassword) {
@@ -137,16 +139,28 @@ export const authRouter = router({
   verifyEmail: publicProcedure
     .meta({ openapi: { method: "POST", path: getPath("/verify-email"), tags: TAGS } })
     .input(verifyEmailInputSchema)
-    .output(messageOutputSchema)
-    .mutation(async ({ input }) => {
+    .output(authUserSchema)
+    .mutation(async ({ input, ctx }) => {
       try {
-        return await authService.verifyEmail(input);
+        return await authService.verifyEmail(input, ctx.res);
       } catch (error) {
         mapAuthError(error);
       }
     }),
 
-  resendVerification: protectedProcedure
+  resendVerificationEmail: publicProcedure
+    .meta({ openapi: { method: "POST", path: getPath("/resend-verification-email"), tags: TAGS } })
+    .input(resendVerificationEmailInputSchema)
+    .output(messageOutputSchema)
+    .mutation(async ({ input }) => {
+      try {
+        return await authService.resendVerificationEmail(input);
+      } catch (error) {
+        mapAuthError(error);
+      }
+    }),
+
+  resendVerification: verifiedProcedure
     .meta({ openapi: { method: "POST", path: getPath("/resend-verification"), tags: TAGS, protect: true } })
     .input(zodUndefinedModel)
     .output(messageOutputSchema)
@@ -158,7 +172,7 @@ export const authRouter = router({
       }
     }),
 
-  toggle2FA: protectedProcedure
+  toggle2FA: verifiedProcedure
     .meta({ openapi: { method: "POST", path: getPath("/toggle-2fa"), tags: TAGS, protect: true } })
     .input(toggle2FAInputSchema)
     .output(

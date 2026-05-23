@@ -15,7 +15,7 @@ import {
 import { TRPCError } from "@trpc/server";
 
 import { zodUndefinedModel } from "../../schema";
-import { protectedProcedure, publicProcedure, router } from "../../trpc";
+import { publicProcedure, router, verifiedProcedure } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
 
 const formService = new FormService();
@@ -35,7 +35,7 @@ function mapFormError(error: unknown): never {
 }
 
 export const formsRouter = router({
-  create: protectedProcedure
+  create: verifiedProcedure
     .meta({ openapi: { method: "POST", path: getPath("/"), tags: TAGS, protect: true } })
     .input(createFormInputSchema)
     .output(formOutputSchema)
@@ -47,7 +47,7 @@ export const formsRouter = router({
       }
     }),
 
-  update: protectedProcedure
+  update: verifiedProcedure
     .meta({ openapi: { method: "PATCH", path: getPath("/{formId}"), tags: TAGS, protect: true } })
     .input(updateFormInputSchema)
     .output(formOutputSchema)
@@ -59,7 +59,7 @@ export const formsRouter = router({
       }
     }),
 
-  delete: protectedProcedure
+  delete: verifiedProcedure
     .meta({ openapi: { method: "DELETE", path: getPath("/{formId}"), tags: TAGS, protect: true } })
     .input(z.object({ formId: z.string().uuid() }))
     .output(z.object({ success: z.literal(true) }))
@@ -71,7 +71,7 @@ export const formsRouter = router({
       }
     }),
 
-  getById: protectedProcedure
+  getById: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/{formId}"), tags: TAGS, protect: true } })
     .input(z.object({ formId: z.string().uuid() }))
     .output(formOutputSchema)
@@ -83,7 +83,7 @@ export const formsRouter = router({
       }
     }),
 
-  list: protectedProcedure
+  list: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/"), tags: TAGS, protect: true } })
     .input(paginationInputSchema.optional())
     .output(paginatedFormsOutputSchema)
@@ -143,7 +143,7 @@ export const formsRouter = router({
       }
     }),
 
-  listSubmissions: protectedProcedure
+  listSubmissions: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/{formId}/submissions"), tags: TAGS, protect: true } })
     .input(
       z.object({
@@ -164,7 +164,7 @@ export const formsRouter = router({
       }
     }),
 
-  getSubmission: protectedProcedure
+  getSubmission: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/submissions/{submissionId}"), tags: TAGS, protect: true } })
     .input(z.object({ submissionId: z.string().uuid() }))
     .output(submissionOutputSchema)

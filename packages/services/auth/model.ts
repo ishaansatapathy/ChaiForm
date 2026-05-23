@@ -25,6 +25,12 @@ export const messageOutputSchema = z.object({
   message: z.string(),
 });
 
+export const signUpOutputSchema = z.object({
+  message: z.string(),
+  email: z.string().email(),
+});
+
 export type AuthUser = z.infer<typeof authUserSchema>;
 export type SignInOutput = z.infer<typeof signInOutputSchema>;
 export type MessageOutput = z.infer<typeof messageOutputSchema>;
+export type SignUpOutput = z.infer<typeof signUpOutputSchema>;
