@@ -2,5 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile --prod=false",
   "buildCommand": "cd ../.. && pnpm --filter web run build",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/keep-warm",
+      "schedule": "*/14 * * * *"
+    }
+  ]
 }

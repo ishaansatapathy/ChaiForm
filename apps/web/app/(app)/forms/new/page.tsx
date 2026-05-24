@@ -11,6 +11,7 @@ import { FormThemePicker } from "~/components/forms/form-theme-picker";
 import { Highlight } from "~/components/app/highlight";
 import { FORM_TEMPLATES } from "~/lib/form-templates";
 import type { FormThemeId } from "~/lib/form-themes";
+import { createFormAction } from "~/app/(app)/forms/actions";
 import { getTrpcErrorMessage, runWithRetry, useWarmApi } from "~/lib/warm-api";
 import { trpc } from "~/trpc/client";
 import type { RouterInputs } from "@repo/trpc/client";
@@ -25,17 +26,10 @@ const createInitialDraftFields = (): DraftField[] => [
 export default function CreateFormPage() {
   const router = useRouter();
   const utils = trpc.useUtils();
-  useWarmApi();
+  const createForm = trpc.forms.create.useMutation();
   const [saving, setSaving] = useState(false);
 
-  const createForm = trpc.forms.create.useMutation({
-    onSuccess: async () => {
-      await utils.forms.list.invalidate();
-      await utils.analytics.summary.invalidate();
-      toast.success("Form saved");
-      router.push("/dashboard");
-    },
-  });
+  useWarmApi();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -67,6 +61,8 @@ export default function CreateFormPage() {
     }
 
     setSaving(true);
+    toast.message("Saving form… may take up to a minute if the server was idle.");
+
     const payload = {
       title: title.trim(),
       description: description.trim() || undefined,
@@ -76,11 +72,24 @@ export default function CreateFormPage() {
     };
 
     try {
-      await runWithRetry(() => createForm.mutateAsync(payload), {
-        onRetry: (attempt) => {
-          toast.message(`Server waking up… retry ${attempt}/3`);
+      await runWithRetry(
+        async () => {
+          try {
+            return await createFormAction(payload);
+          } catch {
+            return await createForm.mutateAsync(payload);
+          }
         },
-      });
+        {
+          onRetry: (attempt) => {
+            toast.message(`Server waking up… retry ${attempt}/5`);
+          },
+        },
+      );
+      await utils.forms.list.invalidate();
+      await utils.analytics.summary.invalidate();
+      toast.success("Form saved");
+      router.push("/dashboard");
     } catch (error) {
       toast.error(getTrpcErrorMessage(error));
     } finally {
@@ -146,10 +155,10 @@ export default function CreateFormPage() {
             <button
               type="button"
               onClick={handlePublish}
-              disabled={saving || createForm.isPending}
+              disabled={saving}
               className="btn-omni font-display w-full rounded-2xl py-3.5 text-sm font-black tracking-[0.18em] uppercase disabled:opacity-50"
             >
-              {saving || createForm.isPending ? "Saving…" : "Save Form"}
+              {saving ? "Saving…" : "Save Form"}
             </button>
 
             <div className="mt-6 border-t border-white/8 pt-6">

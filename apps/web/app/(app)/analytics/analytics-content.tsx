@@ -119,10 +119,21 @@ export default function AnalyticsContent({
   );
 
   const activeFieldId = selectedFieldId ?? formFields?.fields[0]?.id;
+  const isInitialField =
+    isInitialForm && activeFieldId === initialBundle?.formFields?.fields[0]?.id;
 
-  const { data: fieldBreakdown } = trpc.analytics.fieldBreakdown.useQuery(
+  const {
+    data: fieldBreakdown,
+    isLoading: fieldBreakdownLoading,
+    isError: fieldBreakdownError,
+    refetch: refetchFieldBreakdown,
+  } = trpc.analytics.fieldBreakdown.useQuery(
     { formId: activeFormId!, fieldId: activeFieldId! },
-    { enabled: Boolean(user && activeFormId && activeFieldId), ...QUERY_OPTS },
+    {
+      enabled: Boolean(user && activeFormId && activeFieldId),
+      initialData: isInitialField ? (initialBundle?.fieldBreakdown ?? undefined) : undefined,
+      ...QUERY_OPTS,
+    },
   );
 
   const {
@@ -165,7 +176,7 @@ export default function AnalyticsContent({
   }, [submissionsPage, submissionCursor]);
 
   const submissions = loadedSubmissions;
-  const activeSubmissionId = selectedSubmissionId ?? submissions[0]?.id;
+  const activeSubmissionId = selectedSubmissionId;
   const activeForm = forms.find((form) => form.id === activeFormId);
 
   const statsLoading = formsLoading || (summaryLoading && !summary);
@@ -326,7 +337,11 @@ export default function AnalyticsContent({
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => setSelectedSubmissionId(item.id)}
+                      onClick={() =>
+                        setSelectedSubmissionId(
+                          item.id === activeSubmissionId ? undefined : item.id,
+                        )
+                      }
                       className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
                         item.id === activeSubmissionId
                           ? "bg-lime-400/10 text-lime-400"
@@ -399,9 +414,21 @@ export default function AnalyticsContent({
                 </select>
               </div>
 
-              {!chartsMounted || !fieldBreakdown ? (
+              <div className="min-h-56">
+              {!chartsMounted || (fieldBreakdownLoading && !fieldBreakdown) ? (
                 <ChartSkeleton />
-              ) : (
+              ) : fieldBreakdownError && !fieldBreakdown ? (
+                <div className="text-center">
+                  <p className="text-sm text-white/50">Could not load field breakdown.</p>
+                  <button
+                    type="button"
+                    onClick={() => refetchFieldBreakdown()}
+                    className="mt-3 text-xs font-bold tracking-wider text-lime-400 uppercase"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : fieldBreakdown ? (
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-4 text-sm text-white/50">
                     <span>{fieldBreakdown.totalResponses} responses</span>
@@ -410,10 +437,10 @@ export default function AnalyticsContent({
                     )}
                   </div>
 
-                  {fieldBreakdown.optionCounts.length > 0 && (
+                  {fieldBreakdown.optionCounts.length > 0 ? (
                     <div className="h-56">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={fieldBreakdown.optionCounts}>
+                        <BarChart data={fieldBreakdown.optionCounts.slice(0, 12)}>
                           <CartesianGrid stroke="rgba(255,255,255,0.06)" />
                           <XAxis dataKey="option" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} />
                           <YAxis allowDecimals={false} tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} />
@@ -424,9 +451,28 @@ export default function AnalyticsContent({
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
+                  ) : fieldBreakdown.recentValues.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-white/40">Recent answers</p>
+                      {fieldBreakdown.recentValues.map((value, index) => (
+                        <div
+                          key={`${value}-${index}`}
+                          className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75"
+                        >
+                          {value}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-white/40">No answers for this field yet.</p>
                   )}
                 </div>
+              ) : (
+                <p className="flex min-h-56 items-center justify-center text-sm text-white/40">
+                  Select a field to view breakdown.
+                </p>
               )}
+              </div>
             </div>
           )}
 
@@ -494,7 +540,7 @@ function StatCard({
 }
 
 function ChartSkeleton() {
-  return <div className="h-full animate-pulse rounded-2xl bg-white/4" />;
+  return <div className="h-56 animate-pulse rounded-2xl bg-white/4" />;
 }
 
 function Header() {

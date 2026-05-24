@@ -5,8 +5,8 @@ const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 /** Render cold starts exceed Vercel Hobby limits — keep per-attempt timeout short and retry. */
 export const maxDuration = 60;
 
-const ATTEMPTS = 5;
-const ATTEMPT_TIMEOUT_MS = 12_000;
+const ATTEMPTS = 2;
+const ATTEMPT_TIMEOUT_MS = 9_000;
 
 /** Proxy tRPC so auth Set-Cookie headers reach the browser (rewrites drop them). */
 async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {

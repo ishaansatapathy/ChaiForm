@@ -57,8 +57,9 @@ export function AnalyticsDetailPanel({
     [submissions, activeFilters],
   );
 
-  const activeSubmission =
-    filteredSubmissions.find((item) => item.id === selectedSubmissionId) ?? filteredSubmissions[0];
+  const activeSubmission = selectedSubmissionId
+    ? filteredSubmissions.find((item) => item.id === selectedSubmissionId)
+    : undefined;
 
   const toggleFilter = useCallback((fieldId: string, value: string) => {
     setActiveFilters((prev) => {

@@ -5,7 +5,14 @@ import { useEffect } from "react";
 /** Ping tRPC health via same-origin proxy to wake Render before mutations. */
 export function useWarmApi() {
   useEffect(() => {
-    void fetch("/trpc/health.getHealth?input=%7B%7D", { credentials: "include" }).catch(() => undefined);
+    const ping = () => {
+      void fetch("/trpc/health.getHealth?input=%7B%7D", { credentials: "include" }).catch(
+        () => undefined,
+      );
+    };
+    ping();
+    const interval = setInterval(ping, 25_000);
+    return () => clearInterval(interval);
   }, []);
 }
 
@@ -17,7 +24,10 @@ export function isRetryableTrpcError(error: unknown): boolean {
     message.includes("network") ||
     message.includes("timeout") ||
     message.includes("api unavailable") ||
-    message.includes("load failed")
+    message.includes("load failed") ||
+    message.includes("waking up") ||
+    message.includes("could not save") ||
+    message.includes("could not complete")
   );
 }
 
@@ -41,14 +51,14 @@ export async function runWithRetry<T>(
   task: () => Promise<T>,
   opts?: { attempts?: number; delaysMs?: number[]; onRetry?: (attempt: number) => void },
 ): Promise<T> {
-  const attempts = opts?.attempts ?? 3;
-  const delaysMs = opts?.delaysMs ?? [0, 12_000, 8_000];
+  const attempts = opts?.attempts ?? 5;
+  const delaysMs = opts?.delaysMs ?? [0, 10_000, 15_000, 15_000, 20_000];
   let lastError: unknown;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (attempt > 0) {
       opts?.onRetry?.(attempt + 1);
-      await sleep(delaysMs[attempt] ?? 8_000);
+      await sleep(delaysMs[attempt] ?? 15_000);
     }
     try {
       return await task();

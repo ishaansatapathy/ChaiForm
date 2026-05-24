@@ -7,6 +7,8 @@ import {
   fetchSessionUser,
 } from "~/lib/fetch-session";
 
+export const maxDuration = 60;
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const initialUser = await fetchSessionUser();
   const [initialForms, initialAnalytics] = initialUser
