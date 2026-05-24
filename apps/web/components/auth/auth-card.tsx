@@ -14,9 +14,10 @@ import { trpc } from "~/trpc/client";
 
 type AuthCardProps = {
   mode: "sign-in" | "sign-up";
+  googleEnabled?: boolean;
 };
 
-export function AuthCard({ mode }: AuthCardProps) {
+export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") ?? "/dashboard";
@@ -166,7 +167,7 @@ export function AuthCard({ mode }: AuthCardProps) {
         {!twoFactorStep && <AuthModeToggle mode={mode} />}
       </div>
 
-      {!twoFactorStep && <SocialButtons />}
+      {!twoFactorStep && <SocialButtons googleEnabled={googleEnabled} nextPath={nextPath} />}
 
       {!twoFactorStep && (
         <div className="relative my-7 flex items-center gap-3">

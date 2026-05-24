@@ -18,7 +18,7 @@ const VISIBILITY = {
 
 export function FormCard({ form }: { form: FormListItem }) {
   const vis = VISIBILITY[form.visibility];
-  const sharePath = form.slug ? `/f/s/${form.slug}` : `/f/${form.id}`;
+  const sharePath = `/f/${form.id}`;
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}${sharePath}` : sharePath;
   const [shareOpen, setShareOpen] = useState(false);
 

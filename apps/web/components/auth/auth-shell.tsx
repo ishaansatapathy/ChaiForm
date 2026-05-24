@@ -13,9 +13,10 @@ import { HudFrame } from "~/components/auth/hud-frame";
 
 type AuthShellProps = {
   mode: "sign-in" | "sign-up";
+  googleEnabled?: boolean;
 };
 
-export function AuthShell({ mode }: AuthShellProps) {
+export function AuthShell({ mode, googleEnabled = false }: AuthShellProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const badgeRef = useRef<HTMLDivElement>(null);
   const taglineRef = useRef<HTMLParagraphElement>(null);
@@ -90,7 +91,7 @@ export function AuthShell({ mode }: AuthShellProps) {
           <div ref={cardRef}>
             <HudFrame>
               <Suspense fallback={<div className="h-[420px] animate-pulse rounded-[1.8rem] bg-white/5" />}>
-                <AuthCard mode={mode} />
+                <AuthCard mode={mode} googleEnabled={googleEnabled} />
               </Suspense>
             </HudFrame>
           </div>

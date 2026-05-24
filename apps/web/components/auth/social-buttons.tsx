@@ -1,9 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
-import { trpc } from "~/trpc/client";
-
 function GoogleIcon() {
   return (
     <svg className="size-4 text-white/80" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -15,72 +11,25 @@ function GoogleIcon() {
   );
 }
 
-export function SocialButtons() {
-  const [redirecting, setRedirecting] = useState(false);
-  const {
-    data: providers,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = trpc.auth.getSupportedAuthenticationProviders.useQuery(undefined, {
-    retry: 1,
-  });
+type SocialButtonsProps = {
+  googleEnabled?: boolean;
+  nextPath?: string;
+};
 
-  const google = providers?.find((p) => p.provider === "GOOGLE_OAUTH");
-  const canUseGoogle = Boolean(google?.authUrl);
+export function SocialButtons({ googleEnabled = false, nextPath = "/dashboard" }: SocialButtonsProps) {
+  if (!googleEnabled) return null;
 
-  const handleGoogle = () => {
-    if (!google?.authUrl || redirecting) return;
-    setRedirecting(true);
-    window.location.assign(google.authUrl);
-  };
-
-  const hint =
-    redirecting
-      ? "Redirecting to Google…"
-      : isLoading
-      ? "Connecting to auth server…"
-      : isError
-        ? "API unreachable — start backend on port 8000"
-        : !canUseGoogle
-          ? "Google sign-in not configured on API"
-          : null;
+  const googleHref = `/api-auth/google?state=${encodeURIComponent(nextPath)}`;
 
   return (
     <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={handleGoogle}
-        disabled={isLoading || redirecting || !canUseGoogle}
-        className="group flex w-full items-center justify-center gap-3 rounded-2xl border border-white/6 bg-[#141414] py-3.5 text-[11px] font-bold text-white/70 transition-colors hover:bg-[#1a1a1a] hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+      <a
+        href={googleHref}
+        className="group flex w-full items-center justify-center gap-3 rounded-2xl border border-white/6 bg-[#141414] py-3.5 text-[11px] font-bold text-white/70 transition-colors hover:bg-[#1a1a1a] hover:text-white"
       >
         <GoogleIcon />
-        <span>
-          {redirecting ? "Opening Google…" : (google?.displayText ?? "Continue with Google")}
-        </span>
-      </button>
-
-      {hint && (
-        <p className="font-mono text-center text-[9px] tracking-[0.12em] text-amber-400/80 uppercase">
-          {hint}
-          {isError && (
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="ml-2 underline hover:text-amber-300"
-            >
-              retry
-            </button>
-          )}
-        </p>
-      )}
-
-      {isError && process.env.NODE_ENV === "development" && (
-        <p className="font-mono text-center text-[8px] text-white/25">
-          {error.message}
-        </p>
-      )}
+        <span>Continue with Google</span>
+      </a>
     </div>
   );
 }

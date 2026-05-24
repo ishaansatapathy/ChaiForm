@@ -330,7 +330,14 @@ class FormService {
   }
 
   async getPublicFormBySlug(slug: string) {
-    const [row] = await db.select().from(formsTable).where(eq(formsTable.slug, slug)).limit(1);
+    const normalizedSlug = slug.trim().toLowerCase();
+    if (!normalizedSlug) throw new FormError("NOT_FOUND", "Form not found");
+
+    const [row] = await db
+      .select()
+      .from(formsTable)
+      .where(sql`lower(${formsTable.slug}) = ${normalizedSlug}`)
+      .limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
     if (row.visibility === "draft") throw new FormError("NOT_FOUND", "Form not available");
 
