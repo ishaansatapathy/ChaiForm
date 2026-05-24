@@ -3,23 +3,51 @@
 import Link from "next/link";
 import { Activity, BarChart2, Plus } from "lucide-react";
 
+import { useAppData } from "~/components/app/app-data-provider";
 import { FormCard } from "~/components/app/form-card";
 import { Highlight } from "~/components/app/highlight";
 import { getPublicDisplayName } from "~/lib/user-display-name";
 import { trpc } from "~/trpc/client";
 
 export default function DashboardPage() {
+  const { initialForms, initialAnalytics } = useAppData();
   const { data: user } = trpc.auth.me.useQuery();
   const greetingName = user ? getPublicDisplayName(user) : "Hero";
-  const { data: formsPage, isLoading } = trpc.forms.list.useQuery({ limit: 100 });
-  const forms = formsPage?.items ?? [];
-  const { data: analytics } = trpc.analytics.summary.useQuery({});
 
+  const {
+    data: formsPage,
+    isLoading,
+    isError,
+    refetch,
+  } = trpc.forms.list.useQuery(
+    { limit: 100 },
+    {
+      initialData: initialForms ?? undefined,
+      enabled: Boolean(user),
+      retry: 2,
+      staleTime: 30_000,
+    },
+  );
+
+  const { data: analytics } = trpc.analytics.summary.useQuery(
+    {},
+    {
+      initialData: initialAnalytics ?? undefined,
+      enabled: Boolean(user),
+      retry: 2,
+      staleTime: 30_000,
+    },
+  );
+
+  const forms = formsPage?.items ?? initialForms?.items ?? [];
   const publishedCount = forms.filter((f) => f.visibility !== "draft").length;
+  const totalResponses = analytics?.totalSubmissions ?? initialAnalytics?.totalSubmissions ?? 0;
+  const loadingForms = isLoading && forms.length === 0 && !isError;
+
   const statItems = [
     { label: "Forms Created", value: forms.length.toString(), icon: BarChart2, trend: "All time" },
     { label: "Published", value: publishedCount.toString(), icon: Activity, trend: "Live" },
-    { label: "Total Responses", value: String(analytics?.totalSubmissions ?? 0), icon: BarChart2, trend: "All forms" },
+    { label: "Total Responses", value: String(totalResponses), icon: BarChart2, trend: "All forms" },
   ];
 
   return (
@@ -75,8 +103,22 @@ export default function DashboardPage() {
 
       <div>
         <h2 className="font-display mb-6 text-2xl font-bold text-white">Your Forms</h2>
-        {isLoading ? (
+        {loadingForms ? (
           <p className="text-white/40">Loading forms…</p>
+        ) : isError && forms.length === 0 ? (
+          <div className="app-surface mx-auto max-w-xl rounded-3xl border border-white/10 p-10 text-center">
+            <p className="font-display text-xl font-bold text-white">Could not load forms</p>
+            <p className="mt-3 text-sm text-white/50">
+              The server may be waking up. Wait a few seconds and try again.
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="btn-omni font-display mt-6 inline-flex rounded-2xl px-6 py-3 text-sm font-black tracking-wide uppercase"
+            >
+              Retry
+            </button>
+          </div>
         ) : forms.length === 0 ? (
           <div className="app-surface mx-auto max-w-xl rounded-3xl border border-white/10 p-10 text-center">
             <p className="font-display text-2xl font-bold text-white">No forms yet</p>

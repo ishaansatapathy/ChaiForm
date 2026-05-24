@@ -1,10 +1,25 @@
 import type { ReactNode } from "react";
 
 import { AppShell } from "~/components/app/app-shell";
-import { fetchSessionUser } from "~/lib/fetch-session";
+import {
+  fetchAnalyticsSummary,
+  fetchFormsList,
+  fetchSessionUser,
+} from "~/lib/fetch-session";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const initialUser = await fetchSessionUser();
+  const [initialForms, initialAnalytics] = initialUser
+    ? await Promise.all([fetchFormsList(100), fetchAnalyticsSummary()])
+    : [null, null];
 
-  return <AppShell initialUser={initialUser}>{children}</AppShell>;
+  return (
+    <AppShell
+      initialUser={initialUser}
+      initialForms={initialForms}
+      initialAnalytics={initialAnalytics}
+    >
+      {children}
+    </AppShell>
+  );
 }
