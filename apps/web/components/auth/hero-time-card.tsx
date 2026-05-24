@@ -34,12 +34,16 @@ export function HeroTimeCard({ welcomeName, saving = false, onSubmit }: HeroTime
     const card = cardRef.current;
     if (!overlay || !card) return;
 
-    gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.35, ease: "power2.out" });
-    gsap.fromTo(
-      card,
-      { opacity: 0, scale: 0.94, y: 24 },
-      { opacity: 1, scale: 1, y: 0, duration: 0.65, ease: "back.out(1.25)" },
-    );
+    const ctx = gsap.context(() => {
+      gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.35, ease: "power2.out" });
+      gsap.fromTo(
+        card,
+        { opacity: 0, scale: 0.94, y: 24 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.65, ease: "back.out(1.25)" },
+      );
+    });
+
+    return () => ctx.revert();
   }, [mounted]);
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -58,14 +62,14 @@ export function HeroTimeCard({ welcomeName, saving = false, onSubmit }: HeroTime
   return createPortal(
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-9999 flex items-start justify-center bg-black/95 px-4 pt-[max(2.5rem,8vh)] backdrop-blur-sm sm:items-center sm:pt-0"
+      className="fixed inset-0 z-9999 flex items-start justify-center bg-black/95 px-4 pt-[max(2.5rem,8vh)] opacity-100 backdrop-blur-sm sm:items-center sm:pt-0"
       role="dialog"
       aria-modal="true"
       aria-labelledby="quick-setup-title"
     >
       <div
         ref={cardRef}
-        className="quick-setup-card relative w-full max-w-[460px] overflow-hidden rounded-[1.85rem] bg-[#050505] px-7 py-8 sm:px-9 sm:py-10"
+        className="quick-setup-card relative w-full max-w-[460px] overflow-hidden rounded-[1.85rem] bg-[#050505] px-7 py-8 opacity-100 sm:px-9 sm:py-10"
       >
         <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-linear-to-r from-transparent via-[#70b404]/35 to-transparent" />
         <div className="pointer-events-none absolute top-4 left-4 size-3 border-t border-l border-[#70b404]/25" />

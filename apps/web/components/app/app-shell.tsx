@@ -31,9 +31,9 @@ function AppBackground() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { data: user, isLoading, isError, error } = trpc.auth.me.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
+  const { data: user, isLoading, isError, error, refetch, isFetching } = trpc.auth.me.useQuery(undefined, {
+    retry: 2,
+    refetchOnWindowFocus: true,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -46,11 +46,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     const unauthorized =
       error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED";
     if (unauthorized) {
-      router.replace("/sign-in");
+      router.replace("/sign-in?next=" + encodeURIComponent(window.location.pathname));
     }
   }, [isError, error, router]);
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !user)) {
     return (
       <div className="relative flex min-h-screen items-center justify-center">
         <AppBackground />
@@ -64,7 +64,37 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="relative flex min-h-screen items-center justify-center px-4">
+        <AppBackground />
+        <div className="relative z-10 max-w-sm text-center">
+          <p className="font-display text-xl font-bold text-white">Session could not be loaded</p>
+          <p className="mt-2 text-sm text-white/45">
+            {isError
+              ? "We could not reach the auth server. Check your connection and try again."
+              : "Please sign in to continue."}
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="rounded-2xl border border-lime-400/35 px-5 py-2.5 text-xs font-bold tracking-[0.18em] text-lime-400 uppercase hover:bg-lime-400/10"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => router.replace("/sign-in")}
+              className="btn-omni font-display rounded-2xl px-5 py-2.5 text-xs font-black tracking-[0.18em] uppercase"
+            >
+              Sign in
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen">
