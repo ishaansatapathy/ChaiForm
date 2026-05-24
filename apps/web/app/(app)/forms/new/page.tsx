@@ -11,8 +11,8 @@ import { FormThemePicker } from "~/components/forms/form-theme-picker";
 import { Highlight } from "~/components/app/highlight";
 import { FORM_TEMPLATES } from "~/lib/form-templates";
 import type { FormThemeId } from "~/lib/form-themes";
-import { createFormAction } from "~/app/(app)/forms/actions";
-import { getTrpcErrorMessage, runWithRetry, useWarmApi } from "~/lib/warm-api";
+import { getSaveErrorMessage, saveFormWithColdStart } from "~/lib/save-form";
+import { useWarmApi } from "~/lib/warm-api";
 import { trpc } from "~/trpc/client";
 import type { RouterInputs } from "@repo/trpc/client";
 
@@ -26,8 +26,8 @@ const createInitialDraftFields = (): DraftField[] => [
 export default function CreateFormPage() {
   const router = useRouter();
   const utils = trpc.useUtils();
-  const createForm = trpc.forms.create.useMutation();
   const [saving, setSaving] = useState(false);
+  const [serverReady, setServerReady] = useState(false);
 
   useWarmApi();
 
@@ -61,7 +61,6 @@ export default function CreateFormPage() {
     }
 
     setSaving(true);
-    toast.message("Saving form… may take up to a minute if the server was idle.");
 
     const payload = {
       title: title.trim(),
@@ -72,26 +71,16 @@ export default function CreateFormPage() {
     };
 
     try {
-      await runWithRetry(
-        async () => {
-          try {
-            return await createFormAction(payload);
-          } catch {
-            return await createForm.mutateAsync(payload);
-          }
-        },
-        {
-          onRetry: (attempt) => {
-            toast.message(`Server waking up… retry ${attempt}/5`);
-          },
-        },
-      );
+      await saveFormWithColdStart("create", payload, {
+        onProgress: (message) => toast.message(message),
+      });
+      setServerReady(true);
       await utils.forms.list.invalidate();
       await utils.analytics.summary.invalidate();
       toast.success("Form saved");
       router.push("/dashboard");
     } catch (error) {
-      toast.error(getTrpcErrorMessage(error));
+      toast.error(getSaveErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -160,6 +149,11 @@ export default function CreateFormPage() {
             >
               {saving ? "Saving…" : "Save Form"}
             </button>
+            {!serverReady && !saving && (
+              <p className="mt-2 text-center text-[11px] text-white/35">
+                First save may take up to 60s while the server wakes up.
+              </p>
+            )}
 
             <div className="mt-6 border-t border-white/8 pt-6">
               <p className="font-mono mb-1 text-[9px] tracking-[0.28em] text-white/35 uppercase">Need inspiration?</p>

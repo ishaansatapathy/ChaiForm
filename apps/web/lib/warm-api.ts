@@ -49,10 +49,16 @@ export function sleep(ms: number) {
 
 export async function runWithRetry<T>(
   task: () => Promise<T>,
-  opts?: { attempts?: number; delaysMs?: number[]; onRetry?: (attempt: number) => void },
+  opts?: {
+    attempts?: number;
+    delaysMs?: number[];
+    onRetry?: (attempt: number) => void;
+    isRetryable?: (error: unknown) => boolean;
+  },
 ): Promise<T> {
   const attempts = opts?.attempts ?? 5;
   const delaysMs = opts?.delaysMs ?? [0, 10_000, 15_000, 15_000, 20_000];
+  const canRetry = opts?.isRetryable ?? isRetryableTrpcError;
   let lastError: unknown;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -64,7 +70,7 @@ export async function runWithRetry<T>(
       return await task();
     } catch (error) {
       lastError = error;
-      if (!isRetryableTrpcError(error) || attempt === attempts - 1) {
+      if (!canRetry(error) || attempt === attempts - 1) {
         throw error;
       }
     }
