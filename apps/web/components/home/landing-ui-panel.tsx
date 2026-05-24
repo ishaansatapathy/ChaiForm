@@ -86,11 +86,11 @@ export function LandingUiPanel({ type }: { type: PanelType }) {
 
     return (
 
-      <DiagramShell title="Rule map">
+      <DiagramShell title="One-question flow">
 
-        {["If rating ≤ 2", "Else if email set", "Show follow-up"].map((rule, i) => (
+        {["Q1 · Name", "Q2 · Email", "Q3 · Feedback"].map((step, i) => (
 
-          <div key={rule} className="flex shrink-0 items-center gap-2.5">
+          <div key={step} className="flex shrink-0 items-center gap-2.5">
 
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-[#70b404]/35 font-mono text-[9px] text-[#9ed926]">
 
@@ -100,7 +100,7 @@ export function LandingUiPanel({ type }: { type: PanelType }) {
 
             <div className="min-w-0 flex-1 truncate rounded-md border border-white/12 px-3 py-2 font-mono text-[10px] text-white">
 
-              {rule}
+              {step}
 
             </div>
 
@@ -110,7 +110,7 @@ export function LandingUiPanel({ type }: { type: PanelType }) {
 
         <div className="landing-label mt-auto shrink-0 rounded-md border border-dashed border-[#70b404]/30 py-2 text-center text-[9px] tracking-[0.2em] opacity-80">
 
-          + Add branch
+          Progress · Enter ↵ · Submit
 
         </div>
 

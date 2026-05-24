@@ -13,7 +13,21 @@ function fieldValueSchema(field: FormField) {
       schema = z.string().regex(/^-?\d+(\.\d+)?$/, "Must be a valid number");
       break;
     case "date":
-      schema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be a valid date (YYYY-MM-DD)");
+      schema = z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be a valid date (YYYY-MM-DD)")
+        .refine((value) => {
+          if (!value) return true;
+          const parts = value.split("-").map(Number);
+          if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) return false;
+          const [year, month, day] = parts as [number, number, number];
+          const date = new Date(Date.UTC(year, month - 1, day));
+          return (
+            date.getUTCFullYear() === year &&
+            date.getUTCMonth() === month - 1 &&
+            date.getUTCDate() === day
+          );
+        }, "Must be a valid calendar date");
       break;
     case "rating": {
       const max = field.config?.maxRating ?? 5;
@@ -100,11 +114,16 @@ export function buildSubmissionSchema(fields: FormField[]) {
 export function validateSubmissionAnswers(fields: FormField[], answers: { fieldId: string; value: string }[]) {
   const answerMap: Record<string, string> = {};
   const fieldIds = new Set(fields.map((field) => field.id));
+  const seenFieldIds = new Set<string>();
 
   for (const answer of answers) {
     if (!fieldIds.has(answer.fieldId)) {
       throw new Error("Invalid field in submission");
     }
+    if (seenFieldIds.has(answer.fieldId)) {
+      throw new Error("Duplicate field in submission");
+    }
+    seenFieldIds.add(answer.fieldId);
     answerMap[answer.fieldId] = answer.value?.trim() ?? "";
   }
 
@@ -118,8 +137,8 @@ export function validateSubmissionAnswers(fields: FormField[], answers: { fieldI
   const parsed = schema.safeParse(answerMap);
 
   if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    throw new Error(issue?.message ?? "Invalid submission");
+    const messages = parsed.error.issues.map((issue) => issue.message).filter(Boolean);
+    throw new Error(messages[0] ?? "Invalid submission");
   }
 
   return answerMap;

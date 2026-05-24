@@ -55,24 +55,10 @@ function buildOpenApiDocument() {
 
     return document;
   } catch (error) {
-    logger.warn("OpenAPI document generation skipped", {
+    logger.error("OpenAPI document generation failed", {
       message: error instanceof Error ? error.message : error,
     });
-
-    return {
-      openapi: "3.0.0",
-      info: { title: "ChaiForm OpenAPI", version: "1.0.0" },
-      components: {
-        securitySchemes: {
-          cookieAuth: {
-            type: "apiKey",
-            in: "cookie",
-            name: "jwt",
-          },
-        },
-      },
-      paths: {},
-    };
+    throw error;
   }
 }
 

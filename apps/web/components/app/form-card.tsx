@@ -7,6 +7,7 @@ import { BarChart3, Eye, FileText, Globe, Link2, Lock, Pencil, Share2 } from "lu
 import type { RouterOutputs } from "@repo/trpc/client";
 
 import { ShareFormModal } from "~/components/app/share-form-modal";
+import { getFormSharePath, getFormShareUrl } from "~/lib/form-share-url";
 
 type FormListItem = RouterOutputs["forms"]["list"]["items"][number];
 
@@ -18,8 +19,8 @@ const VISIBILITY = {
 
 export function FormCard({ form }: { form: FormListItem }) {
   const vis = VISIBILITY[form.visibility];
-  const sharePath = `/f/${form.id}`;
-  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}${sharePath}` : sharePath;
+  const sharePath = getFormSharePath(form);
+  const shareUrl = getFormShareUrl(form);
   const [shareOpen, setShareOpen] = useState(false);
 
   return (

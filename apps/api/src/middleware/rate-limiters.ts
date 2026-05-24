@@ -1,5 +1,7 @@
 import rateLimit from "express-rate-limit";
 
+/** In-memory store — fine for single-instance demos. Use Redis store in multi-instance production. */
+
 const skipInTests = () => process.env.VITEST === "true";
 
 export const authCredentialLimiter = rateLimit({

@@ -408,7 +408,7 @@ class FormService {
   }
 
   async submitForm(input: SubmitFormInput) {
-    if (input.website && input.website.length > 0) {
+    if (input.website.length > 0) {
       throw new FormError("BAD_REQUEST", "Submission rejected");
     }
 

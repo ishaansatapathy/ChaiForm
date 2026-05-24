@@ -4,6 +4,7 @@ import type { RouterOutputs } from "@repo/trpc/client";
 
 export type SessionUser = RouterOutputs["auth"]["me"];
 export type FormsListPage = RouterOutputs["forms"]["list"];
+export type FormDetail = RouterOutputs["forms"]["getById"];
 export type AnalyticsSummary = RouterOutputs["analytics"]["summary"];
 export type SubmissionsOverTime = RouterOutputs["analytics"]["submissionsOverTime"];
 export type FormFieldsList = RouterOutputs["analytics"]["listFormFields"];
@@ -87,6 +88,15 @@ export async function fetchFormsList(limit = 100): Promise<FormsListPage | null>
     return null;
   }
   return fetchTrpcQuery<FormsListPage>("forms.list", { limit }, cookieHeader);
+}
+
+export async function fetchFormById(formId: string): Promise<FormDetail | null> {
+  const cookieStore = await cookies();
+  const cookieHeader = buildCookieHeader(cookieStore);
+  if (!cookieHeader.includes("jwt") && !cookieHeader.includes("jwt_refresh")) {
+    return null;
+  }
+  return fetchTrpcQuery<FormDetail>("forms.getById", { formId }, cookieHeader);
 }
 
 export async function fetchAnalyticsSummary(formId?: string): Promise<AnalyticsSummary | null> {

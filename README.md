@@ -51,16 +51,16 @@ chaiform/
 |------|----------------|
 | Monorepo & structure | Turborepo, shared packages, clean root |
 | Auth | Google OAuth + email/password, JWT cookies |
-| Form builder | Create/edit/delete, 7 field types, themes, visibility |
+| Form builder | Create/edit/delete, 7 field types, **themes picker**, **live preview**, one-question public flow |
 | Public explore | `/explore` lists public forms only |
 | Email notifications | Creator notified on new submission (Resend) |
-| Spam protection | Rate limits + honeypot on public submit |
-| Zod validation | Field schemas + dynamic submission validator |
-| tRPC | Type-safe `forms`, `analytics`, `auth` routers |
-| Drizzle | `forms`, `form_fields`, `submissions`, `submission_responses` |
-| Public submission | `/f/[formId]`, `/f/s/[slug]`, rate-limited submit |
-| Analytics | Summary, trend chart, field breakdown, CSV export, pagination |
-| Scalar | http://localhost:8000/docs |
+| Spam protection | Rate limits + **required honeypot** on public submit |
+| Zod validation | Field schemas + dynamic submission validator + duplicate/bounds checks |
+| tRPC | Type-safe `forms`, `analytics`, `auth` routers + structured Zod errors |
+| Drizzle | `forms`, `form_fields`, `submissions`, `submission_responses` + indexes |
+| Public submission | `/f/[formId]`, `/f/s/[slug]`, rate-limited submit, Typeform-style UX |
+| Analytics | Summary, trend chart, field breakdown, **full CSV export**, flow chart, pagination |
+| Scalar | https://chaiform.onrender.com/docs |
 
 ## Demo credentials (for judges)
 
@@ -159,3 +159,16 @@ Private — hackathon project.
 ## Deploy (production)
 
 See **[DEPLOY.md](./DEPLOY.md)** for **Neon + Render (API) + Vercel (web)** setup.
+
+### Live demo (production)
+
+| Service | URL |
+|---------|-----|
+| **Web app** | https://chai-form-web.vercel.app |
+| **API health** | https://chaiform.onrender.com/health |
+| **Scalar API docs** | https://chaiform.onrender.com/docs |
+| **OpenAPI JSON** | https://chaiform.onrender.com/openapi.json |
+
+**Demo login:** `demo@chaiform.dev` / `DemoPass123!` (after seed)
+
+**Sample public form:** https://chai-form-web.vercel.app/f/s/product-feedback

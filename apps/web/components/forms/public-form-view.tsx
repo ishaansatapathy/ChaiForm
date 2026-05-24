@@ -17,6 +17,23 @@ type PublicFormViewProps = {
   thankYouPath: string;
 };
 
+function isFieldEmpty(field: PublicForm["fields"][number], value: string) {
+  const trimmed = value.trim();
+  if (field.type === "checkbox") {
+    if (isMultiCheckboxConfig(field.config)) {
+      if (!trimmed || trimmed === "[]") return true;
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        return !Array.isArray(parsed) || parsed.length === 0;
+      } catch {
+        return true;
+      }
+    }
+    return trimmed !== "true";
+  }
+  return trimmed.length === 0;
+}
+
 export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const router = useRouter();
   const theme = getFormTheme(form.theme);
@@ -34,7 +51,13 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   });
 
   const [values, setValues] = useState<Record<string, string>>({});
+  const [step, setStep] = useState(0);
   const honeypotRef = useRef<HTMLInputElement>(null);
+
+  const fields = form.fields;
+  const currentField = fields[step];
+  const isLastStep = step >= fields.length - 1;
+  const progress = fields.length > 0 ? ((step + 1) / fields.length) * 100 : 0;
 
   useEffect(() => {
     if (honeypotRef.current) {
@@ -49,52 +72,116 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.id]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const honeypot = honeypotRef.current?.value.trim() ?? "";
+  const validateCurrentStep = () => {
+    if (!currentField) return true;
+    const value = values[currentField.id] ?? "";
+    if (currentField.required && isFieldEmpty(currentField, value)) {
+      toast.error(`"${currentField.label}" is required`);
+      return false;
+    }
+    return true;
+  };
+
+  const handleContinue = () => {
+    if (!validateCurrentStep()) return;
+    if (isLastStep) {
+      handleSubmit();
+      return;
+    }
+    setStep((prev) => Math.min(prev + 1, fields.length - 1));
+  };
+
+  const handleSubmit = () => {
+    if (!validateCurrentStep()) return;
+    const honeypot = honeypotRef.current?.value ?? "";
     submit.mutate({
       formId: form.id,
-      ...(honeypot ? { website: honeypot } : {}),
-      answers: form.fields.map((field) => ({
+      website: honeypot,
+      answers: fields.map((field) => ({
         fieldId: field.id,
         value: values[field.id] ?? "",
       })),
     });
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    if (currentField?.type === "text" && (event.target as HTMLElement).tagName === "TEXTAREA") return;
+    event.preventDefault();
+    handleContinue();
+  };
+
   return (
-    <div className={`relative min-h-screen px-4 py-16 text-white ${theme.pageBg}`}>
+    <div className={`relative flex min-h-screen flex-col px-4 py-12 text-white ${theme.pageBg}`}>
       <div className={`pointer-events-none absolute inset-0 ${theme.glow}`} />
-      <form onSubmit={handleSubmit} className="relative mx-auto max-w-xl space-y-6">
-        <div>
+
+      <div className="relative mx-auto flex w-full max-w-xl flex-1 flex-col">
+        <div className="mb-8">
           <p className={`font-mono mb-2 text-[10px] tracking-[0.3em] uppercase opacity-70 ${theme.accentSoft}`}>
             ChaiForm · {theme.label}
           </p>
-          <h1 className="font-display text-4xl font-black tracking-tight">{form.title}</h1>
-          {form.description && <p className="mt-3 text-white/50">{form.description}</p>}
+          <h1 className="font-display text-3xl font-black tracking-tight md:text-4xl">{form.title}</h1>
+          {form.description && step === 0 && <p className="mt-3 text-white/50">{form.description}</p>}
         </div>
 
-        {form.fields.map((field) => {
-          const multiCheckbox = field.type === "checkbox" && isMultiCheckboxConfig(field.config);
-          const Wrapper = multiCheckbox ? "div" : "label";
+        {fields.length > 0 && (
+          <div className="mb-8 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-lime-400 transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
 
-          return (
-            <Wrapper key={field.id} className="block space-y-2">
-              {(field.type !== "checkbox" || multiCheckbox) && (
-                <span className="text-sm font-medium text-white/80">
-                  {field.label}
-                  {field.required && <span className={theme.accentText}> *</span>}
-                </span>
+        {currentField && (
+          <div className="flex flex-1 flex-col" onKeyDown={handleKeyDown}>
+            {(() => {
+              const multiCheckbox =
+                currentField.type === "checkbox" && isMultiCheckboxConfig(currentField.config);
+              const Wrapper = multiCheckbox ? "div" : "label";
+
+              return (
+                <Wrapper className="block space-y-3">
+                  {(currentField.type !== "checkbox" || multiCheckbox) && (
+                    <span className="text-lg font-medium text-white/90">
+                      {currentField.label}
+                      {currentField.required && <span className={theme.accentText}> *</span>}
+                    </span>
+                  )}
+                  <FormFieldInput
+                    field={currentField}
+                    theme={theme}
+                    value={values[currentField.id] ?? ""}
+                    onChange={(value) => setValues((prev) => ({ ...prev, [currentField.id]: value }))}
+                  />
+                </Wrapper>
+              );
+            })()}
+
+            <div className="mt-auto flex flex-wrap items-center gap-3 pt-10">
+              {step > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStep((prev) => Math.max(prev - 1, 0))}
+                  className="rounded-2xl border border-white/15 px-5 py-3 text-sm font-bold tracking-wide text-white/60 uppercase transition-colors hover:border-white/30 hover:text-white"
+                >
+                  Back
+                </button>
               )}
-              <FormFieldInput
-                field={field}
-                theme={theme}
-                value={values[field.id] ?? ""}
-                onChange={(value) => setValues((prev) => ({ ...prev, [field.id]: value }))}
-              />
-            </Wrapper>
-          );
-        })}
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={submit.isPending}
+                className="btn-omni font-display flex-1 rounded-2xl py-3.5 text-sm font-black tracking-[0.18em] uppercase disabled:opacity-50 sm:flex-none sm:px-10"
+              >
+                {submit.isPending ? "Submitting…" : isLastStep ? "Submit" : "Continue"}
+              </button>
+              <p className="w-full font-mono text-[10px] tracking-wider text-white/30 uppercase">
+                Question {step + 1} of {fields.length} · Press Enter ↵
+              </p>
+            </div>
+          </div>
+        )}
 
         <input
           ref={honeypotRef}
@@ -110,15 +197,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
           onFocus={(event) => event.currentTarget.removeAttribute("readonly")}
           className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0"
         />
-
-        <button
-          type="submit"
-          disabled={submit.isPending}
-          className="btn-omni font-display w-full rounded-2xl py-3.5 text-sm font-black tracking-[0.18em] uppercase disabled:opacity-50"
-        >
-          {submit.isPending ? "Submitting…" : "Submit"}
-        </button>
-      </form>
+      </div>
     </div>
   );
 }

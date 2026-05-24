@@ -21,6 +21,7 @@ import { downloadSubmissionsCsv } from "~/lib/export-csv";
 import type { AnalyticsBundle, FormsListPage } from "~/lib/fetch-session";
 import { trpc } from "~/trpc/client";
 import type { RouterOutputs } from "@repo/trpc/client";
+import { toast } from "sonner";
 
 type SubmissionItem = RouterOutputs["forms"]["listSubmissions"]["items"][number];
 
@@ -49,6 +50,8 @@ export default function AnalyticsContent({
   }, []);
 
   const { data: user } = trpc.auth.me.useQuery();
+  const utils = trpc.useUtils();
+  const [exporting, setExporting] = useState(false);
   const { data: formsPage, isLoading: formsLoading } = trpc.forms.list.useQuery(
     { limit: 100 },
     {
@@ -168,9 +171,35 @@ export default function AnalyticsContent({
   const statsLoading = formsLoading || (summaryLoading && !summary);
   const showSubmissionsLoading = submissionsLoading && submissions.length === 0 && !submissionsError;
 
-  const handleExportCsv = () => {
-    if (!activeForm || submissions.length === 0) return;
-    downloadSubmissionsCsv(activeForm.title, submissions);
+  const handleExportCsv = async () => {
+    if (!activeForm || !activeFormId) return;
+    setExporting(true);
+    try {
+      const allRows: SubmissionItem[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await utils.forms.listSubmissions.fetch({
+          formId: activeFormId,
+          limit: 100,
+          cursor,
+          search: submissionSearch.trim() || undefined,
+        });
+        allRows.push(...page.items);
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+
+      if (allRows.length === 0) {
+        toast.error("No submissions to export");
+        return;
+      }
+
+      downloadSubmissionsCsv(activeForm.title, allRows);
+      toast.success(`Exported ${allRows.length} submissions`);
+    } catch {
+      toast.error("Could not export submissions");
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (formsLoading && forms.length === 0) {
@@ -263,10 +292,10 @@ export default function AnalyticsContent({
               <button
                 type="button"
                 onClick={handleExportCsv}
-                disabled={submissions.length === 0}
+                disabled={submissions.length === 0 || exporting}
                 className="font-mono rounded-lg border border-lime-400/25 px-2 py-1 text-[9px] tracking-widest text-lime-400/90 uppercase transition-colors hover:bg-lime-400/10 disabled:opacity-40"
               >
-                Export CSV
+                {exporting ? "Exporting…" : "Export CSV"}
               </button>
             </div>
             <input
@@ -408,7 +437,7 @@ export default function AnalyticsContent({
               <p className="text-white/50">Share your form link to collect the first submission.</p>
               {activeFormId && (
                 <Link
-                  href={`/f/${activeFormId}`}
+                  href={activeForm?.slug ? `/f/s/${activeForm.slug}` : `/f/${activeFormId}`}
                   className="font-annotate mt-4 inline-block text-xl text-lime-400"
                   target="_blank"
                 >
