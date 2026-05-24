@@ -47,7 +47,7 @@ export function AppShell({
   initialAnalytics?: AnalyticsSummary | null;
 }) {
   const router = useRouter();
-  const { data: user, isLoading, isError, error, refetch, isFetching } = trpc.auth.me.useQuery(undefined, {
+  const { data: user, isLoading, isError, error, refetch, isFetching } = trpc.auth.me.useQuery({}, {
     initialData: initialUser ?? undefined,
     retry: 2,
     refetchOnWindowFocus: true,

@@ -11,7 +11,7 @@ import { trpc } from "~/trpc/client";
 
 export default function DashboardPage() {
   const { initialForms, initialAnalytics } = useAppData();
-  const { data: user } = trpc.auth.me.useQuery();
+  const { data: user } = trpc.auth.me.useQuery({});
   const greetingName = user ? getPublicDisplayName(user) : "Hero";
 
   const {

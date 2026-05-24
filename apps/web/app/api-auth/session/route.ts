@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const cookie = request.headers.get("cookie") ?? "";
 
   try {
-    const upstreamRes = await fetch(`${API_BASE}/trpc/auth.me`, {
+    const upstreamRes = await fetch(`${API_BASE}/trpc/auth.me?input=%7B%7D`, {
       headers: cookie ? { cookie } : undefined,
       cache: "no-store",
       signal: AbortSignal.timeout(25_000),

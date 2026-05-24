@@ -24,7 +24,7 @@ const NAV = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { data: user } = trpc.auth.me.useQuery();
+  const { data: user } = trpc.auth.me.useQuery({});
   const logout = useLogout();
 
   return (
@@ -96,7 +96,7 @@ export function AppSidebar() {
             </div>
             <button
               type="button"
-              onClick={() => logout.mutate()}
+              onClick={() => logout.mutate({})}
               disabled={logout.isPending}
               className="rounded-xl p-2 text-white/30 transition-colors hover:bg-white/5 hover:text-lime-400"
               aria-label="Sign out"

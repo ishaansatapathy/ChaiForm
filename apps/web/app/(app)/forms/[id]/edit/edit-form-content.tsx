@@ -27,7 +27,7 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
   const utils = trpc.useUtils();
   useWarmApi();
   const [saving, setSaving] = useState(false);
-  const { data: user } = trpc.auth.me.useQuery();
+  const { data: user } = trpc.auth.me.useQuery({});
 
   const {
     data: form,
