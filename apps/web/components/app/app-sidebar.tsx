@@ -46,10 +46,11 @@ export function AppSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-medium transition-all duration-300 ${
                 active
-                  ? "bg-white/[0.05] text-white shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]"
-                  : "text-white/40 hover:bg-white/[0.02] hover:text-white"
+                  ? "bg-white/5 text-white shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]"
+                  : "text-white/40 hover:bg-white/2 hover:text-white"
               }`}
             >
               {active && (
@@ -66,9 +67,9 @@ export function AppSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-white/5 bg-gradient-to-t from-white/[0.01] to-transparent p-6">
+      <div className="mt-auto border-t border-white/5 bg-gradient-to-t from-white/1 to-transparent p-6">
         {user && (
-          <div className="flex items-center justify-between gap-3 rounded-3xl border border-white/5 bg-white/[0.03] p-4 transition-all duration-500 hover:border-white/10">
+          <div className="flex items-center justify-between gap-3 rounded-3xl border border-white/5 bg-white/3 p-4 transition-all duration-500 hover:border-white/10">
             <div className="flex min-w-0 items-center gap-3">
               {user.profileImageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element

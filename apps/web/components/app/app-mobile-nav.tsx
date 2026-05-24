@@ -25,6 +25,7 @@ export function AppMobileNav() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               className="relative flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium"
             >
               {active && (

@@ -118,7 +118,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
           <input
             value={field.label}
             onChange={(e) => updateField(field.id, { label: e.target.value })}
-            className="mb-4 w-full rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-sm text-white outline-none"
+            className="mb-4 w-full rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
           />
 
           <div className="flex flex-wrap gap-2">
@@ -157,7 +157,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
               }
               rows={3}
               placeholder="One option per line"
-              className="mt-4 w-full rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-sm text-white outline-none"
+              className="mt-4 w-full rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
             />
           )}
 
@@ -174,7 +174,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                     config: { ...field.config, maxRating: Number(e.target.value) || 5 },
                   })
                 }
-                className="mt-2 w-full rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-sm text-white outline-none"
+                className="mt-2 w-full rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
               />
             </label>
           )}

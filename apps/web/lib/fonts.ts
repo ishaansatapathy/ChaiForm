@@ -1,4 +1,4 @@
-import { Caveat, Exo_2, Orbitron, Rubik_Dirt, Shadows_Into_Light } from "next/font/google";
+import { Caveat, Exo_2, Orbitron, Rubik_Dirt } from "next/font/google";
 
 /** BRAVE GATES-style heavy rough brush — hero headline */
 export const rubikDirt = Rubik_Dirt({
@@ -12,14 +12,6 @@ export const orbitron = Orbitron({
   subsets: ["latin"],
   weight: ["700", "800", "900"],
   variable: "--font-orbitron",
-  display: "swap",
-});
-
-/** Soft slanted marker handwriting — hero headline */
-export const shadowsIntoLight = Shadows_Into_Light({
-  subsets: ["latin"],
-  weight: ["400"],
-  variable: "--font-hand",
   display: "swap",
 });
 

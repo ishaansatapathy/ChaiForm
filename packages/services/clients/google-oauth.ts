@@ -23,9 +23,9 @@ export function getGoogleOAuth2Client(): OAuth2Client {
 export function generateGoogleAuthUrl(state?: string) {
   const client = getGoogleOAuth2Client();
   return client.generateAuthUrl({
-    access_type: "offline",
+    access_type: "online",
     scope: ["openid", "email", "profile"],
-    prompt: "consent",
+    prompt: "select_account",
     state,
   });
 }

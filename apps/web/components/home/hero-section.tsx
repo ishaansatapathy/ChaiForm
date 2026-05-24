@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useRef, type CSSProperties } from "react";
+import dynamic from "next/dynamic";
 import gsap from "gsap";
 
 import { rubikDirt } from "~/lib/fonts";
+
+const SmokeBackground = dynamic(
+  () => import("./smoke-background").then((m) => m.SmokeBackground),
+  { ssr: false },
+);
 
 export function HeroSection() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -88,31 +94,15 @@ export function HeroSection() {
   return (
     <div
       ref={rootRef}
-      className="relative flex h-screen w-full items-center justify-end overflow-hidden"
+      className="relative flex h-screen w-full items-center justify-start overflow-hidden"
     >
       <div
         className="absolute inset-0 bg-black bg-cover bg-[center_left] bg-no-repeat"
         style={{ backgroundImage: "url(/images/ben10/bg-landing.png)" }}
       />
 
-      {/* Breathing green aura behind character on left side — adds depth */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-1"
-        style={{
-          background:
-            "radial-gradient(ellipse 50% 60% at 22% 55%, rgba(74,222,128,0.22) 0%, rgba(74,222,128,0.08) 30%, transparent 60%)",
-        }}
-      />
-      <div aria-hidden className="b10s-pulse pointer-events-none absolute top-1/2 left-[22%] z-1 aspect-square w-[40vw] -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(74,222,128,0.14) 0%, transparent 70%)",
-          filter: "blur(70px)",
-        }}
-      />
-
-      {/* HeroSmokeCursor disabled — mousemove + blend was janking scroll on landing */}
+      {/* Volumetric 3D smoke/dust overlay directly on top of the background image */}
+      <SmokeBackground />
 
       {/* Slow scan line — ambient system-alive feel */}
       <div aria-hidden className="fx-scan-line absolute inset-x-0 z-2" style={{ top: 0 }} />
@@ -135,16 +125,6 @@ export function HeroSection() {
         style={{ background: "linear-gradient(to bottom, transparent, #000)" }}
       />
 
-      {/* Ground glow strip — character feels rooted in the world */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute bottom-0 left-0 z-2 h-32 w-[55%]"
-        style={{
-          background:
-            "radial-gradient(ellipse 70% 100% at 30% 100%, rgba(74,222,128,0.32) 0%, rgba(74,222,128,0.08) 40%, transparent 75%)",
-          mixBlendMode: "screen",
-        }}
-      />
 
       <div
         ref={hudTopRef}
@@ -304,7 +284,7 @@ function HeroEmbers() {
     const r2 = ((seed * 7) % 233280) / 233280;
     const r3 = ((seed * 13) % 233280) / 233280;
     return {
-      left: 4 + r1 * 46, // 4% → 50% (left half of viewport)
+      left: r1 * 96, // Spread across full screen
       bottom: -6 + r2 * 18,
       delay: r3 * 5,
       duration: 6 + r1 * 6,
@@ -330,7 +310,7 @@ function HeroEmbers() {
               animationDuration: `${e.duration}s`,
               "--dx": `${e.dx}px`,
               "--dy": `${e.dy}px`,
-              "--ember-color": "rgba(140, 255, 170, 0.85)",
+              "--ember-color": "rgba(255, 255, 255, 0.25)",
             } as CSSProperties
           }
         />

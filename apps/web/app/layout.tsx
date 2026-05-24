@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { caveat, exo2, orbitron, rubikDirt, shadowsIntoLight } from "~/lib/fonts";
+import { caveat, exo2, orbitron, rubikDirt } from "~/lib/fonts";
 import { GlobalProviders } from "~/providers/global";
 
 const geistSans = localFont({
@@ -26,10 +26,19 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <style
+          dangerouslySetInnerHTML={{
+            __html: "html,body{background:#020202!important;color:#fff}",
+          }}
+        />
+        <link rel="preload" href="/videos/loading.mp4" as="video" type="video/mp4" />
+        <link rel="preload" href="/images/ben10/landing-wallpaper.png" as="image" />
+      </head>
       <body
         suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${exo2.variable} ${shadowsIntoLight.variable} ${caveat.variable} ${rubikDirt.variable}`}
+        className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${exo2.variable} ${caveat.variable} ${rubikDirt.variable} bg-(--landing-bg) text-white antialiased`}
       >
         <GlobalProviders>{children}</GlobalProviders>
       </body>

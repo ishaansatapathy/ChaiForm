@@ -40,7 +40,7 @@ function AnswerNode({ data }: NodeProps<Node<AnswerNodeData>>) {
       <Handle type="target" position={Position.Top} className="!bg-lime-400" />
       <p className="font-mono text-[9px] tracking-[0.22em] text-lime-400/70 uppercase">{data.type}</p>
       <p className="mt-1 text-sm font-semibold text-white">{data.label}</p>
-      <p className="mt-2 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-xs text-white/75">
+      <p className="mt-2 rounded-lg border border-white/5 bg-white/3 px-3 py-2 text-xs text-white/75">
         {data.value || "— skipped —"}
       </p>
       <Handle type="source" position={Position.Bottom} className="!bg-lime-400" />
