@@ -14,7 +14,9 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get("jwt")?.value;
-  if (!token) {
+  const refreshToken = request.cookies.get("jwt_refresh")?.value;
+
+  if (!token && !refreshToken) {
     const signInUrl = request.nextUrl.clone();
     signInUrl.pathname = "/sign-in";
     signInUrl.searchParams.set("next", pathname);

@@ -39,6 +39,7 @@ export function AuthCard({ mode }: AuthCardProps) {
   const signUpMutation = trpc.auth.signUp.useMutation();
   const signInMutation = trpc.auth.signIn.useMutation();
   const verify2FAMutation = trpc.auth.verify2FA.useMutation();
+  const utils = trpc.useUtils();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -51,11 +52,12 @@ export function AuthCard({ mode }: AuthCardProps) {
     return "Something went wrong";
   };
 
-  const completeSignIn = (path: string) => {
+  const completeSignIn = async (path: string) => {
+    await utils.auth.me.invalidate();
     prefetchAppRoutes(router);
     markHeroTimePending();
     const destination = path.startsWith("/") ? path : "/dashboard";
-    router.push(withHeroTimeParam(destination));
+    window.location.assign(withHeroTimeParam(destination));
   };
 
   useEffect(() => {
@@ -81,7 +83,7 @@ export function AuthCard({ mode }: AuthCardProps) {
           email: twoFactorStep.email,
           otp: twoFactorStep.otp,
         });
-        completeSignIn(nextPath);
+        await completeSignIn(nextPath);
         return;
       }
 
@@ -101,7 +103,7 @@ export function AuthCard({ mode }: AuthCardProps) {
           return;
         }
 
-        completeSignIn(nextPath);
+        await completeSignIn(nextPath);
         return;
       }
 
