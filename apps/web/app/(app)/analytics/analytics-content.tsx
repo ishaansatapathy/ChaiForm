@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import {
   Bar,
   BarChart,
@@ -16,32 +15,61 @@ import {
 } from "recharts";
 
 import { Highlight } from "~/components/app/highlight";
+import { useAppData } from "~/components/app/app-data-provider";
 import { AnalyticsDetailPanel } from "~/components/analytics/analytics-detail-panel";
 import { downloadSubmissionsCsv } from "~/lib/export-csv";
+import type { AnalyticsBundle, FormsListPage } from "~/lib/fetch-session";
 import { trpc } from "~/trpc/client";
 import type { RouterOutputs } from "@repo/trpc/client";
 
 type SubmissionItem = RouterOutputs["forms"]["listSubmissions"]["items"][number];
 
-export default function AnalyticsContent() {
-  const searchParams = useSearchParams();
-  const initialFormId = searchParams.get("form") ?? undefined;
+const QUERY_OPTS = {
+  retry: 2,
+  staleTime: 30_000,
+} as const;
+
+type AnalyticsContentProps = {
+  initialForms?: FormsListPage | null;
+  initialFormId?: string;
+  initialBundle?: AnalyticsBundle | null;
+};
+
+export default function AnalyticsContent({
+  initialForms: initialFormsProp,
+  initialFormId,
+  initialBundle,
+}: AnalyticsContentProps) {
+  const { initialForms: contextForms } = useAppData();
+  const initialForms = initialFormsProp ?? contextForms;
   const [chartsMounted, setChartsMounted] = useState(false);
 
   useEffect(() => {
     setChartsMounted(true);
   }, []);
 
-  const { data: formsPage, isLoading: formsLoading } = trpc.forms.list.useQuery({ limit: 100 });
-  const forms = formsPage?.items ?? [];
+  const { data: user } = trpc.auth.me.useQuery();
+  const { data: formsPage, isLoading: formsLoading } = trpc.forms.list.useQuery(
+    { limit: 100 },
+    {
+      initialData: initialForms ?? undefined,
+      enabled: Boolean(user),
+      ...QUERY_OPTS,
+    },
+  );
+
+  const forms = formsPage?.items ?? initialForms?.items ?? [];
   const [selectedFormId, setSelectedFormId] = useState<string | undefined>(initialFormId);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | undefined>();
   const [selectedFieldId, setSelectedFieldId] = useState<string | undefined>();
   const [submissionSearch, setSubmissionSearch] = useState("");
   const [submissionCursor, setSubmissionCursor] = useState<string | undefined>();
-  const [loadedSubmissions, setLoadedSubmissions] = useState<SubmissionItem[]>([]);
+  const [loadedSubmissions, setLoadedSubmissions] = useState<SubmissionItem[]>(
+    initialBundle?.submissions?.items ?? [],
+  );
 
   const activeFormId = selectedFormId ?? forms[0]?.id;
+  const isInitialForm = activeFormId === initialFormId && !submissionCursor && !submissionSearch.trim();
 
   useEffect(() => {
     setSubmissionCursor(undefined);
@@ -49,43 +77,82 @@ export default function AnalyticsContent() {
     setSelectedSubmissionId(undefined);
   }, [activeFormId, submissionSearch]);
 
-  const { data: summary } = trpc.analytics.summary.useQuery(
+  useEffect(() => {
+    if (isInitialForm && initialBundle?.submissions?.items) {
+      setLoadedSubmissions(initialBundle.submissions.items);
+    }
+  }, [isInitialForm, initialBundle?.submissions?.items]);
+
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    isError: summaryError,
+    refetch: refetchSummary,
+  } = trpc.analytics.summary.useQuery(
     { formId: activeFormId },
-    { enabled: Boolean(activeFormId) },
+    {
+      enabled: Boolean(user && activeFormId),
+      initialData: isInitialForm ? (initialBundle?.summary ?? undefined) : undefined,
+      ...QUERY_OPTS,
+    },
   );
 
-  const { data: overTime } = trpc.analytics.submissionsOverTime.useQuery(
+  const { data: overTime, isLoading: overTimeLoading } = trpc.analytics.submissionsOverTime.useQuery(
     { formId: activeFormId!, days: 30 },
-    { enabled: Boolean(activeFormId) },
+    {
+      enabled: Boolean(user && activeFormId),
+      initialData: isInitialForm ? (initialBundle?.overTime ?? undefined) : undefined,
+      ...QUERY_OPTS,
+    },
   );
 
   const { data: formFields } = trpc.analytics.listFormFields.useQuery(
     { formId: activeFormId! },
-    { enabled: Boolean(activeFormId) },
+    {
+      enabled: Boolean(user && activeFormId),
+      initialData: isInitialForm ? (initialBundle?.formFields ?? undefined) : undefined,
+      ...QUERY_OPTS,
+    },
   );
 
   const activeFieldId = selectedFieldId ?? formFields?.fields[0]?.id;
 
   const { data: fieldBreakdown } = trpc.analytics.fieldBreakdown.useQuery(
     { formId: activeFormId!, fieldId: activeFieldId! },
-    { enabled: Boolean(activeFormId && activeFieldId) },
+    { enabled: Boolean(user && activeFormId && activeFieldId), ...QUERY_OPTS },
   );
 
-  const { data: submissionsPage, isLoading: submissionsLoading } = trpc.forms.listSubmissions.useQuery(
+  const {
+    data: submissionsPage,
+    isLoading: submissionsLoading,
+    isError: submissionsError,
+    refetch: refetchSubmissions,
+  } = trpc.forms.listSubmissions.useQuery(
     {
       formId: activeFormId!,
       limit: 15,
       cursor: submissionCursor,
       search: submissionSearch.trim() || undefined,
     },
-    { enabled: Boolean(activeFormId) },
+    {
+      enabled: Boolean(user && activeFormId),
+      initialData:
+        isInitialForm && !submissionCursor
+          ? (initialBundle?.submissions ?? undefined)
+          : undefined,
+      ...QUERY_OPTS,
+    },
   );
 
   const { data: allSubmissionsPage } = trpc.forms.listSubmissions.useQuery(
     { formId: activeFormId!, limit: 100 },
-    { enabled: Boolean(activeFormId) },
+    {
+      enabled: Boolean(user && activeFormId),
+      initialData: isInitialForm ? (initialBundle?.allSubmissions ?? undefined) : undefined,
+      ...QUERY_OPTS,
+    },
   );
-  const allSubmissions = allSubmissionsPage?.items ?? [];
+  const allSubmissions = allSubmissionsPage?.items ?? initialBundle?.allSubmissions?.items ?? [];
 
   useEffect(() => {
     if (!submissionsPage) return;
@@ -95,17 +162,18 @@ export default function AnalyticsContent() {
   }, [submissionsPage, submissionCursor]);
 
   const submissions = loadedSubmissions;
-
   const activeSubmissionId = selectedSubmissionId ?? submissions[0]?.id;
-
   const activeForm = forms.find((form) => form.id === activeFormId);
+
+  const statsLoading = formsLoading || (summaryLoading && !summary);
+  const showSubmissionsLoading = submissionsLoading && submissions.length === 0 && !submissionsError;
 
   const handleExportCsv = () => {
     if (!activeForm || submissions.length === 0) return;
     downloadSubmissionsCsv(activeForm.title, submissions);
   };
 
-  if (formsLoading) {
+  if (formsLoading && forms.length === 0) {
     return <p className="text-white/40">Loading forms…</p>;
   }
 
@@ -127,17 +195,38 @@ export default function AnalyticsContent() {
     <section className="py-4">
       <Header />
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total forms" value={summary?.totalForms ?? 0} loading={formsLoading} />
-        <StatCard label="Total responses" value={summary?.totalSubmissions ?? 0} loading={formsLoading} />
-        <StatCard label="Last 7 days" value={summary?.submissionsLast7Days ?? 0} loading={formsLoading} />
-        <StatCard
-          label="Completion rate"
-          value={summary?.selectedForm?.completionRate ?? summary?.averageCompletionRate ?? 0}
-          suffix="%"
-          loading={formsLoading}
-        />
-      </div>
+      {summaryError && !summary ? (
+        <div className="app-surface mb-8 rounded-2xl border border-red-400/20 p-5 text-center">
+          <p className="text-sm text-white/70">Could not load analytics summary.</p>
+          <button
+            type="button"
+            onClick={() => refetchSummary()}
+            className="btn-omni font-display mt-4 inline-flex rounded-xl px-5 py-2 text-xs font-black tracking-wide uppercase"
+          >
+            Retry
+          </button>
+        </div>
+      ) : (
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Total forms" value={summary?.totalForms ?? 0} loading={statsLoading} />
+          <StatCard
+            label="Total responses"
+            value={summary?.totalSubmissions ?? activeForm?.submissionCount ?? 0}
+            loading={statsLoading}
+          />
+          <StatCard
+            label="Last 7 days"
+            value={summary?.submissionsLast7Days ?? 0}
+            loading={statsLoading}
+          />
+          <StatCard
+            label="Completion rate"
+            value={summary?.selectedForm?.completionRate ?? summary?.averageCompletionRate ?? 0}
+            suffix="%"
+            loading={statsLoading}
+          />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <aside className="space-y-6">
@@ -186,8 +275,19 @@ export default function AnalyticsContent() {
               placeholder="Filter by answer…"
               className="mb-3 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
             />
-            {submissionsLoading && submissions.length === 0 ? (
+            {showSubmissionsLoading ? (
               <p className="px-2 text-sm text-white/40">Loading…</p>
+            ) : submissionsError && submissions.length === 0 ? (
+              <div className="px-2 text-center">
+                <p className="text-sm text-white/50">Could not load submissions.</p>
+                <button
+                  type="button"
+                  onClick={() => refetchSubmissions()}
+                  className="mt-3 text-xs font-bold tracking-wider text-lime-400 uppercase"
+                >
+                  Retry
+                </button>
+              </div>
             ) : submissions.length === 0 ? (
               <p className="px-2 text-sm text-white/40">No submissions yet.</p>
             ) : (
@@ -230,9 +330,9 @@ export default function AnalyticsContent() {
           <div className="app-surface rounded-3xl p-6">
             <h3 className="font-display mb-4 text-lg font-bold text-white">Submissions over time</h3>
             <div className="h-56">
-              {!chartsMounted || !overTime ? (
+              {!chartsMounted || (overTimeLoading && !overTime) ? (
                 <ChartSkeleton />
-              ) : (
+              ) : overTime && overTime.points.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={overTime.points}>
                     <CartesianGrid stroke="rgba(255,255,255,0.06)" />
@@ -245,6 +345,10 @@ export default function AnalyticsContent() {
                     <Line type="monotone" dataKey="count" stroke="#4ade80" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
+              ) : (
+                <p className="flex h-full items-center justify-center text-sm text-white/40">
+                  No submission data for this period yet.
+                </p>
               )}
             </div>
           </div>
@@ -297,7 +401,9 @@ export default function AnalyticsContent() {
             </div>
           )}
 
-          {submissions.length === 0 ? (
+          {!showSubmissionsLoading &&
+          submissions.length === 0 &&
+          (activeForm?.submissionCount ?? 0) === 0 ? (
             <div className="text-center">
               <p className="text-white/50">Share your form link to collect the first submission.</p>
               {activeFormId && (
@@ -317,15 +423,15 @@ export default function AnalyticsContent() {
       {allSubmissions.length > 0 && formFields && (
         <div className="mt-8">
           <AnalyticsDetailPanel
-          key={activeFormId}
-          formTitle={activeForm?.title ?? "Form"}
-          fields={formFields.fields}
-          submissions={allSubmissions}
-          allSubmissionsCount={summary?.selectedForm?.submissionCount ?? allSubmissions.length}
-          selectedSubmissionId={activeSubmissionId}
-          onSelectSubmission={setSelectedSubmissionId}
-          chartsMounted={chartsMounted}
-        />
+            key={activeFormId}
+            formTitle={activeForm?.title ?? "Form"}
+            fields={formFields.fields}
+            submissions={allSubmissions}
+            allSubmissionsCount={summary?.selectedForm?.submissionCount ?? allSubmissions.length}
+            selectedSubmissionId={activeSubmissionId}
+            onSelectSubmission={setSelectedSubmissionId}
+            chartsMounted={chartsMounted}
+          />
         </div>
       )}
     </section>
