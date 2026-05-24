@@ -6,11 +6,15 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { TRPCClientError } from "@repo/trpc/client";
 
+import type { RouterOutputs } from "@repo/trpc/client";
+
 import { AppMobileNav } from "~/components/app/app-mobile-nav";
 import { AppSidebar } from "~/components/app/app-sidebar";
 import { HeroTimeGate } from "~/components/app/hero-time-gate";
 import { prefetchAppRoutes } from "~/lib/prefetch-app-routes";
 import { trpc } from "~/trpc/client";
+
+type SessionUser = RouterOutputs["auth"]["me"];
 
 function AppBackground() {
   return (
@@ -29,9 +33,16 @@ function AppBackground() {
   );
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  initialUser,
+}: {
+  children: ReactNode;
+  initialUser?: SessionUser | null;
+}) {
   const router = useRouter();
   const { data: user, isLoading, isError, error, refetch, isFetching } = trpc.auth.me.useQuery(undefined, {
+    initialData: initialUser ?? undefined,
     retry: 2,
     refetchOnWindowFocus: true,
     staleTime: 5 * 60 * 1000,
@@ -42,6 +53,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [router]);
 
   useEffect(() => {
+    if (initialUser) return;
+    void fetch("/api-auth/session", { credentials: "include", cache: "no-store" })
+      .then((response) => {
+        if (response.ok) void refetch();
+      })
+      .catch(() => undefined);
+  }, [initialUser, refetch]);
+
+  useEffect(() => {
     if (!isError) return;
     const unauthorized =
       error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED";
@@ -50,7 +70,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [isError, error, router]);
 
-  if (isLoading || (isFetching && !user)) {
+  const resolvedUser = user ?? initialUser ?? null;
+  const waitingForSession =
+    !resolvedUser && (isLoading || isFetching) && !isError;
+
+  if (waitingForSession) {
     return (
       <div className="relative flex min-h-screen items-center justify-center">
         <AppBackground />
@@ -64,17 +88,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!user) {
+  if (!resolvedUser) {
+    const unauthorized =
+      isError && error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED";
+    const message = unauthorized
+      ? "Your session expired. Please sign in again."
+      : isError
+        ? "The auth server is waking up (Render cold start). Wait a few seconds and retry."
+        : "Please sign in to continue.";
+
     return (
       <div className="relative flex min-h-screen items-center justify-center px-4">
         <AppBackground />
         <div className="relative z-10 max-w-sm text-center">
           <p className="font-display text-xl font-bold text-white">Session could not be loaded</p>
-          <p className="mt-2 text-sm text-white/45">
-            {isError
-              ? "We could not reach the auth server. Check your connection and try again."
-              : "Please sign in to continue."}
-          </p>
+          <p className="mt-2 text-sm text-white/45">{message}</p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
               type="button"
@@ -99,7 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative min-h-screen">
       <AppBackground />
-      <HeroTimeGate user={user} />
+      <HeroTimeGate user={resolvedUser} />
       <div className="relative z-10 flex flex-col lg:flex-row">
         <AppSidebar />
         <main className="min-h-screen flex-1 px-4 pt-8 pb-32 sm:px-6 lg:px-8 lg:pb-10">

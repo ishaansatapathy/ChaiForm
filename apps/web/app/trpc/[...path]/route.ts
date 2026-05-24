@@ -13,13 +13,48 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
   if (contentType) headers.set("content-type", contentType);
   const cookie = request.headers.get("cookie");
   if (cookie) headers.set("cookie", cookie);
+  const accept = request.headers.get("accept");
+  if (accept) headers.set("accept", accept);
 
-  const upstreamRes = await fetch(upstream, {
-    method: request.method,
-    headers,
-    body: request.method !== "GET" && request.method !== "HEAD" ? await request.arrayBuffer() : undefined,
-    redirect: "manual",
-  });
+  const body =
+    request.method !== "GET" && request.method !== "HEAD"
+      ? await request.arrayBuffer()
+      : undefined;
+
+  let upstreamRes: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      upstreamRes = await fetch(upstream, {
+        method: request.method,
+        headers,
+        body,
+        redirect: "manual",
+        signal: AbortSignal.timeout(25_000),
+      });
+
+      if (upstreamRes.status < 500) break;
+
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+      }
+    } catch {
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+        continue;
+      }
+      return NextResponse.json(
+        { error: { message: "API unavailable", code: -32004, data: { code: "TIMEOUT" } } },
+        { status: 503 },
+      );
+    }
+  }
+
+  if (!upstreamRes) {
+    return NextResponse.json(
+      { error: { message: "API unavailable", code: -32004, data: { code: "TIMEOUT" } } },
+      { status: 503 },
+    );
+  }
 
   const response = new NextResponse(upstreamRes.body, {
     status: upstreamRes.status,
