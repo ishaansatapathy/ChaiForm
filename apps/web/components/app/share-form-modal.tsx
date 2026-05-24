@@ -72,7 +72,7 @@ export function ShareFormModal({ open, shareUrl, formTitle, onClose }: ShareForm
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 px-4 py-8 backdrop-blur-md"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/75 px-4 py-8 backdrop-blur-md"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
