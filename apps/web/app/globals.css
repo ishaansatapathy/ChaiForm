@@ -192,6 +192,66 @@ html {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
+.hero-time-card {
+  border: 1px solid rgb(112 180 4 / 0.28);
+  background:
+    radial-gradient(circle at 50% 0%, rgb(112 180 4 / 0.12), transparent 42%),
+    linear-gradient(180deg, #101010 0%, #070707 100%);
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgb(112 180 4 / 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.quick-setup-card {
+  border: 1px solid rgb(112 180 4 / 0.22);
+  background: #050505;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.9),
+    0 0 28px rgb(112 180 4 / 0.14),
+    0 0 56px rgb(112 180 4 / 0.08),
+    0 32px 64px rgb(0 0 0 / 0.85);
+}
+
+.quick-setup-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgb(112 180 4 / 0.06);
+}
+
+.omnitrix-symbol-wrap {
+  position: relative;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-inline: auto;
+}
+
+.omnitrix-symbol-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  background: transparent;
+  box-shadow:
+    0 0 18px rgb(112 180 4 / 0.35),
+    0 0 36px rgb(112 180 4 / 0.12);
+  pointer-events: none;
+}
+
+.omnitrix-symbol-glow {
+  filter: drop-shadow(0 0 10px rgb(112 180 4 / 0.45))
+    drop-shadow(0 0 22px rgb(112 180 4 / 0.2));
+}
+
+.auth-input.ben10-input:focus {
+  border-color: rgb(112 180 4 / 0.4);
+  background: #0a0a0a;
+  box-shadow: 0 0 0 3px rgb(112 180 4 / 0.08);
+}
+
 /* === Auth inputs ============================================================ */
 .auth-input {
   width: 100%;

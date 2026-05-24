@@ -13,6 +13,7 @@ import {
 
 import { trpc } from "~/trpc/client";
 import { useLogout } from "~/lib/use-logout";
+import { getPublicDisplayName } from "~/lib/user-display-name";
 
 const NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -49,7 +50,7 @@ export function AppSidebar() {
               prefetch={true}
               className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-medium transition-all duration-300 ${
                 active
-                  ? "bg-white/5 text-white shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]"
+                  ? "bg-white/5 text-white inset-shadow-sm"
                   : "text-white/40 hover:bg-white/2 hover:text-white"
               }`}
             >
@@ -67,7 +68,7 @@ export function AppSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-white/5 bg-gradient-to-t from-white/1 to-transparent p-6">
+      <div className="mt-auto border-t border-white/5 bg-linear-to-t from-white/5 to-transparent p-6">
         {user && (
           <div className="flex items-center justify-between gap-3 rounded-3xl border border-white/5 bg-white/3 p-4 transition-all duration-500 hover:border-white/10">
             <div className="flex min-w-0 items-center gap-3">
@@ -85,7 +86,9 @@ export function AppSidebar() {
                 </div>
               )}
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-white">{user.fullName}</p>
+                <p className="truncate text-sm font-bold text-white">
+                  {user ? getPublicDisplayName(user) : "Hero"}
+                </p>
                 <p className="truncate text-[10px] font-medium tracking-wider text-white/30">
                   {user.email}
                 </p>

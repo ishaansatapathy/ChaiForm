@@ -12,7 +12,7 @@ export function Highlight({
   return (
     <span
       className={cn(
-        "relative inline-block rounded-[2px] border border-white/14 bg-white/[0.015] px-[0.055em] pb-[0.01em]",
+        "relative inline-block rounded-[2px] border border-white/14 bg-white/2 px-[0.055em] pb-[0.01em]",
         className,
       )}
     >

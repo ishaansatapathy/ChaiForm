@@ -8,6 +8,7 @@ import {
   forgotPasswordInputSchema,
   resetPasswordInputSchema,
   resendVerificationEmailInputSchema,
+  setupProfileInputSchema,
   signInInputSchema,
   signUpInputSchema,
   toggle2FAInputSchema,
@@ -38,12 +39,12 @@ export const authRouter = router({
     .meta({ openapi: { method: "POST", path: getPath("/sign-up"), tags: TAGS } })
     .input(signUpInputSchema)
     .output(signUpOutputSchema)
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       try {
         if (input.password !== input.confirmPassword) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Passwords do not match" });
         }
-        return await authService.signUp(input, ctx.res);
+        return await authService.signUp(input);
       } catch (error) {
         mapAuthError(error);
       }
@@ -160,7 +161,7 @@ export const authRouter = router({
       }
     }),
 
-  resendVerification: verifiedProcedure
+  resendVerification: protectedProcedure
     .meta({ openapi: { method: "POST", path: getPath("/resend-verification"), tags: TAGS, protect: true } })
     .input(zodUndefinedModel)
     .output(messageOutputSchema)
@@ -184,6 +185,18 @@ export const authRouter = router({
     .mutation(async ({ input, ctx }) => {
       try {
         return await authService.toggle2FA(ctx.user.id, input.enabled);
+      } catch (error) {
+        mapAuthError(error);
+      }
+    }),
+
+  setupProfile: verifiedProcedure
+    .meta({ openapi: { method: "POST", path: getPath("/setup-profile"), tags: TAGS, protect: true } })
+    .input(setupProfileInputSchema)
+    .output(authUserSchema)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await authService.setupProfile(ctx.user.id, input.displayName);
       } catch (error) {
         mapAuthError(error);
       }

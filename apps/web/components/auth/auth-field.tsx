@@ -17,8 +17,28 @@ export function AuthField({ label, className, id, ...props }: AuthFieldProps) {
       >
         {label}
       </label>
-      <input id={fieldId} className={`auth-input ${className ?? ""}`} {...props} />
+      <input
+        id={fieldId}
+        suppressHydrationWarning
+        className={`auth-input ${className ?? ""}`}
+        {...props}
+      />
     </div>
+  );
+}
+
+export function AuthSubmitButton({
+  className,
+  type = "submit",
+  ...props
+}: React.ComponentProps<"button">) {
+  return (
+    <button
+      type={type}
+      suppressHydrationWarning
+      className={className}
+      {...props}
+    />
   );
 }
 

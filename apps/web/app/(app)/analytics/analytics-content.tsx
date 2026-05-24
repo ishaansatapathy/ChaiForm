@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -15,9 +16,19 @@ import {
   YAxis,
 } from "recharts";
 
-import { SubmissionFlowChart } from "~/components/analytics/submission-flow-chart";
 import { Highlight } from "~/components/app/highlight";
+import { downloadSubmissionsCsv } from "~/lib/export-csv";
 import { trpc } from "~/trpc/client";
+
+const SubmissionFlowChart = dynamic(
+  () =>
+    import("~/components/analytics/submission-flow-chart").then((mod) => ({
+      default: mod.SubmissionFlowChart,
+    })),
+  {
+    loading: () => <div className="app-surface h-64 animate-pulse rounded-3xl bg-white/3" />,
+  },
+);
 
 export default function AnalyticsContent() {
   const searchParams = useSearchParams();
@@ -70,6 +81,13 @@ export default function AnalyticsContent() {
     { submissionId: activeSubmissionId! },
     { enabled: Boolean(activeSubmissionId) },
   );
+
+  const activeForm = forms.find((form) => form.id === activeFormId);
+
+  const handleExportCsv = () => {
+    if (!activeForm || submissions.length === 0) return;
+    downloadSubmissionsCsv(activeForm.title, submissions);
+  };
 
   const participantLabel = useMemo(() => {
     if (!submission?.submittedAt) return undefined;
@@ -140,7 +158,17 @@ export default function AnalyticsContent() {
           </div>
 
           <div className="app-surface rounded-3xl p-4">
-            <p className="font-mono mb-3 px-2 text-[9px] tracking-[0.3em] text-white/35 uppercase">Submissions</p>
+            <div className="mb-3 flex items-center justify-between gap-2 px-2">
+              <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Submissions</p>
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                disabled={submissions.length === 0}
+                className="font-mono rounded-lg border border-lime-400/25 px-2 py-1 text-[9px] tracking-widest text-lime-400/90 uppercase transition-colors hover:bg-lime-400/10 disabled:opacity-40"
+              >
+                Export CSV
+              </button>
+            </div>
             {submissionsLoading ? (
               <p className="px-2 text-sm text-white/40">Loading…</p>
             ) : submissions.length === 0 ? (
@@ -291,7 +319,7 @@ function StatCard({
 }
 
 function ChartSkeleton() {
-  return <div className="h-full animate-pulse rounded-2xl bg-white/[0.04]" />;
+  return <div className="h-full animate-pulse rounded-2xl bg-white/4" />;
 }
 
 function Header() {

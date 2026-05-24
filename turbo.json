@@ -1,11 +1,25 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "DATABASE_URL",
+    "JWT_SECRET",
+    "JWT_REFRESH_SECRET",
+    "CLIENT_URL",
+    "BASE_URL",
+    "API_INTERNAL_URL",
+    "NODE_ENV",
+    "RESEND_API_KEY",
+    "EMAIL_FROM",
+    "SEED_USER_EMAIL",
+    "SEED_DEMO_PASSWORD",
+    "VITEST"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]

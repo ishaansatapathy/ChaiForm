@@ -5,10 +5,12 @@ import { Activity, BarChart2, Plus } from "lucide-react";
 
 import { FormCard } from "~/components/app/form-card";
 import { Highlight } from "~/components/app/highlight";
+import { getPublicDisplayName } from "~/lib/user-display-name";
 import { trpc } from "~/trpc/client";
 
 export default function DashboardPage() {
   const { data: user } = trpc.auth.me.useQuery();
+  const greetingName = user ? getPublicDisplayName(user) : "Hero";
   const { data: formsPage, isLoading } = trpc.forms.list.useQuery({ limit: 100 });
   const forms = formsPage?.items ?? [];
   const { data: analytics } = trpc.analytics.summary.useQuery({});
@@ -27,7 +29,7 @@ export default function DashboardPage() {
           {"// system online · creator mode"}
         </p>
         <h2 className="font-display text-3xl font-black tracking-tight text-white md:text-4xl">
-          Welcome back, {user?.fullName?.split(" ")[0] ?? "Hero"}
+          Welcome back, {greetingName}
         </h2>
         <p className="font-annotate mt-2 text-xl text-lime-400/90 -rotate-2">
           Your forms are ready to deploy.
@@ -79,12 +81,8 @@ export default function DashboardPage() {
           <div className="app-surface mx-auto max-w-xl rounded-3xl border border-white/10 p-10 text-center">
             <p className="font-display text-2xl font-bold text-white">No forms yet</p>
             <p className="mt-3 text-sm leading-relaxed text-white/50">
-              Create your first form, or load demo data after signing up:
+              Create your first form to start collecting responses, sharing links, and viewing analytics.
             </p>
-            <code className="mt-4 block rounded-xl bg-black/40 px-4 py-3 font-mono text-xs text-lime-400/90">
-              pnpm db:seed
-            </code>
-            <p className="mt-2 text-xs text-white/35">Set SEED_USER_EMAIL in .env to your account email.</p>
             <Link
               href="/forms/new"
               className="btn-omni font-display mt-8 inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-black tracking-wide uppercase"

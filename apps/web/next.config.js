@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = path.resolve(configDir, "../..");
 
+const apiInternalUrl = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   turbopack: {
@@ -13,11 +15,11 @@ const nextConfig = {
     return [
       {
         source: "/trpc/:path*",
-        destination: "http://localhost:8000/trpc/:path*",
+        destination: `${apiInternalUrl}/trpc/:path*`,
       },
       {
         source: "/api-auth/:path*",
-        destination: "http://localhost:8000/auth/:path*",
+        destination: `${apiInternalUrl}/auth/:path*`,
       },
     ];
   },

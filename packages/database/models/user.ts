@@ -14,6 +14,7 @@ export const usersTable = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
 
   fullName: varchar("full_name", { length: 80 }).notNull(),
+  displayName: varchar("display_name", { length: 80 }),
 
   email: varchar("email", { length: 255 }).notNull().unique(),
   emailVerified: boolean("email_verified").default(false),
@@ -23,6 +24,7 @@ export const usersTable = pgTable("users", {
   providerId: varchar("provider_id", { length: 255 }),
 
   verificationToken: varchar("verification_token", { length: 64 }),
+  verificationTokenExpire: timestamp("verification_token_expire"),
   resetPasswordToken: varchar("reset_password_token", { length: 64 }),
   resetPasswordOtp: varchar("reset_password_otp", { length: 6 }),
   resetPasswordExpire: timestamp("reset_password_expire"),

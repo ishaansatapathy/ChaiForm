@@ -26,4 +26,24 @@ export default [
       "turbo/no-undeclared-env-vars": "off",
     },
   },
+  {
+    files: ["next.config.js"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+      },
+    },
+  },
+  {
+    files: ["components/home/smoke-background.tsx"],
+    rules: {
+      "react/no-unknown-property": "off",
+    },
+  },
+  {
+    files: ["components/home/hero-landing.tsx"],
+    rules: {
+      "@next/next/no-img-element": "off",
+    },
+  },
 ];

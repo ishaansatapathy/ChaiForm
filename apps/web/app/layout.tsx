@@ -33,7 +33,6 @@ export default function RootLayout({
             __html: "html,body{background:#020202!important;color:#fff}",
           }}
         />
-        <link rel="preload" href="/videos/loading.mp4" as="video" type="video/mp4" />
         <link rel="preload" href="/images/ben10/landing-wallpaper.png" as="image" />
       </head>
       <body
