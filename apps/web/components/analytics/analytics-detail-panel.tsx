@@ -31,7 +31,7 @@ type AnalyticsDetailPanelProps = {
   submissions: Submission[];
   allSubmissionsCount: number;
   selectedSubmissionId?: string;
-  onSelectSubmission: (submissionId: string) => void;
+  onSelectSubmission: (submissionId: string | undefined) => void;
   chartsMounted: boolean;
 };
 
@@ -229,7 +229,7 @@ function ParticipantList({
 }: {
   submissions: Submission[];
   activeSubmissionId?: string;
-  onSelect: (id: string) => void;
+  onSelect: (id: string | undefined) => void;
 }) {
   if (submissions.length === 0) {
     return <p className="text-sm text-white/40">No participants match these filters.</p>;
@@ -255,7 +255,7 @@ function ParticipantList({
             >
               <button
                 type="button"
-                onClick={() => onSelect(expanded ? "" : submission.id)}
+                onClick={() => onSelect(expanded ? undefined : submission.id)}
                 className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
               >
                 <div className="flex items-center gap-3">
