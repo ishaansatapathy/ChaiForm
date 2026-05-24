@@ -5,6 +5,17 @@ import type { RouterOutputs } from "@repo/trpc/client";
 export type SessionUser = RouterOutputs["auth"]["me"];
 export type FormsListPage = RouterOutputs["forms"]["list"];
 export type AnalyticsSummary = RouterOutputs["analytics"]["summary"];
+export type SubmissionsOverTime = RouterOutputs["analytics"]["submissionsOverTime"];
+export type FormFieldsList = RouterOutputs["analytics"]["listFormFields"];
+export type SubmissionsPage = RouterOutputs["forms"]["listSubmissions"];
+
+export type AnalyticsBundle = {
+  summary: AnalyticsSummary | null;
+  overTime: SubmissionsOverTime | null;
+  formFields: FormFieldsList | null;
+  submissions: SubmissionsPage | null;
+  allSubmissions: SubmissionsPage | null;
+};
 
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
@@ -78,11 +89,43 @@ export async function fetchFormsList(limit = 100): Promise<FormsListPage | null>
   return fetchTrpcQuery<FormsListPage>("forms.list", { limit }, cookieHeader);
 }
 
-export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary | null> {
+export async function fetchAnalyticsSummary(formId?: string): Promise<AnalyticsSummary | null> {
   const cookieStore = await cookies();
   const cookieHeader = buildCookieHeader(cookieStore);
   if (!cookieHeader.includes("jwt") && !cookieHeader.includes("jwt_refresh")) {
     return null;
   }
-  return fetchTrpcQuery<AnalyticsSummary>("analytics.summary", {}, cookieHeader);
+  return fetchTrpcQuery<AnalyticsSummary>(
+    "analytics.summary",
+    formId ? { formId } : {},
+    cookieHeader,
+  );
+}
+
+export async function fetchAnalyticsBundle(formId: string): Promise<AnalyticsBundle> {
+  const cookieStore = await cookies();
+  const cookieHeader = buildCookieHeader(cookieStore);
+  if (!cookieHeader.includes("jwt") && !cookieHeader.includes("jwt_refresh")) {
+    return {
+      summary: null,
+      overTime: null,
+      formFields: null,
+      submissions: null,
+      allSubmissions: null,
+    };
+  }
+
+  const [summary, overTime, formFields, submissions, allSubmissions] = await Promise.all([
+    fetchTrpcQuery<AnalyticsSummary>("analytics.summary", { formId }, cookieHeader),
+    fetchTrpcQuery<SubmissionsOverTime>(
+      "analytics.submissionsOverTime",
+      { formId, days: 30 },
+      cookieHeader,
+    ),
+    fetchTrpcQuery<FormFieldsList>("analytics.listFormFields", { formId }, cookieHeader),
+    fetchTrpcQuery<SubmissionsPage>("forms.listSubmissions", { formId, limit: 15 }, cookieHeader),
+    fetchTrpcQuery<SubmissionsPage>("forms.listSubmissions", { formId, limit: 100 }, cookieHeader),
+  ]);
+
+  return { summary, overTime, formFields, submissions, allSubmissions };
 }
