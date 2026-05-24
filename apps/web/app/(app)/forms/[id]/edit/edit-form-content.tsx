@@ -10,8 +10,8 @@ import { FormBuilderPreview } from "~/components/forms/form-builder-preview";
 import { FormThemePicker } from "~/components/forms/form-theme-picker";
 import { Highlight } from "~/components/app/highlight";
 import type { FormThemeId } from "~/lib/form-themes";
-import { updateFormAction } from "~/app/(app)/forms/actions";
-import { getTrpcErrorMessage, runWithRetry, useWarmApi } from "~/lib/warm-api";
+import { getSaveErrorMessage, saveFormWithColdStart } from "~/lib/save-form";
+import { useWarmApi } from "~/lib/warm-api";
 import type { FormDetail } from "~/lib/fetch-session";
 import { trpc } from "~/trpc/client";
 import type { RouterInputs } from "@repo/trpc/client";
@@ -27,7 +27,6 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
   const router = useRouter();
   const utils = trpc.useUtils();
   const [saving, setSaving] = useState(false);
-  const updateForm = trpc.forms.update.useMutation();
   const { data: user } = trpc.auth.me.useQuery({});
 
   useWarmApi();
@@ -122,7 +121,6 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
     }
 
     setSaving(true);
-    toast.message("Saving changes… may take up to a minute if the server was idle.");
 
     const payload = {
       formId,
@@ -135,27 +133,16 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
     };
 
     try {
-      await runWithRetry(
-        async () => {
-          try {
-            return await updateFormAction(payload);
-          } catch {
-            return await updateForm.mutateAsync(payload);
-          }
-        },
-        {
-          onRetry: (attempt) => {
-            toast.message(`Server waking up… retry ${attempt}/5`);
-          },
-        },
-      );
+      await saveFormWithColdStart("update", payload, {
+        onProgress: (message) => toast.message(message),
+      });
       await utils.forms.list.invalidate();
       await utils.forms.getById.invalidate({ formId });
       await utils.analytics.summary.invalidate();
       toast.success("Form updated");
       router.push("/dashboard");
     } catch (error) {
-      toast.error(getTrpcErrorMessage(error));
+      toast.error(getSaveErrorMessage(error));
     } finally {
       setSaving(false);
     }
