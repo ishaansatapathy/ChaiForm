@@ -172,30 +172,44 @@ class FormService {
     const fields = input.fields ? this.normalizeInputFields(input.fields, true) : undefined;
 
     let slug = existing.slug;
-    if (input.slug) {
-      slug = await createUniqueSlug(input.slug, input.formId);
-    } else if (input.title && input.title.trim() !== existing.title) {
-      slug = await createUniqueSlug(input.title.trim(), input.formId);
+    if (input.slug !== undefined) {
+      slug = await createUniqueSlug(input.slug.trim(), input.formId);
     }
 
-    const [updated] = await db
-      .update(formsTable)
-      .set({
-        title: input.title?.trim() ?? existing.title,
-        description: input.description !== undefined ? input.description.trim() || null : existing.description,
-        visibility: input.visibility ?? existing.visibility,
-        slug,
-        updatedAt: new Date(),
-      })
-      .where(eq(formsTable.id, input.formId))
-      .returning();
+    const [updated] = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(formsTable)
+        .set({
+          title: input.title?.trim() ?? existing.title,
+          description: input.description !== undefined ? input.description.trim() || null : existing.description,
+          visibility: input.visibility ?? existing.visibility,
+          slug,
+          updatedAt: new Date(),
+        })
+        .where(eq(formsTable.id, input.formId))
+        .returning();
 
-    if (!updated) throw new FormError("BAD_REQUEST", "Unable to update form");
+      if (!row) throw new FormError("BAD_REQUEST", "Unable to update form");
 
-    if (fields) {
-      await db.delete(formFieldsTable).where(eq(formFieldsTable.formId, input.formId));
-      await this.insertFields(input.formId, fields);
-    }
+      if (fields) {
+        await tx.delete(formFieldsTable).where(eq(formFieldsTable.formId, input.formId));
+        if (fields.length > 0) {
+          await tx.insert(formFieldsTable).values(
+            fields.map((field, index) => ({
+              id: field.id,
+              formId: input.formId,
+              label: field.label,
+              type: field.type,
+              required: field.required,
+              sortOrder: index,
+              config: field.config ?? {},
+            })),
+          );
+        }
+      }
+
+      return [row];
+    });
 
     const [countRow] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -331,27 +345,31 @@ class FormService {
       value: validated[field.id] ?? "",
     }));
 
-    const [created] = await db
-      .insert(submissionsTable)
-      .values({
-        formId: form.id,
-        answers,
-      })
-      .returning();
+    const [created] = await db.transaction(async (tx) => {
+      const [submission] = await tx
+        .insert(submissionsTable)
+        .values({
+          formId: form.id,
+          answers,
+        })
+        .returning();
 
-    if (!created) throw new FormError("BAD_REQUEST", "Unable to save submission");
+      if (!submission) throw new FormError("BAD_REQUEST", "Unable to save submission");
 
-    const responseRows = answers
-      .filter((answer) => answer.value.length > 0)
-      .map((answer) => ({
-        submissionId: created.id,
-        fieldId: answer.fieldId,
-        value: answer.value,
-      }));
+      const responseRows = answers
+        .filter((answer) => answer.value.length > 0)
+        .map((answer) => ({
+          submissionId: submission.id,
+          fieldId: answer.fieldId,
+          value: answer.value,
+        }));
 
-    if (responseRows.length > 0) {
-      await db.insert(submissionResponsesTable).values(responseRows);
-    }
+      if (responseRows.length > 0) {
+        await tx.insert(submissionResponsesTable).values(responseRows);
+      }
+
+      return [submission];
+    });
 
     return {
       id: created.id,

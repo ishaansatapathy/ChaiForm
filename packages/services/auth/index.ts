@@ -31,6 +31,21 @@ import type { AuthUser, SignInOutput, SignUpOutput } from "./model";
 const GENERIC_RECOVERY_MESSAGE = "If an account exists for that email, we sent reset instructions.";
 const GENERIC_VERIFY_MESSAGE =
   "If an account exists and is not yet verified, we sent a new verification link.";
+const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+function verificationExpiry() {
+  return new Date(Date.now() + VERIFICATION_TTL_MS);
+}
+
+async function sendVerificationEmail(email: string, verificationToken: string) {
+  const verifyUrl = `${env.CLIENT_URL}/verify-email/${verificationToken}`;
+  await sendEmail({
+    email,
+    subject: "Verify Your ChaiForm Account",
+    html: `<p>Welcome to ChaiForm! <a href="${verifyUrl}">Verify your email</a></p>`,
+    text: `Verify your account: ${verifyUrl}`,
+  });
+}
 
 function sanitizeEmail(email: string) {
   return email.toLowerCase().trim();
@@ -40,6 +55,7 @@ function toPublicUser(user: SelectUser): AuthUser {
   return {
     id: user.id,
     fullName: user.fullName,
+    displayName: user.displayName ?? null,
     email: user.email,
     emailVerified: user.emailVerified ?? false,
     profileImageUrl: user.profileImageUrl ?? null,
@@ -123,7 +139,7 @@ class AuthService {
     return null;
   }
 
-  public async signUp(input: SignUpInput, _res: Response): Promise<SignUpOutput> {
+  public async signUp(input: SignUpInput): Promise<SignUpOutput> {
     const sanitizedEmail = sanitizeEmail(input.email);
     const existing = await this.findUserByEmail(sanitizedEmail);
     if (existing) {
@@ -141,6 +157,7 @@ class AuthService {
         passwordHash,
         authProvider: "local",
         verificationToken,
+        verificationTokenExpire: verificationExpiry(),
         emailVerified: false,
       })
       .returning();
@@ -149,13 +166,7 @@ class AuthService {
       throw new AuthError("INTERNAL", "Unable to create account. Please try again.");
     }
 
-    const verifyUrl = `${env.CLIENT_URL}/verify-email/${verificationToken}`;
-    await sendEmail({
-      email: user.email,
-      subject: "Verify Your ChaiForm Account",
-      html: `<p>Welcome to ChaiForm! <a href="${verifyUrl}">Verify your email</a></p>`,
-      text: `Verify your account: ${verifyUrl}`,
-    });
+    await sendVerificationEmail(user.email, verificationToken);
 
     return {
       message: "Account created. Check your email to verify before signing in.",
@@ -289,7 +300,7 @@ class AuthService {
         text: `Your password reset code is: ${otp}`,
       });
     } else {
-      const resetUrl = `${env.CLIENT_URL}/reset-password/${resetToken}`;
+      const resetUrl = `${env.CLIENT_URL}/reset-password/${resetToken}?email=${encodeURIComponent(user.email)}`;
       await sendEmail({
         email: user.email,
         subject: "Reset Your Password — ChaiForm",
@@ -362,6 +373,8 @@ class AuthService {
   }
 
   public async verifyEmail(input: VerifyEmailInput, res: Response): Promise<AuthUser> {
+    const now = new Date();
+
     const [user] = await db
       .select()
       .from(usersTable)
@@ -372,9 +385,13 @@ class AuthService {
       throw new AuthError("BAD_REQUEST", "Invalid or expired verification link.");
     }
 
+    if (user.verificationTokenExpire && user.verificationTokenExpire < now) {
+      throw new AuthError("BAD_REQUEST", "Verification link expired. Request a new one.");
+    }
+
     const [updated] = await db
       .update(usersTable)
-      .set({ emailVerified: true, verificationToken: null })
+      .set({ emailVerified: true, verificationToken: null, verificationTokenExpire: null })
       .where(eq(usersTable.id, user.id))
       .returning();
 
@@ -397,16 +414,10 @@ class AuthService {
     const verificationToken = crypto.randomBytes(32).toString("hex");
     await db
       .update(usersTable)
-      .set({ verificationToken })
+      .set({ verificationToken, verificationTokenExpire: verificationExpiry() })
       .where(eq(usersTable.id, user.id));
 
-    const verifyUrl = `${env.CLIENT_URL}/verify-email/${verificationToken}`;
-    await sendEmail({
-      email: user.email,
-      subject: "Verify Your ChaiForm Account",
-      html: `<p>Verify your email: <a href="${verifyUrl}">${verifyUrl}</a></p>`,
-      text: `Verify your account: ${verifyUrl}`,
-    });
+    await sendVerificationEmail(user.email, verificationToken);
 
     return { message: GENERIC_VERIFY_MESSAGE };
   }
@@ -423,16 +434,10 @@ class AuthService {
     const verificationToken = crypto.randomBytes(32).toString("hex");
     await db
       .update(usersTable)
-      .set({ verificationToken })
+      .set({ verificationToken, verificationTokenExpire: verificationExpiry() })
       .where(eq(usersTable.id, user.id));
 
-    const verifyUrl = `${env.CLIENT_URL}/verify-email/${verificationToken}`;
-    await sendEmail({
-      email: user.email,
-      subject: "Verify Your ChaiForm Account",
-      html: `<p>Verify your email: <a href="${verifyUrl}">${verifyUrl}</a></p>`,
-      text: `Verify your account: ${verifyUrl}`,
-    });
+    await sendVerificationEmail(user.email, verificationToken);
 
     return { message: "Verification email resent successfully!" };
   }
@@ -454,6 +459,30 @@ class AuthService {
     };
   }
 
+  public async setupProfile(userId: string, displayName: string): Promise<AuthUser> {
+    const user = await this.findUserById(userId);
+    if (!user) {
+      throw new AuthError("NOT_FOUND", "User not found");
+    }
+
+    const trimmed = displayName.trim();
+    if (trimmed.length < 2) {
+      throw new AuthError("BAD_REQUEST", "Display name must be at least 2 characters");
+    }
+
+    const [updated] = await db
+      .update(usersTable)
+      .set({ displayName: trimmed })
+      .where(eq(usersTable.id, userId))
+      .returning();
+
+    if (!updated) {
+      throw new AuthError("INTERNAL", "Unable to save display name");
+    }
+
+    return toPublicUser(updated);
+  }
+
   public async handleGoogleCallback(code: string, res: Response, returnTo = "/dashboard"): Promise<string> {
     if (!isGoogleOAuthConfigured()) {
       throw new AuthError("INTERNAL", "Google OAuth is not configured");
@@ -464,8 +493,12 @@ class AuthService {
       const { tokens } = await client.getToken(code);
       client.setCredentials(tokens);
 
+      if (!tokens.id_token) {
+        throw new AuthError("UNAUTHORIZED", "Google sign-in did not return an ID token");
+      }
+
       const ticket = await client.verifyIdToken({
-        idToken: tokens.id_token!,
+        idToken: tokens.id_token,
         audience: env.GOOGLE_OAUTH_CLIENT_ID,
       });
 
@@ -514,11 +547,19 @@ class AuthService {
 
       if (!user.emailVerified) {
         clearAuthCookies(res);
+        const verificationToken = crypto.randomBytes(32).toString("hex");
+        await db
+          .update(usersTable)
+          .set({ verificationToken, verificationTokenExpire: verificationExpiry() })
+          .where(eq(usersTable.id, user.id));
+        await sendVerificationEmail(user.email, verificationToken);
         return `${env.CLIENT_URL}/check-email?email=${encodeURIComponent(user.email)}`;
       }
 
       issueAuthCookies(res, user.id);
-      return `${env.CLIENT_URL}${returnTo.startsWith("/") ? returnTo : `/${returnTo}`}`;
+      const destination = returnTo.startsWith("/") ? returnTo : `/${returnTo}`;
+      const separator = destination.includes("?") ? "&" : "?";
+      return `${env.CLIENT_URL}${destination}${separator}hero=1`;
     } catch (error) {
       throw toAuthError(error, "Google sign-in failed. Please try again.");
     }

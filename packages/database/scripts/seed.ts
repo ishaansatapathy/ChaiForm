@@ -2,6 +2,8 @@ import "dotenv/config";
 
 import { randomUUID } from "node:crypto";
 
+import bcrypt from "bcryptjs";
+
 import { db, eq } from "@repo/database";
 import {
   formFieldsTable,
@@ -57,20 +59,42 @@ const DEMO_SUBMISSIONS = [
   },
 ];
 
-async function main() {
-  const email = process.env.SEED_USER_EMAIL ?? "demo@chaiform.dev";
-
+async function ensureDemoUser(email: string) {
   const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  if (existingUser) return existingUser;
 
-  if (!existingUser) {
-    console.log(`No user found for ${email}. Sign up first, then re-run: pnpm db:seed`);
-    process.exit(0);
+  const demoPassword = process.env.SEED_DEMO_PASSWORD ?? "DemoPass123!";
+  const passwordHash = await bcrypt.hash(demoPassword, 12);
+
+  const [created] = await db
+    .insert(usersTable)
+    .values({
+      fullName: "Demo Creator",
+      email,
+      passwordHash,
+      authProvider: "local",
+      emailVerified: true,
+    })
+    .returning();
+
+  if (!created) {
+    throw new Error("Failed to create demo user");
   }
+
+  console.log(`Created verified demo user: ${email}`);
+  console.log(`Demo password: ${demoPassword}`);
+  return created;
+}
+
+async function main() {
+  const email = (process.env.SEED_USER_EMAIL ?? "demo@chaiform.dev").toLowerCase();
+
+  const user = await ensureDemoUser(email);
 
   const [existingForm] = await db
     .select()
     .from(formsTable)
-    .where(eq(formsTable.userId, existingUser.id))
+    .where(eq(formsTable.userId, user.id))
     .limit(1);
 
   if (existingForm) {
@@ -107,7 +131,7 @@ async function main() {
   const [form] = await db
     .insert(formsTable)
     .values({
-      userId: existingUser.id,
+      userId: user.id,
       title: "Product feedback",
       description: "Tell us what you think about ChaiForm.",
       visibility: "public",
@@ -165,6 +189,7 @@ async function main() {
 
   console.log("Demo seed complete.");
   console.log(`Form: Product feedback (${DEMO_SUBMISSIONS.length} submissions, 48 views)`);
+  console.log(`Sign in: ${email} / ${process.env.SEED_DEMO_PASSWORD ?? "DemoPass123!"}`);
   console.log(`Public URL: http://localhost:3000/f/s/product-feedback`);
   console.log(`Analytics: http://localhost:3000/analytics?form=${form.id}`);
 }

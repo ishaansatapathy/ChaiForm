@@ -31,6 +31,10 @@ function CheckEmailContent() {
           We sent a verification link{email ? ` to ${email}` : ""}. Open it to activate your account
           before signing in.
         </p>
+        <p className="mt-3 rounded-xl border border-white/10 bg-white/3 px-4 py-3 text-left text-xs leading-relaxed text-white/45">
+          Dev tip: without <code className="text-lime-400/90">RESEND_API_KEY</code>, check the API server
+          logs for the verification link after sign-up or resend.
+        </p>
         {email && (
           <button
             type="button"

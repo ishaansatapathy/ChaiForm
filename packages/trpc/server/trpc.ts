@@ -7,7 +7,17 @@ import { createContext } from "./context";
 export const tRPCContext = initTRPC
   .meta<OpenApiMeta>()
   .context<typeof createContext>()
-  .create({});
+  .create({
+    errorFormatter({ shape, error }) {
+      return {
+        ...shape,
+        data: {
+          ...shape.data,
+          zodError: error.cause instanceof Error ? error.cause.message : null,
+        },
+      };
+    },
+  });
 
 export const router = tRPCContext.router;
 

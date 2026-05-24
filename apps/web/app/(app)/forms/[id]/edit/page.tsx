@@ -35,6 +35,7 @@ export default function EditFormPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [slug, setSlug] = useState("");
   const [visibility, setVisibility] = useState<"public" | "unlisted" | "draft">("public");
   const [fields, setFields] = useState<DraftField[]>([]);
 
@@ -42,6 +43,7 @@ export default function EditFormPage() {
     if (!form) return;
     setTitle(form.title);
     setDescription(form.description ?? "");
+    setSlug(form.slug ?? "");
     setVisibility(form.visibility);
     setFields(form.fields as DraftField[]);
   }, [form]);
@@ -59,6 +61,7 @@ export default function EditFormPage() {
       formId,
       title: title.trim(),
       description: description.trim() || undefined,
+      slug: slug.trim() !== (form.slug ?? "") ? slug.trim() : undefined,
       visibility,
       fields: fields as UpdateFormFields,
     });
@@ -100,7 +103,7 @@ export default function EditFormPage() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Description (optional)"
               rows={3}
-              className="mt-6 w-full resize-none rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-sm text-white/70 outline-none placeholder:text-white/25"
+              className="mt-6 w-full resize-none rounded-2xl border border-white/5 bg-white/2 p-4 text-sm text-white/70 outline-none placeholder:text-white/25"
             />
           </div>
 
@@ -113,12 +116,24 @@ export default function EditFormPage() {
             <select
               value={visibility}
               onChange={(e) => setVisibility(e.target.value as "public" | "unlisted" | "draft")}
-              className="mb-6 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none"
+              className="mb-4 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none"
             >
               <option value="public">Public</option>
               <option value="unlisted">Unlisted</option>
               <option value="draft">Draft</option>
             </select>
+            <label className="mb-6 block space-y-2">
+              <span className="font-mono text-[9px] tracking-[0.28em] text-white/35 uppercase">Share slug</span>
+              <input
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                placeholder="product-feedback"
+                className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 font-mono text-sm text-white outline-none placeholder:text-white/25"
+              />
+              {slug && (
+                <span className="block font-mono text-[10px] text-white/35">/f/s/{slug}</span>
+              )}
+            </label>
             <button
               type="button"
               onClick={handleSave}

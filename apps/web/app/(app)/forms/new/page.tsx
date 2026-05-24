@@ -77,7 +77,7 @@ export default function CreateFormPage() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Description (optional)"
               rows={3}
-              className="mt-6 w-full resize-none rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-sm text-white/70 outline-none placeholder:text-white/25"
+              className="mt-6 w-full resize-none rounded-2xl border border-white/5 bg-white/2 p-4 text-sm text-white/70 outline-none placeholder:text-white/25"
             />
           </div>
 

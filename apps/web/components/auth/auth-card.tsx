@@ -1,12 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { TRPCClientError } from "@repo/trpc/client";
 import { toast } from "sonner";
 
-import { AuthField, AuthModeToggle } from "~/components/auth/auth-field";
+import { AuthField, AuthModeToggle, AuthSubmitButton } from "~/components/auth/auth-field";
 import { SocialButtons } from "~/components/auth/social-buttons";
+import { markHeroTimePending, withHeroTimeParam } from "~/lib/hero-time";
+import { prefetchAppRoutes } from "~/lib/prefetch-app-routes";
 import { trpc } from "~/trpc/client";
 
 type AuthCardProps = {
@@ -15,6 +18,8 @@ type AuthCardProps = {
 
 export function AuthCard({ mode }: AuthCardProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") ?? "/dashboard";
   const isLogin = mode === "sign-in";
   const [loading, setLoading] = useState(false);
   const [twoFactorStep, setTwoFactorStep] = useState<{ email: string; otp: string } | null>(null);
@@ -41,6 +46,13 @@ export function AuthCard({ mode }: AuthCardProps) {
     return "Something went wrong";
   };
 
+  const completeSignIn = (path: string) => {
+    prefetchAppRoutes(router);
+    markHeroTimePending();
+    const destination = path.startsWith("/") ? path : "/dashboard";
+    router.push(withHeroTimeParam(destination));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -52,8 +64,7 @@ export function AuthCard({ mode }: AuthCardProps) {
           email: twoFactorStep.email,
           otp: twoFactorStep.otp,
         });
-        toast.success("Signed in successfully");
-        router.push("/dashboard");
+        completeSignIn(nextPath);
         return;
       }
 
@@ -69,13 +80,7 @@ export function AuthCard({ mode }: AuthCardProps) {
           return;
         }
 
-        if (!result.user.emailVerified) {
-          router.push(`/check-email?email=${encodeURIComponent(result.user.email)}`);
-          return;
-        }
-
-        toast.success("Signed in successfully");
-        router.push("/dashboard");
+        completeSignIn(nextPath);
         return;
       }
 
@@ -206,13 +211,12 @@ export function AuthCard({ mode }: AuthCardProps) {
 
             {isLogin && (
               <div className="-mt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => toast.info("Password recovery coming soon.")}
+                <Link
+                  href="/forgot-password"
                   className="font-mono text-[10px] tracking-widest text-white/35 uppercase transition-colors hover:text-lime-400"
                 >
                   Forgot password?
-                </button>
+                </Link>
               </div>
             )}
 
@@ -238,8 +242,7 @@ export function AuthCard({ mode }: AuthCardProps) {
           </p>
         )}
 
-        <button
-          type="submit"
+        <AuthSubmitButton
           disabled={loading}
           className="mt-3 w-full rounded-xl bg-[#d4d4d8] py-3.5 text-sm font-bold text-black transition-colors hover:bg-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -250,7 +253,7 @@ export function AuthCard({ mode }: AuthCardProps) {
               : isLogin
                 ? "Sign In"
                 : "Sign Up"}
-        </button>
+        </AuthSubmitButton>
 
         {!twoFactorStep && (
           <p className="font-mono mt-3 text-center text-[9px] tracking-[0.28em] text-white/30 uppercase">

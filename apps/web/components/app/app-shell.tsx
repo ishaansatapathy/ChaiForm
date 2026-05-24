@@ -8,6 +8,8 @@ import { TRPCClientError } from "@repo/trpc/client";
 
 import { AppMobileNav } from "~/components/app/app-mobile-nav";
 import { AppSidebar } from "~/components/app/app-sidebar";
+import { HeroTimeGate } from "~/components/app/hero-time-gate";
+import { prefetchAppRoutes } from "~/lib/prefetch-app-routes";
 import { trpc } from "~/trpc/client";
 
 function AppBackground() {
@@ -31,9 +33,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { data: user, isLoading, isError, error } = trpc.auth.me.useQuery(undefined, {
     retry: false,
-    refetchOnWindowFocus: true,
-    staleTime: 0,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
   });
+
+  useEffect(() => {
+    prefetchAppRoutes(router);
+  }, [router]);
 
   useEffect(() => {
     if (!isError) return;
@@ -63,6 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative min-h-screen">
       <AppBackground />
+      <HeroTimeGate user={user} />
       <div className="relative z-10 flex flex-col lg:flex-row">
         <AppSidebar />
         <main className="min-h-screen flex-1 px-4 pt-8 pb-32 sm:px-6 lg:px-8 lg:pb-10">

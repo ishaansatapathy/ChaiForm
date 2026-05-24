@@ -1,17 +1,11 @@
-import { Suspense } from "react";
+import dynamic from "next/dynamic";
 
-import AnalyticsContent from "./analytics-content";
+import { PageSkeleton } from "~/components/app/page-skeleton";
+
+const AnalyticsContent = dynamic(() => import("./analytics-content"), {
+  loading: () => <PageSkeleton label="Loading analytics" />,
+});
 
 export default function AnalyticsPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="py-20 text-center font-mono text-[10px] tracking-[0.3em] text-white/40 uppercase">
-          loading analytics…
-        </div>
-      }
-    >
-      <AnalyticsContent />
-    </Suspense>
-  );
+  return <AnalyticsContent />;
 }

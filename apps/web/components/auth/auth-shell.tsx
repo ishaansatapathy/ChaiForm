@@ -5,6 +5,8 @@ import gsap from "gsap";
 import Image from "next/image";
 import Link from "next/link";
 
+import { Suspense } from "react";
+
 import { AuthCard } from "~/components/auth/auth-card";
 import { AuthErrorToast } from "~/components/auth/auth-error-toast";
 import { HudFrame } from "~/components/auth/hud-frame";
@@ -87,7 +89,9 @@ export function AuthShell({ mode }: AuthShellProps) {
 
           <div ref={cardRef}>
             <HudFrame>
-              <AuthCard mode={mode} />
+              <Suspense fallback={<div className="h-[420px] animate-pulse rounded-[1.8rem] bg-white/5" />}>
+                <AuthCard mode={mode} />
+              </Suspense>
             </HudFrame>
           </div>
 

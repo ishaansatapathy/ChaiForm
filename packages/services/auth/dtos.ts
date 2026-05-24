@@ -46,6 +46,14 @@ export const resendVerificationEmailInputSchema = z.object({
   email: z.string().trim().email("Invalid email"),
 });
 
+export const setupProfileInputSchema = z.object({
+  displayName: z
+    .string()
+    .trim()
+    .min(2, "Display name must be at least 2 characters")
+    .max(40, "Display name must be at most 40 characters"),
+});
+
 export function assertSignUpPasswordsMatch(input: z.infer<typeof signUpInputSchema>) {
   if (input.password !== input.confirmPassword) {
     throw new Error("Passwords do not match");
@@ -67,3 +75,4 @@ export type Verify2FAInput = z.infer<typeof verify2FAInputSchema>;
 export type Toggle2FAInput = z.infer<typeof toggle2FAInputSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailInputSchema>;
 export type ResendVerificationEmailInput = z.infer<typeof resendVerificationEmailInputSchema>;
+export type SetupProfileInput = z.infer<typeof setupProfileInputSchema>;
