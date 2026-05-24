@@ -7,7 +7,7 @@ import type { Request, Response } from "express";
 
 import { env } from "../env";
 import { getGoogleOAuth2Client, isGoogleOAuthConfigured } from "../clients/google-oauth";
-import { sendEmail } from "./email";
+import { isDevEmailLogging, sendEmail } from "./email";
 import { AuthError, toAuthError } from "./errors";
 import type {
   ForgotPasswordInput,
@@ -67,6 +67,12 @@ function generateOtp() {
   return crypto.randomInt(100_000, 1_000_000).toString();
 }
 
+function twoFactorChallengeMessage() {
+  return isDevEmailLogging()
+    ? "2FA code logged in the API console (dev mode)"
+    : "2FA code sent to your email";
+}
+
 function assertEmailVerified(user: SelectUser) {
   if (!user.emailVerified) {
     throw new AuthError(
@@ -91,6 +97,33 @@ class AuthService {
   private async findUserById(userId: string) {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
     return user ?? null;
+  }
+
+  private async initiateTwoFactorChallenge(user: SelectUser) {
+    const otp = generateOtp();
+    const expire = new Date(Date.now() + 5 * 60 * 1000);
+
+    await db
+      .update(usersTable)
+      .set({ twoFactorOtp: otp, twoFactorOtpExpire: expire })
+      .where(eq(usersTable.id, user.id));
+
+    await sendEmail({
+      email: user.email,
+      subject: "Your ChaiForm 2FA Code",
+      html: `<p>Your two-factor authentication code is: <strong>${otp}</strong></p>`,
+      text: `Your 2FA code is: ${otp}`,
+    });
+
+    return {
+      email: user.email,
+      message: twoFactorChallengeMessage(),
+    };
+  }
+
+  private buildTwoFactorSignInUrl(email: string) {
+    const params = new URLSearchParams({ "2fa": "1", email });
+    return `${env.CLIENT_URL}/sign-in?${params.toString()}`;
   }
 
   public toPublicUser(user: SelectUser): AuthUser {
@@ -185,25 +218,10 @@ class AuthService {
     assertEmailVerified(user);
 
     if (user.twoFactorEnabled) {
-      const otp = generateOtp();
-      const expire = new Date(Date.now() + 5 * 60 * 1000);
-
-      await db
-        .update(usersTable)
-        .set({ twoFactorOtp: otp, twoFactorOtpExpire: expire })
-        .where(eq(usersTable.id, user.id));
-
-      await sendEmail({
-        email: user.email,
-        subject: "Your ChaiForm 2FA Code",
-        html: `<p>Your two-factor authentication code is: <strong>${otp}</strong></p>`,
-        text: `Your 2FA code is: ${otp}`,
-      });
-
+      const challenge = await this.initiateTwoFactorChallenge(user);
       return {
         twoFactorRequired: true,
-        email: user.email,
-        message: "2FA code sent to your email",
+        ...challenge,
       };
     }
 
@@ -554,6 +572,12 @@ class AuthService {
           .where(eq(usersTable.id, user.id));
         await sendVerificationEmail(user.email, verificationToken);
         return `${env.CLIENT_URL}/check-email?email=${encodeURIComponent(user.email)}`;
+      }
+
+      if (user.twoFactorEnabled) {
+        clearAuthCookies(res);
+        await this.initiateTwoFactorChallenge(user);
+        return this.buildTwoFactorSignInUrl(user.email);
       }
 
       issueAuthCookies(res, user.id);

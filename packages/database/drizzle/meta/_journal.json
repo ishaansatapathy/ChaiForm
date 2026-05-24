@@ -38,10 +38,31 @@
       "breakpoints": true
     },
     {
+      "idx": 5,
+      "version": "7",
+      "when": 1767592965696,
+      "tag": "0005_drop_legacy_fields_jsonb",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1767592965697,
+      "tag": "0006_verification_token_expire",
+      "breakpoints": true
+    },
+    {
       "idx": 7,
       "version": "7",
       "when": 1767592965698,
       "tag": "0007_display_name",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1767592965699,
+      "tag": "0008_form_theme",
       "breakpoints": true
     }
   ]

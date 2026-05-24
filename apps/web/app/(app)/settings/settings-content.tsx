@@ -11,11 +11,15 @@ import { trpc } from "~/trpc/client";
 import { useLogout } from "~/lib/use-logout";
 
 export default function SettingsContent() {
+  const utils = trpc.useUtils();
   const { data: user } = trpc.auth.me.useQuery();
   const [showRough, setShowRough] = useState(false);
   const logout = useLogout();
   const toggle2FA = trpc.auth.toggle2FA.useMutation({
-    onSuccess: (res) => toast.success(res.message),
+    onSuccess: async (res) => {
+      toast.success(res.message);
+      await utils.auth.me.invalidate();
+    },
     onError: (err) => toast.error(err.message),
   });
 

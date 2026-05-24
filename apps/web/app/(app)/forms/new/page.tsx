@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { FormBuilderFields, type DraftField } from "~/components/forms/form-builder-fields";
 import { Highlight } from "~/components/app/highlight";
+import { FORM_TEMPLATES } from "~/lib/form-templates";
 import { trpc } from "~/trpc/client";
 import type { RouterInputs } from "@repo/trpc/client";
 
@@ -19,8 +20,11 @@ const INITIAL_DRAFT_FIELDS: DraftField[] = [
 
 export default function CreateFormPage() {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const createForm = trpc.forms.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await utils.forms.list.invalidate();
+      await utils.analytics.summary.invalidate();
       toast.success("Form saved");
       router.push("/dashboard");
     },
@@ -31,6 +35,23 @@ export default function CreateFormPage() {
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"public" | "unlisted" | "draft">("public");
   const [fields, setFields] = useState<DraftField[]>(INITIAL_DRAFT_FIELDS);
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+
+  const applyTemplate = (templateId: string) => {
+    const template = FORM_TEMPLATES.find((item) => item.id === templateId);
+    if (!template) return;
+
+    setTitle(template.title);
+    setDescription(template.formDescription);
+    setFields(
+      template.fields.map((field) => ({
+        ...field,
+        id: crypto.randomUUID(),
+      })),
+    );
+    setActiveTemplateId(templateId);
+    toast.success(`${template.label} template loaded — edit and save when ready`);
+  };
 
   const handlePublish = () => {
     if (!title.trim()) {
@@ -41,6 +62,7 @@ export default function CreateFormPage() {
       title: title.trim(),
       description: description.trim() || undefined,
       visibility,
+      theme: "default",
       fields: fields as CreateFormFields,
     });
   };
@@ -93,11 +115,11 @@ export default function CreateFormPage() {
             <select
               value={visibility}
               onChange={(e) => setVisibility(e.target.value as "public" | "unlisted" | "draft")}
-              className="mb-6 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none"
+              className="form-select mb-6 w-full rounded-xl border border-white/10 bg-[#0a0a0a] px-3 py-2.5 text-sm text-white outline-none"
             >
-              <option value="public">Public — anyone with link</option>
+              <option value="public">Public — listed on Explore</option>
               <option value="unlisted">Unlisted — link only</option>
-              <option value="draft">Draft — hidden from respondents</option>
+              <option value="draft">Private — hidden from respondents</option>
             </select>
             <button
               type="button"
@@ -107,6 +129,31 @@ export default function CreateFormPage() {
             >
               {createForm.isPending ? "Saving…" : "Save Form"}
             </button>
+
+            <div className="mt-6 border-t border-white/8 pt-6">
+              <p className="font-mono mb-1 text-[9px] tracking-[0.28em] text-white/35 uppercase">Need inspiration?</p>
+              <p className="mb-3 text-xs text-white/40">Use a starter template — fields load into the builder.</p>
+              <div className="space-y-2">
+                {FORM_TEMPLATES.map((template) => {
+                  const active = activeTemplateId === template.id;
+                  return (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => applyTemplate(template.id)}
+                      className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
+                        active
+                          ? "border-lime-400/40 bg-lime-400/10"
+                          : "border-white/8 bg-white/2 hover:border-white/15 hover:bg-white/4"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold text-white">{template.label}</p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-white/45">{template.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </aside>
       </div>

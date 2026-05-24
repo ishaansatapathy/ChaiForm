@@ -1,7 +1,6 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -17,18 +16,12 @@ import {
 } from "recharts";
 
 import { Highlight } from "~/components/app/highlight";
+import { AnalyticsDetailPanel } from "~/components/analytics/analytics-detail-panel";
 import { downloadSubmissionsCsv } from "~/lib/export-csv";
 import { trpc } from "~/trpc/client";
+import type { RouterOutputs } from "@repo/trpc/client";
 
-const SubmissionFlowChart = dynamic(
-  () =>
-    import("~/components/analytics/submission-flow-chart").then((mod) => ({
-      default: mod.SubmissionFlowChart,
-    })),
-  {
-    loading: () => <div className="app-surface h-64 animate-pulse rounded-3xl bg-white/3" />,
-  },
-);
+type SubmissionItem = RouterOutputs["forms"]["listSubmissions"]["items"][number];
 
 export default function AnalyticsContent() {
   const searchParams = useSearchParams();
@@ -44,8 +37,17 @@ export default function AnalyticsContent() {
   const [selectedFormId, setSelectedFormId] = useState<string | undefined>(initialFormId);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | undefined>();
   const [selectedFieldId, setSelectedFieldId] = useState<string | undefined>();
+  const [submissionSearch, setSubmissionSearch] = useState("");
+  const [submissionCursor, setSubmissionCursor] = useState<string | undefined>();
+  const [loadedSubmissions, setLoadedSubmissions] = useState<SubmissionItem[]>([]);
 
   const activeFormId = selectedFormId ?? forms[0]?.id;
+
+  useEffect(() => {
+    setSubmissionCursor(undefined);
+    setLoadedSubmissions([]);
+    setSelectedSubmissionId(undefined);
+  }, [activeFormId, submissionSearch]);
 
   const { data: summary } = trpc.analytics.summary.useQuery(
     { formId: activeFormId },
@@ -70,17 +72,31 @@ export default function AnalyticsContent() {
   );
 
   const { data: submissionsPage, isLoading: submissionsLoading } = trpc.forms.listSubmissions.useQuery(
+    {
+      formId: activeFormId!,
+      limit: 15,
+      cursor: submissionCursor,
+      search: submissionSearch.trim() || undefined,
+    },
+    { enabled: Boolean(activeFormId) },
+  );
+
+  const { data: allSubmissionsPage } = trpc.forms.listSubmissions.useQuery(
     { formId: activeFormId!, limit: 100 },
     { enabled: Boolean(activeFormId) },
   );
-  const submissions = submissionsPage?.items ?? [];
+  const allSubmissions = allSubmissionsPage?.items ?? [];
+
+  useEffect(() => {
+    if (!submissionsPage) return;
+    setLoadedSubmissions((prev) =>
+      submissionCursor ? [...prev, ...submissionsPage.items] : submissionsPage.items,
+    );
+  }, [submissionsPage, submissionCursor]);
+
+  const submissions = loadedSubmissions;
 
   const activeSubmissionId = selectedSubmissionId ?? submissions[0]?.id;
-
-  const { data: submission, isLoading: submissionLoading } = trpc.forms.getSubmission.useQuery(
-    { submissionId: activeSubmissionId! },
-    { enabled: Boolean(activeSubmissionId) },
-  );
 
   const activeForm = forms.find((form) => form.id === activeFormId);
 
@@ -88,11 +104,6 @@ export default function AnalyticsContent() {
     if (!activeForm || submissions.length === 0) return;
     downloadSubmissionsCsv(activeForm.title, submissions);
   };
-
-  const participantLabel = useMemo(() => {
-    if (!submission?.submittedAt) return undefined;
-    return `Submission · ${new Date(submission.submittedAt).toLocaleString()}`;
-  }, [submission?.submittedAt]);
 
   if (formsLoading) {
     return <p className="text-white/40">Loading forms…</p>;
@@ -169,30 +180,48 @@ export default function AnalyticsContent() {
                 Export CSV
               </button>
             </div>
-            {submissionsLoading ? (
+            <input
+              value={submissionSearch}
+              onChange={(e) => setSubmissionSearch(e.target.value)}
+              placeholder="Filter by answer…"
+              className="mb-3 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
+            />
+            {submissionsLoading && submissions.length === 0 ? (
               <p className="px-2 text-sm text-white/40">Loading…</p>
             ) : submissions.length === 0 ? (
               <p className="px-2 text-sm text-white/40">No submissions yet.</p>
             ) : (
-              <div className="max-h-72 space-y-1 overflow-y-auto">
-                {submissions.map((item, index) => (
+              <>
+                <div className="max-h-72 space-y-1 overflow-y-auto">
+                  {submissions.map((item, index) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedSubmissionId(item.id)}
+                      className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
+                        item.id === activeSubmissionId
+                          ? "bg-lime-400/10 text-lime-400"
+                          : "text-white/45 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      Participant {submissions.length - index}
+                      <span className="mt-0.5 block font-mono text-[9px] text-white/30">
+                        {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : "—"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {submissionsPage?.nextCursor && (
                   <button
-                    key={item.id}
                     type="button"
-                    onClick={() => setSelectedSubmissionId(item.id)}
-                    className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
-                      item.id === activeSubmissionId
-                        ? "bg-lime-400/10 text-lime-400"
-                        : "text-white/45 hover:bg-white/5 hover:text-white"
-                    }`}
+                    onClick={() => setSubmissionCursor(submissionsPage.nextCursor ?? undefined)}
+                    disabled={submissionsLoading}
+                    className="mt-3 w-full rounded-xl border border-white/10 py-2 text-xs font-bold tracking-wider text-white/50 uppercase transition-colors hover:border-lime-400/30 hover:text-lime-400 disabled:opacity-40"
                   >
-                    Participant {submissions.length - index}
-                    <span className="mt-0.5 block font-mono text-[9px] text-white/30">
-                      {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : "—"}
-                    </span>
+                    {submissionsLoading ? "Loading…" : "Load more"}
                   </button>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
         </aside>
@@ -227,7 +256,7 @@ export default function AnalyticsContent() {
                 <select
                   value={activeFieldId ?? ""}
                   onChange={(e) => setSelectedFieldId(e.target.value)}
-                  className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none"
+                  className="form-select rounded-xl border border-white/10 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none"
                 >
                   {formFields.fields.map((field) => (
                     <option key={field.id} value={field.id}>
@@ -281,13 +310,23 @@ export default function AnalyticsContent() {
                 </Link>
               )}
             </div>
-          ) : submissionLoading || !submission ? (
-            <p className="text-white/40">Loading submission flow…</p>
-          ) : (
-            <SubmissionFlowChart answers={submission.answers} participantLabel={participantLabel} />
-          )}
+          ) : null}
         </div>
       </div>
+
+      {allSubmissions.length > 0 && formFields && (
+        <div className="mt-8">
+          <AnalyticsDetailPanel
+          key={activeFormId}
+          fields={formFields.fields}
+          submissions={allSubmissions}
+          allSubmissionsCount={summary?.selectedForm?.submissionCount ?? allSubmissions.length}
+          selectedSubmissionId={activeSubmissionId}
+          onSelectSubmission={setSelectedSubmissionId}
+          chartsMounted={chartsMounted}
+        />
+        </div>
+      )}
     </section>
   );
 }
@@ -332,7 +371,7 @@ function Header() {
       <h1 className="font-display text-5xl tracking-tight text-white md:text-6xl">
         <Highlight>Analytics</Highlight> Hub
       </h1>
-      <p className="mt-3 text-sm text-white/45">Aggregate metrics, trends, and per-submission flow views.</p>
+      <p className="mt-3 text-sm text-white/45">Trends, smart filters, graph & flowchart views for every response.</p>
     </div>
   );
 }

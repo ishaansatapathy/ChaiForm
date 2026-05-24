@@ -44,6 +44,15 @@ function fieldValueSchema(field: FormField) {
       }
       break;
     }
+    case "checkbox": {
+      const checkboxSchema = z.enum(["true", "false"], {
+        message: "Checkbox must be checked or unchecked",
+      });
+      if (!field.required) {
+        return z.union([z.literal(""), checkboxSchema]).optional();
+      }
+      return z.literal("true", { message: `"${field.label}" must be checked` });
+    }
     default:
       schema = z.string().max(5000);
   }

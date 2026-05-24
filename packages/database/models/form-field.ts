@@ -6,6 +6,7 @@ export type FieldConfigJson = {
   options?: string[];
   maxRating?: number;
   placeholder?: string;
+  checkboxLabel?: string;
 };
 
 export const formFieldsTable = pgTable("form_fields", {

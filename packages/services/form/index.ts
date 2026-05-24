@@ -19,6 +19,7 @@ import type {
   UpdateFormInput,
 } from "./model";
 import { createUniqueSlug } from "./slug";
+import { notifyCreatorOfSubmission } from "./notifications";
 import { validateSubmissionAnswers } from "./validation";
 
 export class FormError extends Error {
@@ -67,6 +68,12 @@ function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
         ...base,
         type: "rating",
         config: { maxRating: config?.maxRating ?? 5 },
+      };
+    case "checkbox":
+      return {
+        ...base,
+        type: "checkbox",
+        config: config?.checkboxLabel ? { checkboxLabel: config.checkboxLabel } : undefined,
       };
     case "text":
     case "email":
@@ -135,6 +142,7 @@ class FormService {
       title: row.title,
       description: row.description ?? null,
       visibility: row.visibility,
+      theme: row.theme ?? "default",
       fields,
       submissionCount,
       viewCount: row.viewCount ?? 0,
@@ -155,6 +163,7 @@ class FormService {
         title: input.title.trim(),
         description: input.description?.trim() || null,
         visibility: input.visibility,
+        theme: input.theme ?? "default",
         slug,
         viewCount: 0,
       })
@@ -183,6 +192,7 @@ class FormService {
           title: input.title?.trim() ?? existing.title,
           description: input.description !== undefined ? input.description.trim() || null : existing.description,
           visibility: input.visibility ?? existing.visibility,
+          theme: input.theme ?? existing.theme ?? "default",
           slug,
           updatedAt: new Date(),
         })
@@ -301,6 +311,7 @@ class FormService {
       slug: row.slug ?? null,
       title: row.title,
       description: row.description ?? null,
+      theme: row.theme ?? "default",
       fields,
     };
   }
@@ -317,7 +328,55 @@ class FormService {
       slug: row.slug ?? null,
       title: row.title,
       description: row.description ?? null,
+      theme: row.theme ?? "default",
       fields,
+    };
+  }
+
+  async listPublicForms(pagination: PaginationInput = { limit: 20 }) {
+    const limit = pagination.limit ?? 20;
+
+    const conditions = [eq(formsTable.visibility, "public")];
+    if (pagination.cursor) {
+      const [cursorRow] = await db
+        .select({ createdAt: formsTable.createdAt })
+        .from(formsTable)
+        .where(eq(formsTable.id, pagination.cursor))
+        .limit(1);
+      if (cursorRow?.createdAt) {
+        conditions.push(lt(formsTable.createdAt, cursorRow.createdAt));
+      }
+    }
+
+    const rows = await db
+      .select({
+        form: formsTable,
+        submissionCount: sql<number>`count(${submissionsTable.id})::int`,
+      })
+      .from(formsTable)
+      .leftJoin(submissionsTable, eq(submissionsTable.formId, formsTable.id))
+      .where(and(...conditions))
+      .groupBy(formsTable.id)
+      .orderBy(desc(formsTable.createdAt))
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+    const items = pageRows.map((row) => ({
+      id: row.form.id,
+      slug: row.form.slug ?? null,
+      title: row.form.title,
+      description: row.form.description ?? null,
+      theme: row.form.theme ?? "default",
+      submissionCount: row.submissionCount ?? 0,
+      viewCount: row.form.viewCount ?? 0,
+      createdAt: toIso(row.form.createdAt),
+    }));
+
+    return {
+      items,
+      nextCursor: hasMore ? (pageRows[pageRows.length - 1]?.form.id ?? null) : null,
     };
   }
 
@@ -329,6 +388,15 @@ class FormService {
   }
 
   async submitForm(input: SubmitFormInput) {
+    if (input.website && input.website.length > 0) {
+      throw new FormError("BAD_REQUEST", "Submission rejected");
+    }
+
+    const [formRow] = await db.select().from(formsTable).where(eq(formsTable.id, input.formId)).limit(1);
+    if (!formRow || formRow.visibility === "draft") {
+      throw new FormError("NOT_FOUND", "Form not found");
+    }
+
     const form = await this.getPublicForm(input.formId);
     let validated: Record<string, string>;
 
@@ -371,6 +439,14 @@ class FormService {
       return [submission];
     });
 
+    void notifyCreatorOfSubmission({
+      ownerUserId: formRow.userId,
+      formTitle: form.title,
+      formSlug: form.slug,
+      formId: form.id,
+      answers,
+    }).catch(() => undefined);
+
     return {
       id: created.id,
       formId: created.formId,
@@ -385,6 +461,16 @@ class FormService {
     const limit = pagination.limit ?? 20;
 
     const conditions = [eq(submissionsTable.formId, formId)];
+    if (pagination.search?.trim()) {
+      const pattern = `%${pagination.search.trim()}%`;
+      conditions.push(
+        sql`exists (
+          select 1 from ${submissionResponsesTable} sr
+          where sr.submission_id = ${submissionsTable.id}
+          and sr.value ilike ${pattern}
+        )`,
+      );
+    }
     if (pagination.cursor) {
       const [cursorRow] = await db
         .select({ submittedAt: submissionsTable.submittedAt })

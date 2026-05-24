@@ -4,6 +4,7 @@
 
 html {
   scroll-behavior: auto;
+  color-scheme: dark;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -1030,5 +1031,31 @@ html {
 .landing-diagram,
 .landing-ui-panel {
   min-height: 0;
+}
+
+/* Native select dropdowns — dark options on dark UI */
+select,
+.form-select {
+  color-scheme: dark;
+  color: #ffffff;
+  background-color: #0a0a0a;
+}
+
+select option,
+.form-select option {
+  background-color: #0a0a0a;
+  color: #ffffff;
+}
+
+select option:checked,
+.form-select option:checked {
+  background-color: #1a1a1a;
+  color: #b8ff4a;
+}
+
+select option:hover,
+.form-select option:hover {
+  background-color: #141414;
+  color: #ffffff;
 }
 

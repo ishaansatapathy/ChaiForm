@@ -2,20 +2,26 @@
 
 import type { RouterOutputs } from "@repo/trpc/client";
 
-type PublicField = RouterOutputs["forms"]["getPublic"]["fields"][number];
+import type { FormThemeStyle } from "~/lib/form-themes";
 
-const inputClassName =
-  "w-full rounded-2xl border border-white/10 bg-white/3 px-4 py-3 text-sm outline-none focus:border-lime-400/40";
+type PublicField = RouterOutputs["forms"]["getPublic"]["fields"][number];
 
 export function FormFieldInput({
   field,
   value,
   onChange,
+  theme,
 }: {
   field: PublicField;
   value: string;
   onChange: (value: string) => void;
+  theme?: FormThemeStyle;
 }) {
+  const accent = theme?.accent ?? "border-lime-400 bg-lime-400/20 text-lime-300";
+  const inputClassName =
+    "w-full rounded-2xl border border-white/10 bg-[#0a0a0a] px-4 py-3 text-sm text-white outline-none focus:border-lime-400/40";
+  const selectClassName = `${inputClassName} form-select cursor-pointer`;
+
   switch (field.type) {
     case "select":
       return (
@@ -23,11 +29,13 @@ export function FormFieldInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           required={field.required}
-          className={inputClassName}
+          className={selectClassName}
         >
-          <option value="">Select an option</option>
+          <option value="" className="bg-[#0a0a0a] text-white">
+            Select an option
+          </option>
           {(field.config?.options ?? []).map((option) => (
-            <option key={option} value={option}>
+            <option key={option} value={option} className="bg-[#0a0a0a] text-white">
               {option}
             </option>
           ))}
@@ -46,9 +54,7 @@ export function FormFieldInput({
                 type="button"
                 onClick={() => onChange(rating)}
                 className={`h-11 w-11 rounded-xl border text-sm font-bold transition-colors ${
-                  active
-                    ? "border-lime-400 bg-lime-400/20 text-lime-300"
-                    : "border-white/10 bg-white/2 text-white/50 hover:border-lime-400/30"
+                  active ? accent : "border-white/10 bg-white/2 text-white/50 hover:border-lime-400/30"
                 }`}
               >
                 {rating}
@@ -56,6 +62,25 @@ export function FormFieldInput({
             );
           })}
         </div>
+      );
+    }
+    case "checkbox": {
+      const checked = value === "true";
+      const checkboxLabel = field.config?.checkboxLabel ?? field.label;
+      return (
+        <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-white/3 px-4 py-3">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => onChange(e.target.checked ? "true" : "false")}
+            required={field.required}
+            className="mt-0.5 accent-lime-400"
+          />
+          <span className="text-sm text-white/80">
+            {checkboxLabel}
+            {field.required && <span className={theme?.accentText ?? "text-lime-400"}> *</span>}
+          </span>
+        </label>
       );
     }
     case "date":

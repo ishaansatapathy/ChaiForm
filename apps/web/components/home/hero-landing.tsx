@@ -98,6 +98,13 @@ export function HeroLanding() {
       </div>
 
       <Link
+        href="/explore"
+        className="landing-copy hero-sign-in font-mono absolute top-[max(1.25rem,env(safe-area-inset-top))] left-[max(1.25rem,env(safe-area-inset-left))] z-20 border border-white/15 bg-black/50 px-5 py-3 text-[11px] tracking-[0.28em] text-white/70 uppercase backdrop-blur-sm transition-colors hover:border-white/30 hover:text-white sm:top-8 sm:left-8"
+      >
+        Explore
+      </Link>
+
+      <Link
         href="/sign-in"
         className="landing-copy hero-sign-in font-mono absolute top-[max(1.25rem,env(safe-area-inset-top))] right-[max(1.25rem,env(safe-area-inset-right))] z-20 border border-[#70b404]/45 bg-black/50 px-6 py-3 text-[11px] tracking-[0.32em] text-white uppercase backdrop-blur-sm transition-colors hover:border-[#70b404] hover:bg-[#70b404]/10 sm:top-8 sm:right-8"
       >

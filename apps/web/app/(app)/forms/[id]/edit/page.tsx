@@ -15,18 +15,24 @@ type UpdateFormFields = NonNullable<RouterInputs["forms"]["update"]["fields"]>;
 export default function EditFormPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const utils = trpc.useUtils();
   const formId = params.id;
 
   const { data: form, isLoading } = trpc.forms.getById.useQuery({ formId });
   const updateForm = trpc.forms.update.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await utils.forms.list.invalidate();
+      await utils.forms.getById.invalidate({ formId });
+      await utils.analytics.summary.invalidate();
       toast.success("Form updated");
       router.push("/dashboard");
     },
     onError: (err) => toast.error(err.message),
   });
   const deleteForm = trpc.forms.delete.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await utils.forms.list.invalidate();
+      await utils.analytics.summary.invalidate();
       toast.success("Form deleted");
       router.push("/dashboard");
     },
@@ -113,14 +119,17 @@ export default function EditFormPage() {
         <aside className="space-y-4 lg:sticky lg:top-10 lg:self-start">
           <div className="app-surface rounded-[40px] p-6">
             <h3 className="font-display mb-4 text-lg font-bold text-white">Publish</h3>
+            <label className="mb-2 block text-[10px] font-bold tracking-[0.25em] text-white/40 uppercase">
+              Visibility
+            </label>
             <select
               value={visibility}
               onChange={(e) => setVisibility(e.target.value as "public" | "unlisted" | "draft")}
-              className="mb-4 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none"
+              className="form-select mb-6 w-full rounded-xl border border-white/10 bg-[#0a0a0a] px-3 py-2.5 text-sm text-white outline-none"
             >
-              <option value="public">Public</option>
-              <option value="unlisted">Unlisted</option>
-              <option value="draft">Draft</option>
+              <option value="public">Public — listed on Explore</option>
+              <option value="unlisted">Unlisted — link only</option>
+              <option value="draft">Private — hidden from respondents</option>
             </select>
             <label className="mb-6 block space-y-2">
               <span className="font-mono text-[9px] tracking-[0.28em] text-white/35 uppercase">Share slug</span>

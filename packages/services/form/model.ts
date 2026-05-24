@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { formThemeSchema } from "./themes";
+
 const fieldBaseInputSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1).max(255),
@@ -30,6 +32,13 @@ export const formFieldInputSchema = z.discriminatedUnion("type", [
       maxRating: z.number().int().min(1).max(10).default(5),
     }),
   }),
+  z.object({
+    ...fieldBaseInputSchema.shape,
+    type: z.literal("checkbox"),
+    config: z.object({
+      checkboxLabel: z.string().max(200).optional(),
+    }).optional(),
+  }),
 ]);
 
 export const formFieldSchema = z.discriminatedUnion("type", [
@@ -56,17 +65,28 @@ export const formFieldSchema = z.discriminatedUnion("type", [
       maxRating: z.number().int().min(1).max(10).default(5),
     }),
   }),
+  z.object({
+    id: z.string().uuid(),
+    label: z.string().min(1).max(255),
+    required: z.boolean(),
+    type: z.literal("checkbox"),
+    config: z.object({
+      checkboxLabel: z.string().max(200).optional(),
+    }).optional(),
+  }),
 ]);
 
 export const paginationInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20),
   cursor: z.string().uuid().optional(),
+  search: z.string().max(200).optional(),
 });
 
 export const createFormInputSchema = z.object({
   title: z.string().min(1).max(255),
   description: z.string().max(2000).optional(),
   visibility: z.enum(["public", "unlisted", "draft"]).default("public"),
+  theme: formThemeSchema.default("default"),
   fields: z.array(formFieldInputSchema).min(1),
 });
 
@@ -75,6 +95,7 @@ export const updateFormInputSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   description: z.string().max(2000).optional(),
   visibility: z.enum(["public", "unlisted", "draft"]).optional(),
+  theme: formThemeSchema.optional(),
   slug: z.string().min(1).max(80).optional(),
   fields: z.array(formFieldInputSchema).min(1).optional(),
 });
@@ -85,6 +106,7 @@ export const formOutputSchema = z.object({
   title: z.string(),
   description: z.string().nullable(),
   visibility: z.enum(["public", "unlisted", "draft"]),
+  theme: formThemeSchema,
   fields: z.array(formFieldSchema),
   submissionCount: z.number().int(),
   viewCount: z.number().int(),
@@ -103,7 +125,24 @@ export const publicFormOutputSchema = z.object({
   slug: z.string().nullable(),
   title: z.string(),
   description: z.string().nullable(),
+  theme: formThemeSchema,
   fields: z.array(formFieldSchema),
+});
+
+export const publicFormListingItemSchema = z.object({
+  id: z.string().uuid(),
+  slug: z.string().nullable(),
+  title: z.string(),
+  description: z.string().nullable(),
+  theme: formThemeSchema,
+  submissionCount: z.number().int(),
+  viewCount: z.number().int(),
+  createdAt: z.string().nullable(),
+});
+
+export const paginatedPublicFormsOutputSchema = z.object({
+  items: z.array(publicFormListingItemSchema),
+  nextCursor: z.string().uuid().nullable(),
 });
 
 export const submissionAnswerSchema = z.object({
@@ -121,6 +160,8 @@ export const submitFormInputSchema = z.object({
       value: z.string(),
     }),
   ),
+  /** Honeypot — must stay empty; bots often fill hidden fields */
+  website: z.string().max(0).optional(),
 });
 
 export const submissionOutputSchema = z.object({
