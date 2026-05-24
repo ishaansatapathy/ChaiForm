@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TRPCClientError } from "@repo/trpc/client";
 import { toast } from "sonner";
@@ -22,7 +22,11 @@ export function AuthCard({ mode }: AuthCardProps) {
   const nextPath = searchParams.get("next") ?? "/dashboard";
   const isLogin = mode === "sign-in";
   const [loading, setLoading] = useState(false);
-  const [twoFactorStep, setTwoFactorStep] = useState<{ email: string; otp: string } | null>(null);
+  const [twoFactorStep, setTwoFactorStep] = useState<{
+    email: string;
+    displayEmail: string;
+    otp: string;
+  } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -30,6 +34,7 @@ export function AuthCard({ mode }: AuthCardProps) {
     confirmPassword: "",
   });
   const [error, setError] = useState("");
+  const initialized2FA = useRef(false);
 
   const signUpMutation = trpc.auth.signUp.useMutation();
   const signInMutation = trpc.auth.signIn.useMutation();
@@ -53,6 +58,18 @@ export function AuthCard({ mode }: AuthCardProps) {
     router.push(withHeroTimeParam(destination));
   };
 
+  useEffect(() => {
+    if (!isLogin || initialized2FA.current) return;
+
+    const pending2FA = searchParams.get("2fa");
+    const email = searchParams.get("email");
+    if (pending2FA !== "1" || !email) return;
+
+    initialized2FA.current = true;
+    setTwoFactorStep({ email, displayEmail: email, otp: "" });
+    toast.info("Enter the 2FA code sent to your email");
+  }, [isLogin, searchParams]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -75,7 +92,11 @@ export function AuthCard({ mode }: AuthCardProps) {
         });
 
         if (result.twoFactorRequired) {
-          setTwoFactorStep({ email: result.email, otp: "" });
+          setTwoFactorStep({
+            email: result.email,
+            displayEmail: formData.email.trim() || result.email,
+            otp: "",
+          });
           toast.info(result.message);
           return;
         }
@@ -157,19 +178,25 @@ export function AuthCard({ mode }: AuthCardProps) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {twoFactorStep ? (
-          <AuthField
-            label="2FA Code"
-            name="otp"
-            type="text"
-            value={twoFactorStep.otp}
-            onChange={(e) =>
-              setTwoFactorStep((prev) => (prev ? { ...prev, otp: e.target.value } : prev))
-            }
-            placeholder="123456"
-            required
-            autoComplete="one-time-code"
-            inputMode="numeric"
-          />
+          <>
+            <p className="font-mono text-[10px] tracking-[0.18em] text-white/45">
+              <span className="uppercase">Code sent to</span>{" "}
+              <span className="tracking-normal text-white/60">{twoFactorStep.displayEmail}</span>
+            </p>
+            <AuthField
+              label="2FA Code"
+              name="otp"
+              type="text"
+              value={twoFactorStep.otp}
+              onChange={(e) =>
+                setTwoFactorStep((prev) => (prev ? { ...prev, otp: e.target.value } : prev))
+              }
+              placeholder="123456"
+              required
+              autoComplete="one-time-code"
+              inputMode="numeric"
+            />
+          </>
         ) : (
           <>
             {!isLogin && (

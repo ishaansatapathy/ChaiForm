@@ -5,6 +5,7 @@ import {
   createFormInputSchema,
   formOutputSchema,
   paginatedFormsOutputSchema,
+  paginatedPublicFormsOutputSchema,
   paginatedSubmissionsOutputSchema,
   paginationInputSchema,
   publicFormOutputSchema,
@@ -94,6 +95,18 @@ export const formsRouter = router({
       }
     }),
 
+  listPublic: publicProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/public"), tags: TAGS } })
+    .input(paginationInputSchema.optional())
+    .output(paginatedPublicFormsOutputSchema)
+    .query(async ({ input }) => {
+      try {
+        return await formService.listPublicForms(input ?? { limit: 20 });
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
   getPublic: publicProcedure
     .meta({ openapi: { method: "GET", path: getPath("/public/{formId}"), tags: TAGS } })
     .input(z.object({ formId: z.string().uuid() }))
@@ -149,6 +162,7 @@ export const formsRouter = router({
         formId: z.string().uuid(),
         limit: z.number().int().min(1).max(100).default(20).optional(),
         cursor: z.string().uuid().optional(),
+        search: z.string().max(200).optional(),
       }),
     )
     .output(paginatedSubmissionsOutputSchema)
@@ -157,6 +171,7 @@ export const formsRouter = router({
         return await formService.listSubmissions(ctx.user.id, input.formId, {
           limit: input.limit ?? 20,
           cursor: input.cursor,
+          search: input.search,
         });
       } catch (error) {
         mapFormError(error);

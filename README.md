@@ -51,13 +51,32 @@ chaiform/
 |------|----------------|
 | Monorepo & structure | Turborepo, shared packages, clean root |
 | Auth | Google OAuth + email/password, JWT cookies |
-| Form builder | Create/edit/delete, 6 field types, visibility |
+| Form builder | Create/edit/delete, 7 field types, themes, visibility |
+| Public explore | `/explore` lists public forms only |
+| Email notifications | Creator notified on new submission (Resend) |
+| Spam protection | Rate limits + honeypot on public submit |
 | Zod validation | Field schemas + dynamic submission validator |
 | tRPC | Type-safe `forms`, `analytics`, `auth` routers |
 | Drizzle | `forms`, `form_fields`, `submissions`, `submission_responses` |
 | Public submission | `/f/[formId]`, `/f/s/[slug]`, rate-limited submit |
-| Analytics | Summary, trend chart, field breakdown |
+| Analytics | Summary, trend chart, field breakdown, CSV export, pagination |
 | Scalar | http://localhost:8000/docs |
+
+## Demo credentials (for judges)
+
+After `pnpm db:seed`:
+
+| Field | Value |
+|-------|-------|
+| Email | `demo@chaiform.dev` |
+| Password | `DemoPass123!` |
+
+Quick links after seed:
+
+- Explore gallery: http://localhost:3000/explore
+- Sample public form: http://localhost:3000/f/s/product-feedback
+- Unlisted form (link only): http://localhost:3000/f/s/startup-idea-check
+- Analytics: http://localhost:3000/analytics
 
 ## Stack
 
@@ -136,3 +155,7 @@ pnpm dev
 ## License
 
 Private — hackathon project.
+
+## Deploy (production)
+
+See **[DEPLOY.md](./DEPLOY.md)** for **Neon + Render (API) + Vercel (web)** setup.

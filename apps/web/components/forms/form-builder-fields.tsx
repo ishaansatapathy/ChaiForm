@@ -2,7 +2,7 @@
 
 import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 
-export type FieldType = "text" | "email" | "number" | "select" | "rating" | "date";
+export type FieldType = "text" | "email" | "number" | "select" | "rating" | "date" | "checkbox";
 
 export interface DraftField {
   id: string;
@@ -13,10 +13,11 @@ export interface DraftField {
     options?: string[];
     maxRating?: number;
     placeholder?: string;
+    checkboxLabel?: string;
   };
 }
 
-const FIELD_TYPES: FieldType[] = ["text", "email", "number", "select", "rating", "date"];
+const FIELD_TYPES: FieldType[] = ["text", "email", "number", "select", "rating", "date", "checkbox"];
 
 function defaultConfig(type: FieldType): DraftField["config"] {
   if (type === "select") return { options: ["Option 1", "Option 2"] };
@@ -65,15 +66,14 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
     onChange(next);
   };
 
+  const addFieldButtonClass =
+    "inline-flex items-center gap-2 rounded-full bg-lime-400 px-4 py-2 text-[10px] font-black tracking-[0.2em] text-black uppercase transition-opacity hover:opacity-90";
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="sticky top-0 z-20 -mx-2 flex items-center justify-between border-b border-white/8 bg-black/90 px-2 py-3 backdrop-blur-md">
         <h2 className="font-display text-xl font-bold text-white">Fields</h2>
-        <button
-          type="button"
-          onClick={addField}
-          className="inline-flex items-center gap-2 rounded-full bg-lime-400 px-4 py-2 text-[10px] font-black tracking-[0.2em] text-black uppercase"
-        >
+        <button type="button" onClick={addField} className={addFieldButtonClass}>
           <Plus size={14} />
           Add field
         </button>
@@ -179,6 +179,21 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
             </label>
           )}
 
+          {field.type === "checkbox" && (
+            <label className="mt-4 block text-xs text-white/50">
+              Checkbox label
+              <input
+                value={field.config?.checkboxLabel ?? field.label}
+                onChange={(e) =>
+                  updateField(field.id, {
+                    config: { ...field.config, checkboxLabel: e.target.value },
+                  })
+                }
+                className="mt-2 w-full rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
+              />
+            </label>
+          )}
+
           <label className="mt-4 flex cursor-pointer items-center gap-2 text-xs text-white/50">
             <input
               type="checkbox"
@@ -190,6 +205,15 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
           </label>
         </div>
       ))}
+
+      <button
+        type="button"
+        onClick={addField}
+        className="flex w-full items-center justify-center gap-2 rounded-[32px] border border-dashed border-lime-400/30 bg-lime-400/5 py-4 text-[10px] font-black tracking-[0.2em] text-lime-400 uppercase transition-colors hover:border-lime-400/50 hover:bg-lime-400/10"
+      >
+        <Plus size={14} />
+        Add another field
+      </button>
     </div>
   );
 }

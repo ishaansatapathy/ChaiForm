@@ -128,6 +128,40 @@ describe("validateSubmissionAnswers", () => {
     expect(result[fields[2]!.id]).toBe("");
   });
 
+  it("rejects missing required checkbox field", () => {
+    const checkboxFields: FormField[] = [
+      {
+        id: "77777777-7777-4777-8777-777777777777",
+        label: "Terms",
+        type: "checkbox",
+        required: true,
+        config: { checkboxLabel: "I agree to terms" },
+      },
+    ];
+
+    expect(() =>
+      validateSubmissionAnswers(checkboxFields, [{ fieldId: checkboxFields[0]!.id, value: "false" }]),
+    ).toThrow();
+  });
+
+  it("accepts checked required checkbox", () => {
+    const checkboxFields: FormField[] = [
+      {
+        id: "77777777-7777-4777-8777-777777777777",
+        label: "Terms",
+        type: "checkbox",
+        required: true,
+        config: { checkboxLabel: "I agree to terms" },
+      },
+    ];
+
+    const result = validateSubmissionAnswers(checkboxFields, [
+      { fieldId: checkboxFields[0]!.id, value: "true" },
+    ]);
+
+    expect(result[checkboxFields[0]!.id]).toBe("true");
+  });
+
   it("rejects missing required text field", () => {
     expect(() =>
       validateSubmissionAnswers(fields, [
