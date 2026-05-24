@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-/** tRPC clients often send `{}` for no-input procedures — accept both. */
-export const zodUndefinedModel = z
-  .union([z.undefined(), z.object({}).strict()])
-  .transform(() => undefined);
+/** Empty input for no-arg procedures — must be a ZodObject for OpenAPI / Scalar. */
+export const zodUndefinedModel = z.object({}).strict();
+
 export { z };

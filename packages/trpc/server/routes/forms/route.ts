@@ -85,7 +85,7 @@ export const formsRouter = router({
 
   list: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/"), tags: TAGS, protect: true } })
-    .input(paginationInputSchema.optional())
+    .input(paginationInputSchema)
     .output(paginatedFormsOutputSchema)
     .query(async ({ ctx, input }) => {
       try {
@@ -97,7 +97,7 @@ export const formsRouter = router({
 
   listPublic: publicProcedure
     .meta({ openapi: { method: "GET", path: getPath("/public"), tags: TAGS } })
-    .input(paginationInputSchema.optional())
+    .input(paginationInputSchema)
     .output(paginatedPublicFormsOutputSchema)
     .query(async ({ input }) => {
       try {
