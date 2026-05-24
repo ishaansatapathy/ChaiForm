@@ -2,6 +2,10 @@
 
 import type { RouterOutputs } from "@repo/trpc/client";
 
+import {
+  isMultiCheckboxConfig,
+  parseMultiCheckboxValue,
+} from "~/lib/checkbox-value";
 import type { FormThemeStyle } from "~/lib/form-themes";
 
 type PublicField = RouterOutputs["forms"]["getPublic"]["fields"][number];
@@ -65,6 +69,43 @@ export function FormFieldInput({
       );
     }
     case "checkbox": {
+      if (isMultiCheckboxConfig(field.config)) {
+        const options = field.config?.options ?? [];
+        const selected = parseMultiCheckboxValue(value);
+
+        const toggleOption = (option: string) => {
+          const next = selected.includes(option)
+            ? selected.filter((item) => item !== option)
+            : [...selected, option];
+          onChange(JSON.stringify(next));
+        };
+
+        return (
+          <div className="space-y-2">
+            {options.map((option) => (
+              <label
+                key={option}
+                className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(option)}
+                  onChange={() => toggleOption(option)}
+                  className="mt-0.5 accent-lime-400"
+                />
+                <span className="text-sm text-white/80">{option}</span>
+              </label>
+            ))}
+            {field.required && selected.length === 0 && (
+              <p className="text-xs text-white/40">
+                Select at least one option
+                <span className={theme?.accentText ?? "text-lime-400"}> *</span>
+              </p>
+            )}
+          </div>
+        );
+      }
+
       const checked = value === "true";
       const checkboxLabel = field.config?.checkboxLabel ?? field.label;
       return (

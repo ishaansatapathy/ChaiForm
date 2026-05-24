@@ -35,9 +35,12 @@ export const formFieldInputSchema = z.discriminatedUnion("type", [
   z.object({
     ...fieldBaseInputSchema.shape,
     type: z.literal("checkbox"),
-    config: z.object({
-      checkboxLabel: z.string().max(200).optional(),
-    }).optional(),
+    config: z
+      .object({
+        options: z.array(z.string().min(1).max(200)).min(1).optional(),
+        checkboxLabel: z.string().max(200).optional(),
+      })
+      .optional(),
   }),
 ]);
 
@@ -70,9 +73,12 @@ export const formFieldSchema = z.discriminatedUnion("type", [
     label: z.string().min(1).max(255),
     required: z.boolean(),
     type: z.literal("checkbox"),
-    config: z.object({
-      checkboxLabel: z.string().max(200).optional(),
-    }).optional(),
+    config: z
+      .object({
+        options: z.array(z.string().min(1).max(200)).min(1).optional(),
+        checkboxLabel: z.string().max(200).optional(),
+      })
+      .optional(),
   }),
 ]);
 
@@ -161,7 +167,12 @@ export const submitFormInputSchema = z.object({
     }),
   ),
   /** Honeypot — must stay empty; bots often fill hidden fields */
-  website: z.string().max(0).optional(),
+  website: z
+    .string()
+    .optional()
+    .refine((value) => !value || value.length === 0, {
+      message: "Submission rejected",
+    }),
 });
 
 export const submissionOutputSchema = z.object({

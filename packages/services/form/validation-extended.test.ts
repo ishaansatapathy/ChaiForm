@@ -162,6 +162,42 @@ describe("validateSubmissionAnswers", () => {
     expect(result[checkboxFields[0]!.id]).toBe("true");
   });
 
+  it("rejects required multi-checkbox with no selection", () => {
+    const checkboxFields: FormField[] = [
+      {
+        id: "77777777-7777-4777-8777-777777777777",
+        label: "Interests",
+        type: "checkbox",
+        required: true,
+        config: { options: ["Sports", "Music", "Art"] },
+      },
+    ];
+
+    expect(() =>
+      validateSubmissionAnswers(checkboxFields, [
+        { fieldId: checkboxFields[0]!.id, value: "[]" },
+      ]),
+    ).toThrow();
+  });
+
+  it("accepts required multi-checkbox with valid selections", () => {
+    const checkboxFields: FormField[] = [
+      {
+        id: "77777777-7777-4777-8777-777777777777",
+        label: "Interests",
+        type: "checkbox",
+        required: true,
+        config: { options: ["Sports", "Music", "Art"] },
+      },
+    ];
+
+    const result = validateSubmissionAnswers(checkboxFields, [
+      { fieldId: checkboxFields[0]!.id, value: '["Sports","Art"]' },
+    ]);
+
+    expect(result[checkboxFields[0]!.id]).toBe('["Sports","Art"]');
+  });
+
   it("rejects missing required text field", () => {
     expect(() =>
       validateSubmissionAnswers(fields, [

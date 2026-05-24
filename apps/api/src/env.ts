@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+function normalizeEnvUrl(value: string) {
+  return value.trim().replace(/^["']+|["']+$/g, "").replace(/\/$/, "");
+}
+
 const envSchema = z.object({
   PORT: z.string().optional(),
   NODE_ENV: z.enum(["development", "prod", "production", "test"]).default("development"),
@@ -10,7 +14,12 @@ const envSchema = z.object({
 function createEnv(env: NodeJS.ProcessEnv) {
   const safeParseResult = envSchema.safeParse(env);
   if (!safeParseResult.success) throw new Error(safeParseResult.error.message);
-  return safeParseResult.data;
+  const data = safeParseResult.data;
+  return {
+    ...data,
+    BASE_URL: normalizeEnvUrl(data.BASE_URL),
+    CLIENT_URL: normalizeEnvUrl(data.CLIENT_URL),
+  };
 }
 
 export const env = createEnv(process.env);

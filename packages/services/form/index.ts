@@ -69,12 +69,24 @@ function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
         type: "rating",
         config: { maxRating: config?.maxRating ?? 5 },
       };
-    case "checkbox":
-      return {
-        ...base,
-        type: "checkbox",
-        config: config?.checkboxLabel ? { checkboxLabel: config.checkboxLabel } : undefined,
-      };
+    case "checkbox": {
+      const options = config?.options?.map((option) => option.trim()).filter(Boolean);
+      if (options?.length) {
+        return {
+          ...base,
+          type: "checkbox",
+          config: { options },
+        };
+      }
+      if (config?.checkboxLabel) {
+        return {
+          ...base,
+          type: "checkbox",
+          config: { checkboxLabel: config.checkboxLabel },
+        };
+      }
+      return { ...base, type: "checkbox" };
+    }
     case "text":
     case "email":
     case "number":
@@ -92,6 +104,7 @@ function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
 function defaultConfig(type: FormFieldInput["type"]): FieldConfigJson | undefined {
   if (type === "select") return { options: ["Option 1", "Option 2"] };
   if (type === "rating") return { maxRating: 5 };
+  if (type === "checkbox") return { options: ["Option 1"] };
   return undefined;
 }
 
@@ -153,7 +166,7 @@ class FormService {
   }
 
   async createForm(userId: string, input: CreateFormInput) {
-    const fields = this.normalizeInputFields(input.fields, true);
+    const fields = this.normalizeInputFields(input.fields);
     const slug = await createUniqueSlug(input.title);
 
     const [created] = await db

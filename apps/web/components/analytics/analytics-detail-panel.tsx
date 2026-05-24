@@ -12,6 +12,7 @@ import {
   getParticipantName,
   type ActiveFieldFilters,
 } from "~/lib/analytics-filters";
+import { formatCheckboxAnswerValue } from "~/lib/checkbox-value";
 
 const AggregateFlowChart = dynamic(
   () =>
@@ -285,9 +286,7 @@ function ParticipantList({
                       {answer.type === "rating"
                         ? `⭐ ${answer.value}`
                         : answer.type === "checkbox"
-                          ? answer.value === "true"
-                            ? "Yes"
-                            : "No"
+                          ? formatCheckboxAnswerValue(answer.value)
                           : answer.value}
                     </p>
                   ))}

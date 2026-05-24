@@ -1,5 +1,11 @@
 import type { RouterOutputs } from "@repo/trpc/client";
 
+import {
+  formatCheckboxAnswerValue,
+  isMultiCheckboxConfig,
+  parseMultiCheckboxValue,
+} from "~/lib/checkbox-value";
+
 type FormField = RouterOutputs["analytics"]["listFormFields"]["fields"][number];
 type Submission = RouterOutputs["forms"]["listSubmissions"]["items"][number];
 
@@ -24,6 +30,14 @@ export function buildFilterableFields(
         const answer = submission.answers.find((item) => item.fieldId === field.id);
         const value = answer?.value?.trim();
         if (!value) continue;
+
+        if (field.type === "checkbox" && isMultiCheckboxConfig(field.config)) {
+          for (const option of parseMultiCheckboxValue(value)) {
+            counts.set(option, (counts.get(option) ?? 0) + 1);
+          }
+          continue;
+        }
+
         counts.set(value, (counts.get(value) ?? 0) + 1);
       }
 
@@ -62,6 +76,16 @@ export function buildFilterableFields(
         });
       }
 
+      if (field.type === "checkbox" && isMultiCheckboxConfig(field.config)) {
+        const configured = field.config?.options ?? [];
+        const existing = new Map(options.map((option) => [option.value, option]));
+        options = configured.map((value) => existing.get(value) ?? {
+          value,
+          label: value,
+          count: 0,
+        });
+      }
+
       if (!isFilterableType(field.type)) return null;
 
       return {
@@ -86,7 +110,7 @@ function formatFilterLabel(field: FormField, value: string) {
     return `⭐ ${value}`;
   }
   if (field.type === "checkbox") {
-    return value === "true" ? "Checked" : "Unchecked";
+    return formatCheckboxAnswerValue(value, field.config);
   }
   return value;
 }
@@ -101,7 +125,11 @@ export function applySubmissionFilters(
   return submissions.filter((submission) =>
     entries.every(([fieldId, expected]) => {
       const answer = submission.answers.find((item) => item.fieldId === fieldId);
-      return answer?.value === expected;
+      const value = answer?.value ?? "";
+      if (answer?.type === "checkbox" && value.startsWith("[")) {
+        return parseMultiCheckboxValue(value).includes(expected);
+      }
+      return value === expected;
     }),
   );
 }
@@ -122,6 +150,6 @@ export function getAnswerPreview(submission: Submission, max = 3) {
 
 function formatAnswerValue(type: string, value: string) {
   if (type === "rating") return `⭐ ${value}`;
-  if (type === "checkbox") return value === "true" ? "Yes" : "No";
+  if (type === "checkbox") return formatCheckboxAnswerValue(value);
   return value;
 }
