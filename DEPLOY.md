@@ -39,7 +39,7 @@ DATABASE_URL="postgresql://..." pnpm db:seed
 |---------|-------|
 | **Root Directory** | *(leave empty — repo root)* |
 | **Runtime** | Node |
-| **Build Command** | `pnpm install --frozen-lockfile && pnpm exec turbo build --filter=@repo/api` |
+| **Build Command** | `pnpm install --frozen-lockfile --prod=false && pnpm --filter @repo/api run build` |
 | **Start Command** | `node apps/api/dist/index.js` |
 | **Health Check Path** | `/health` |
 
@@ -71,7 +71,14 @@ DATABASE_URL="postgresql://..." pnpm db:seed
 1. https://vercel.com → **Add New Project** → import GitHub repo
 2. **Root Directory:** `apps/web`
 3. Framework: Next.js (`vercel.json` handles monorepo install/build)
-4. Environment variables:
+4. If build fails with `turbo not found`, override commands:
+
+| Setting | Value |
+|---------|--------|
+| Install Command | `cd ../.. && pnpm install --frozen-lockfile --prod=false` |
+| Build Command | `cd ../.. && pnpm --filter web run build` |
+
+5. Environment variables:
 
 | Variable | Value |
 |----------|-------|

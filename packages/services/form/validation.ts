@@ -45,6 +45,29 @@ function fieldValueSchema(field: FormField) {
       break;
     }
     case "checkbox": {
+      const options = field.config?.options?.map((option) => option.trim()).filter(Boolean) ?? [];
+      if (options.length > 0) {
+        const multiCheckboxSchema = z.string().refine(
+          (value) => {
+            if (!value || value === "[]") return !field.required;
+            try {
+              const parsed: unknown = JSON.parse(value);
+              if (!Array.isArray(parsed)) return false;
+              if (parsed.length === 0) return !field.required;
+              return parsed.every(
+                (item) => typeof item === "string" && options.includes(item),
+              );
+            } catch {
+              return false;
+            }
+          },
+          field.required
+            ? `Select at least one option for "${field.label}"`
+            : "Invalid checkbox selection",
+        );
+        return multiCheckboxSchema;
+      }
+
       const checkboxSchema = z.enum(["true", "false"], {
         message: "Checkbox must be checked or unchecked",
       });

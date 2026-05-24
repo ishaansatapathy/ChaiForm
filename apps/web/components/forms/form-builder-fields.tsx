@@ -22,7 +22,15 @@ const FIELD_TYPES: FieldType[] = ["text", "email", "number", "select", "rating",
 function defaultConfig(type: FieldType): DraftField["config"] {
   if (type === "select") return { options: ["Option 1", "Option 2"] };
   if (type === "rating") return { maxRating: 5 };
+  if (type === "checkbox") return { options: ["Option 1"] };
   return undefined;
+}
+
+function getCheckboxOptions(field: DraftField): string[] {
+  const options = field.config?.options?.map((option) => option.trim()).filter(Boolean);
+  if (options?.length) return options;
+  if (field.config?.checkboxLabel?.trim()) return [field.config.checkboxLabel];
+  return ["Option 1"];
 }
 
 function newFieldId() {
@@ -180,18 +188,58 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
           )}
 
           {field.type === "checkbox" && (
-            <label className="mt-4 block text-xs text-white/50">
-              Checkbox label
-              <input
-                value={field.config?.checkboxLabel ?? field.label}
-                onChange={(e) =>
+            <div className="mt-4 space-y-2">
+              <p className="text-xs text-white/50">Checkbox options</p>
+              {getCheckboxOptions(field).map((option, optionIndex) => (
+                <div key={`${field.id}-option-${optionIndex}`} className="flex items-center gap-2">
+                  <input
+                    value={option}
+                    onChange={(e) => {
+                      const nextOptions = getCheckboxOptions(field).map((item, index) =>
+                        index === optionIndex ? e.target.value : item,
+                      );
+                      updateField(field.id, {
+                        config: { options: nextOptions },
+                      });
+                    }}
+                    placeholder={`Option ${optionIndex + 1}`}
+                    className="flex-1 rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentOptions = getCheckboxOptions(field);
+                      if (currentOptions.length <= 1) return;
+                      updateField(field.id, {
+                        config: {
+                          options: currentOptions.filter((_, index) => index !== optionIndex),
+                        },
+                      });
+                    }}
+                    disabled={getCheckboxOptions(field).length <= 1}
+                    className="text-white/30 hover:text-red-400 disabled:opacity-30"
+                    aria-label="Remove checkbox option"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const currentOptions = getCheckboxOptions(field);
                   updateField(field.id, {
-                    config: { ...field.config, checkboxLabel: e.target.value },
-                  })
-                }
-                className="mt-2 w-full rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
-              />
-            </label>
+                    config: {
+                      options: [...currentOptions, `Option ${currentOptions.length + 1}`],
+                    },
+                  });
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-lime-400/30 px-4 py-2 text-[10px] font-black tracking-[0.2em] text-lime-400 uppercase transition-colors hover:border-lime-400/50 hover:bg-lime-400/5"
+              >
+                <Plus size={14} />
+                Add option
+              </button>
+            </div>
           )}
 
           <label className="mt-4 flex cursor-pointer items-center gap-2 text-xs text-white/50">

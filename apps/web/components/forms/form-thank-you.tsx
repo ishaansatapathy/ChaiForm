@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 
+import { trpc } from "~/trpc/client";
+
 export function FormThankYou({ formTitle }: { formTitle?: string }) {
+  const { data: user } = trpc.auth.me.useQuery(undefined, { retry: false });
+
+  const continueHref = user ? "/dashboard" : "/explore";
+  const continueLabel = user ? "Back to dashboard" : "Explore ChaiForm";
+
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-black px-4 py-16 text-white">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(74,222,128,0.12),transparent_45%)]" />
@@ -13,10 +20,10 @@ export function FormThankYou({ formTitle }: { formTitle?: string }) {
           {formTitle ? `Your response to "${formTitle}" was recorded.` : "Your response was recorded."}
         </p>
         <Link
-          href="/"
+          href={continueHref}
           className="btn-omni font-display mt-8 inline-flex rounded-2xl px-8 py-3.5 text-sm font-black tracking-[0.18em] uppercase"
         >
-          Back to home
+          {continueLabel}
         </Link>
       </div>
     </div>
