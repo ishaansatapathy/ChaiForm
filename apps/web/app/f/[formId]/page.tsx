@@ -1,31 +1,26 @@
-"use client";
-
-import { useParams } from "next/navigation";
-
 import { PublicFormView } from "~/components/forms/public-form-view";
-import { trpc } from "~/trpc/client";
+import { fetchPublicFormById } from "~/lib/fetch-public-form";
 
-export default function PublicFormPage() {
-  const params = useParams<{ formId: string }>();
-  const formId = params.formId;
+export default async function PublicFormPage({
+  params,
+}: {
+  params: Promise<{ formId: string }>;
+}) {
+  const { formId } = await params;
+  const form = await fetchPublicFormById(formId);
 
-  const { data: form, isLoading, isError } = trpc.forms.getPublic.useQuery({ formId });
-
-  if (isLoading) {
+  if (!form) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black text-white/50">
-        Loading form…
+      <div className="flex min-h-screen items-center justify-center bg-black px-4 text-center text-white/50">
+        <div>
+          <p>Form not found.</p>
+          <p className="mt-2 text-xs text-white/35">This link may be invalid or the form is no longer available.</p>
+        </div>
       </div>
     );
   }
 
-  if (isError || !form) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-black text-white/50">
-        Form not found.
-      </div>
-    );
-  }
+  const thankYouPath = form.slug ? `/f/s/${form.slug}/thank-you` : `/f/${form.id}/thank-you`;
 
-  return <PublicFormView form={form} thankYouPath={`/f/${formId}/thank-you`} />;
+  return <PublicFormView form={form} thankYouPath={thankYouPath} />;
 }
