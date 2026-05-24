@@ -5,7 +5,7 @@ import Link from "next/link";
 import { trpc } from "~/trpc/client";
 
 export function FormThankYou({ formTitle }: { formTitle?: string }) {
-  const { data: user } = trpc.auth.me.useQuery(undefined, { retry: false });
+  const { data: user } = trpc.auth.me.useQuery({}, { retry: false });
 
   const continueHref = user ? "/dashboard" : "/explore";
   const continueLabel = user ? "Back to dashboard" : "Explore ChaiForm";

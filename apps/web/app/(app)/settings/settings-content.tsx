@@ -12,7 +12,7 @@ import { useLogout } from "~/lib/use-logout";
 
 export default function SettingsContent() {
   const utils = trpc.useUtils();
-  const { data: user } = trpc.auth.me.useQuery();
+  const { data: user } = trpc.auth.me.useQuery({});
   const [showRough, setShowRough] = useState(false);
   const logout = useLogout();
   const toggle2FA = trpc.auth.toggle2FA.useMutation({
@@ -106,7 +106,7 @@ export default function SettingsContent() {
             </ClientRoughNotation>
             <button
               type="button"
-              onClick={() => logout.mutate()}
+              onClick={() => logout.mutate({})}
               disabled={logout.isPending}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 py-3.5 text-sm font-black tracking-[0.18em] text-red-400 uppercase transition-colors hover:bg-red-500/20"
             >

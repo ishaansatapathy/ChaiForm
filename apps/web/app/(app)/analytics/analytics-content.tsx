@@ -49,7 +49,7 @@ export default function AnalyticsContent({
     setChartsMounted(true);
   }, []);
 
-  const { data: user } = trpc.auth.me.useQuery();
+  const { data: user } = trpc.auth.me.useQuery({});
   const utils = trpc.useUtils();
   const [exporting, setExporting] = useState(false);
   const { data: formsPage, isLoading: formsLoading } = trpc.forms.list.useQuery(

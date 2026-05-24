@@ -5,7 +5,7 @@ import { useEffect } from "react";
 /** Ping tRPC health via same-origin proxy to wake Render before mutations. */
 export function useWarmApi() {
   useEffect(() => {
-    void fetch("/trpc/health.getHealth", { credentials: "include" }).catch(() => undefined);
+    void fetch("/trpc/health.getHealth?input=%7B%7D", { credentials: "include" }).catch(() => undefined);
   }, []);
 }
 

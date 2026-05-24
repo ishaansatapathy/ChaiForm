@@ -78,7 +78,7 @@ export async function fetchSessionUser(): Promise<SessionUser | null> {
   if (!cookieHeader.includes("jwt") && !cookieHeader.includes("jwt_refresh")) {
     return null;
   }
-  return fetchTrpcQuery<SessionUser>("auth.me", undefined, cookieHeader);
+  return fetchTrpcQuery<SessionUser>("auth.me", {}, cookieHeader);
 }
 
 export async function fetchFormsList(limit = 100): Promise<FormsListPage | null> {
