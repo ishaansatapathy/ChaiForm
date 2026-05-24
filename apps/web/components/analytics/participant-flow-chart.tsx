@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type MouseEvent } from "react";
 import {
   Background,
   Controls,
@@ -29,14 +29,13 @@ type ParticipantNodeData = {
   active: boolean;
   answerCount: number;
   submittedAt: string | null;
-  onSelect: (submissionId: string) => void;
 };
 type AnswerNodeData = { label: string; value: string; type: string };
 
 function FormNode({ data }: NodeProps<Node<FormNodeData>>) {
   return (
     <div className="rounded-2xl border-2 border-lime-400/60 bg-lime-400/15 px-6 py-3 text-center shadow-[0_0_30px_rgba(74,222,128,0.25)]">
-      <Handle type="source" position={Position.Bottom} className="bg-lime-400!" />
+      <Handle type="source" position={Position.Bottom} className="pointer-events-none! opacity-0!" />
       <p className="font-mono text-[9px] tracking-[0.3em] text-lime-400 uppercase">Form</p>
       <p className="mt-1 max-w-[220px] truncate text-sm font-bold text-white">{data.label}</p>
       <p className="mt-1 text-[10px] text-white/55">{data.count} participants</p>
@@ -46,16 +45,14 @@ function FormNode({ data }: NodeProps<Node<FormNodeData>>) {
 
 function ParticipantNode({ data }: NodeProps<Node<ParticipantNodeData>>) {
   return (
-    <button
-      type="button"
-      onClick={() => data.onSelect(data.submissionId)}
-      className={`min-w-[180px] cursor-pointer rounded-2xl border px-4 py-3 text-left transition-all ${
+    <div
+      className={`nodrag nopan min-w-[180px] cursor-pointer rounded-2xl border px-4 py-3 text-left transition-all ${
         data.active
           ? "border-lime-400/70 bg-lime-400/15 shadow-[0_0_25px_rgba(74,222,128,0.3)]"
           : "border-white/15 bg-black/70 hover:border-lime-400/40 hover:bg-lime-400/5"
       }`}
     >
-      <Handle type="target" position={Position.Top} className="bg-lime-400!" />
+      <Handle type="target" position={Position.Top} className="pointer-events-none! opacity-0!" />
       <p className="font-mono text-[8px] tracking-[0.22em] text-lime-400/70 uppercase">User</p>
       <p className="mt-1 truncate text-sm font-bold text-white">{data.label}</p>
       <p className="mt-1 text-[10px] text-white/45">
@@ -64,8 +61,10 @@ function ParticipantNode({ data }: NodeProps<Node<ParticipantNodeData>>) {
       <p className="mt-2 text-[9px] font-bold tracking-wider text-lime-300/80 uppercase">
         {data.active ? "Showing responses ↓" : "Click to view ↓"}
       </p>
-      {data.active && <Handle type="source" position={Position.Bottom} className="bg-lime-400!" />}
-    </button>
+      {data.active && (
+        <Handle type="source" position={Position.Bottom} className="pointer-events-none! opacity-0!" />
+      )}
+    </div>
   );
 }
 
@@ -79,7 +78,7 @@ function AnswerNode({ data }: NodeProps<Node<AnswerNodeData>>) {
 
   return (
     <div className="min-w-[220px] rounded-xl border border-white/10 bg-black/80 px-3 py-2 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-md">
-      <Handle type="target" position={Position.Top} className="bg-lime-400!" />
+      <Handle type="target" position={Position.Top} className="pointer-events-none! opacity-0!" />
       <p className="font-mono text-[8px] tracking-[0.22em] text-lime-400/70 uppercase">{data.type}</p>
       <p className="mt-0.5 truncate text-xs font-semibold text-white">{data.label}</p>
       <p className="mt-1.5 rounded-md border border-white/5 bg-white/3 px-2 py-1 text-[11px] text-white/75">
@@ -141,7 +140,6 @@ function ParticipantFlowChartInner({
           active: isActive,
           answerCount,
           submittedAt: submission.submittedAt,
-          onSelect: onSelectSubmission,
         } satisfies ParticipantNodeData,
       });
 
@@ -183,7 +181,13 @@ function ParticipantFlowChartInner({
     });
 
     return { nodes: flowNodes, edges: flowEdges };
-  }, [formTitle, submissions, activeSubmissionId, onSelectSubmission]);
+  }, [formTitle, submissions, activeSubmissionId]);
+
+  const handleNodeClick = (_event: MouseEvent, node: Node) => {
+    if (node.type !== "participant") return;
+    const submissionId = (node.data as ParticipantNodeData).submissionId;
+    onSelectSubmission(submissionId);
+  };
 
   return (
     <div className="h-[640px] overflow-hidden rounded-[32px] border border-white/10 bg-black/30">
@@ -191,12 +195,14 @@ function ParticipantFlowChartInner({
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        onNodeClick={handleNodeClick}
         fitView
         fitViewOptions={{ padding: 0.25 }}
         proOptions={{ hideAttribution: true }}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
+        panOnDrag={[1, 2]}
         panOnScroll
         zoomOnScroll
       >
