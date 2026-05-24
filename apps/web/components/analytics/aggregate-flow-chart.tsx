@@ -31,7 +31,7 @@ type FlowStartNodeData = { label: string; count: number };
 function StartNode({ data }: NodeProps<Node<FlowStartNodeData>>) {
   return (
     <div className="rounded-full border border-lime-400/40 bg-lime-400/10 px-5 py-2 text-center">
-      <Handle type="source" position={Position.Bottom} className="!bg-lime-400" />
+      <Handle type="source" position={Position.Bottom} className="bg-lime-400!" />
       <p className="font-mono text-[10px] tracking-[0.25em] text-lime-400 uppercase">{data.label}</p>
       <p className="mt-1 text-xs text-white/50">{data.count} participants</p>
     </div>
@@ -41,7 +41,7 @@ function StartNode({ data }: NodeProps<Node<FlowStartNodeData>>) {
 function FieldNode({ data }: NodeProps<Node<FlowFieldNodeData>>) {
   return (
     <div className="w-[280px] rounded-2xl border border-white/10 bg-black/80 px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-md">
-      <Handle type="target" position={Position.Top} className="!bg-lime-400" />
+      <Handle type="target" position={Position.Top} className="bg-lime-400!" />
       <p className="font-mono text-[9px] tracking-[0.22em] text-lime-400/70 uppercase">{data.type}</p>
       <p className="mt-1 text-sm font-semibold text-white">{data.label}</p>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -63,7 +63,7 @@ function FieldNode({ data }: NodeProps<Node<FlowFieldNodeData>>) {
           );
         })}
       </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-lime-400" />
+      <Handle type="source" position={Position.Bottom} className="bg-lime-400!" />
     </div>
   );
 }
@@ -144,8 +144,8 @@ function AggregateFlowChartInner({
         zoomOnScroll
       >
         <Background color="#4ade80" gap={20} size={1} style={{ opacity: 0.08 }} />
-        <Controls className="!border-white/10 !bg-black/60 !shadow-none [&>button]:!border-white/10 [&>button]:!bg-black/40 [&>button]:!fill-white/70" />
-        <MiniMap nodeColor="#4ade80" maskColor="rgba(0,0,0,0.75)" className="!border-white/10 !bg-black/50" />
+        <Controls className="border-white/10! bg-black/60! shadow-none! [&>button]:border-white/10! [&>button]:bg-black/40! [&>button]:fill-white/70!" />
+        <MiniMap nodeColor="#4ade80" maskColor="rgba(0,0,0,0.75)" className="border-white/10! bg-black/50!" />
       </ReactFlow>
     </div>
   );
