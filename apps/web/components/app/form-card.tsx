@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { BarChart3, Copy, Eye, FileText, Globe, Link2, Lock, Pencil } from "lucide-react";
-import { toast } from "sonner";
+import { BarChart3, Eye, FileText, Globe, Link2, Lock, Pencil, Share2 } from "lucide-react";
 
 import type { RouterOutputs } from "@repo/trpc/client";
+
+import { ShareFormModal } from "~/components/app/share-form-modal";
 
 type FormListItem = RouterOutputs["forms"]["list"]["items"][number];
 
@@ -18,11 +20,7 @@ export function FormCard({ form }: { form: FormListItem }) {
   const vis = VISIBILITY[form.visibility];
   const sharePath = form.slug ? `/f/s/${form.slug}` : `/f/${form.id}`;
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}${sharePath}` : sharePath;
-
-  const copyLink = async () => {
-    await navigator.clipboard.writeText(shareUrl);
-    toast.success("Form link copied");
-  };
+  const [shareOpen, setShareOpen] = useState(false);
 
   return (
     <article className="app-surface group rounded-xl p-5 transition-all duration-300 hover:border-lime-400/20">
@@ -75,11 +73,11 @@ export function FormCard({ form }: { form: FormListItem }) {
         <span className="text-white/15">·</span>
         <button
           type="button"
-          onClick={copyLink}
-          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-white/45 transition-colors hover:text-white"
+          onClick={() => setShareOpen(true)}
+          className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-lime-400/90 uppercase transition-colors hover:text-lime-300"
         >
-          <Copy size={13} />
-          Copy link
+          <Share2 size={13} />
+          Share
         </button>
         <span className="text-white/15">·</span>
         <Link
@@ -90,6 +88,13 @@ export function FormCard({ form }: { form: FormListItem }) {
           Open form
         </Link>
       </div>
+
+      <ShareFormModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        shareUrl={shareUrl}
+        formTitle={form.title}
+      />
     </article>
   );
 }

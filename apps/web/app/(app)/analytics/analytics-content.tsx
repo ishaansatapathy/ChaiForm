@@ -318,6 +318,7 @@ export default function AnalyticsContent() {
         <div className="mt-8">
           <AnalyticsDetailPanel
           key={activeFormId}
+          formTitle={activeForm?.title ?? "Form"}
           fields={formFields.fields}
           submissions={allSubmissions}
           allSubmissionsCount={summary?.selectedForm?.submissionCount ?? allSubmissions.length}
