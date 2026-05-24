@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { BarChart3, GitBranch, Users, X } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronRight, GitBranch, Users, X } from "lucide-react";
 
 import type { RouterOutputs } from "@repo/trpc/client";
 import {
@@ -14,26 +14,19 @@ import {
 } from "~/lib/analytics-filters";
 import { formatCheckboxAnswerValue } from "~/lib/checkbox-value";
 
-const AggregateFlowChart = dynamic(
+const ParticipantFlowChart = dynamic(
   () =>
-    import("~/components/analytics/aggregate-flow-chart").then((mod) => ({
-      default: mod.AggregateFlowChart,
+    import("~/components/analytics/participant-flow-chart").then((mod) => ({
+      default: mod.ParticipantFlowChart,
     })),
-  { loading: () => <div className="h-[620px] animate-pulse rounded-[32px] bg-white/3" /> },
-);
-
-const SubmissionFlowChart = dynamic(
-  () =>
-    import("~/components/analytics/submission-flow-chart").then((mod) => ({
-      default: mod.SubmissionFlowChart,
-    })),
-  { loading: () => <div className="h-64 animate-pulse rounded-3xl bg-white/3" /> },
+  { loading: () => <div className="h-[640px] animate-pulse rounded-[32px] bg-white/3" /> },
 );
 
 type FormField = RouterOutputs["analytics"]["listFormFields"]["fields"][number];
 type Submission = RouterOutputs["forms"]["listSubmissions"]["items"][number];
 
 type AnalyticsDetailPanelProps = {
+  formTitle: string;
   fields: FormField[];
   submissions: Submission[];
   allSubmissionsCount: number;
@@ -43,6 +36,7 @@ type AnalyticsDetailPanelProps = {
 };
 
 export function AnalyticsDetailPanel({
+  formTitle,
   fields,
   submissions,
   allSubmissionsCount,
@@ -204,22 +198,17 @@ export function AnalyticsDetailPanel({
       ) : (
         <div className="space-y-6">
           <p className="text-sm text-white/45">
-            Click any option in the flow to filter participants — e.g. tap ⭐ 1 to see critical reviews only.
+            Click any participant node to reveal their answers. Use filters above to narrow down responses.
           </p>
-          <AggregateFlowChart
-            fields={filterableFields}
-            participantCount={filteredSubmissions.length}
-            activeFilters={activeFilters}
-            onFilterSelect={toggleFilter}
-          />
-
-          {activeSubmission ? (
-            <SubmissionFlowChart
-              answers={activeSubmission.answers}
-              participantLabel={`${getParticipantName(activeSubmission, 0)} · ${activeSubmission.submittedAt ? new Date(activeSubmission.submittedAt).toLocaleString() : "—"}`}
-            />
-          ) : (
+          {filteredSubmissions.length === 0 ? (
             <p className="text-sm text-white/40">No participants match the current filters.</p>
+          ) : (
+            <ParticipantFlowChart
+              formTitle={formTitle}
+              submissions={filteredSubmissions}
+              activeSubmissionId={activeSubmission?.id}
+              onSelectSubmission={onSelectSubmission}
+            />
           )}
 
           <ParticipantList
@@ -249,49 +238,75 @@ function ParticipantList({
   return (
     <div>
       <p className="font-mono mb-3 text-[9px] tracking-[0.28em] text-white/35 uppercase">
-        Participant responses
+        Participant responses · click to expand
       </p>
       <div className="space-y-3">
         {submissions.map((submission, index) => {
-          const active = submission.id === activeSubmissionId;
+          const expanded = submission.id === activeSubmissionId;
+          const visibleAnswers = submission.answers.filter((answer) => answer.value.trim().length > 0);
           return (
-            <button
+            <div
               key={submission.id}
-              type="button"
-              onClick={() => onSelect(submission.id)}
-              className={`w-full rounded-3xl border px-4 py-4 text-left transition-colors ${
-                active
+              className={`overflow-hidden rounded-3xl border transition-colors ${
+                expanded
                   ? "border-lime-400/35 bg-lime-400/8"
                   : "border-white/8 bg-white/2 hover:border-white/15 hover:bg-white/4"
               }`}
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-white">{getParticipantName(submission, index)}</p>
-                  <p className="mt-1 font-mono text-[10px] text-white/35">
-                    {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : "—"}
-                  </p>
+              <button
+                type="button"
+                onClick={() => onSelect(expanded ? "" : submission.id)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
+                      expanded
+                        ? "border-lime-400/40 bg-lime-400/15 text-lime-300"
+                        : "border-white/10 bg-white/5 text-white/45"
+                    }`}
+                  >
+                    {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-white">{getParticipantName(submission, index)}</p>
+                    <p className="mt-0.5 font-mono text-[10px] text-white/35">
+                      {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : "—"}
+                    </p>
+                  </div>
                 </div>
                 <span className="rounded-full border border-white/10 px-2 py-0.5 font-mono text-[9px] tracking-wider text-white/40 uppercase">
-                  {submission.answers.filter((answer) => answer.value.trim()).length} answers
+                  {visibleAnswers.length} answers
                 </span>
-              </div>
+              </button>
 
-              <div className="mt-3 space-y-1">
-                {submission.answers
-                  .filter((answer) => answer.value.trim().length > 0)
-                  .map((answer) => (
-                    <p key={answer.fieldId} className="text-xs text-white/55">
-                      <span className="text-white/75">{answer.label}:</span>{" "}
-                      {answer.type === "rating"
-                        ? `⭐ ${answer.value}`
-                        : answer.type === "checkbox"
-                          ? formatCheckboxAnswerValue(answer.value)
-                          : answer.value}
-                    </p>
-                  ))}
-              </div>
-            </button>
+              {expanded && (
+                <div className="space-y-2 border-t border-white/8 bg-black/30 px-5 py-4">
+                  {visibleAnswers.length === 0 ? (
+                    <p className="text-xs text-white/40">No answers recorded.</p>
+                  ) : (
+                    visibleAnswers.map((answer) => (
+                      <div
+                        key={answer.fieldId}
+                        className="rounded-2xl border border-white/8 bg-white/3 px-3 py-2.5"
+                      >
+                        <p className="font-mono text-[9px] tracking-[0.22em] text-lime-400/60 uppercase">
+                          {answer.type}
+                        </p>
+                        <p className="mt-0.5 text-xs font-semibold text-white/85">{answer.label}</p>
+                        <p className="mt-1 text-sm text-white/70">
+                          {answer.type === "rating"
+                            ? `⭐ ${answer.value}`
+                            : answer.type === "checkbox"
+                              ? formatCheckboxAnswerValue(answer.value)
+                              : answer.value}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
