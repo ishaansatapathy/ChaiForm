@@ -9,9 +9,11 @@ import { TRPCClientError } from "@repo/trpc/client";
 import type { RouterOutputs } from "@repo/trpc/client";
 
 import { AppMobileNav } from "~/components/app/app-mobile-nav";
+import { AppDataProvider } from "~/components/app/app-data-provider";
 import { AppSidebar } from "~/components/app/app-sidebar";
 import { HeroTimeGate } from "~/components/app/hero-time-gate";
 import { prefetchAppRoutes } from "~/lib/prefetch-app-routes";
+import type { AnalyticsSummary, FormsListPage } from "~/lib/fetch-session";
 import { trpc } from "~/trpc/client";
 
 type SessionUser = RouterOutputs["auth"]["me"];
@@ -36,9 +38,13 @@ function AppBackground() {
 export function AppShell({
   children,
   initialUser,
+  initialForms,
+  initialAnalytics,
 }: {
   children: ReactNode;
   initialUser?: SessionUser | null;
+  initialForms?: FormsListPage | null;
+  initialAnalytics?: AnalyticsSummary | null;
 }) {
   const router = useRouter();
   const { data: user, isLoading, isError, error, refetch, isFetching } = trpc.auth.me.useQuery(undefined, {
@@ -125,16 +131,18 @@ export function AppShell({
   }
 
   return (
-    <div className="relative min-h-screen">
-      <AppBackground />
-      <HeroTimeGate user={resolvedUser} />
-      <div className="relative z-10 flex flex-col lg:flex-row">
-        <AppSidebar />
-        <main className="min-h-screen flex-1 px-4 pt-8 pb-32 sm:px-6 lg:px-8 lg:pb-10">
-          <div className="relative mx-auto max-w-7xl">{children}</div>
-        </main>
-        <AppMobileNav />
+    <AppDataProvider initialForms={initialForms ?? null} initialAnalytics={initialAnalytics ?? null}>
+      <div className="relative min-h-screen">
+        <AppBackground />
+        <HeroTimeGate user={resolvedUser} />
+        <div className="relative z-10 flex flex-col lg:flex-row">
+          <AppSidebar />
+          <main className="min-h-screen flex-1 px-4 pt-8 pb-32 sm:px-6 lg:px-8 lg:pb-10">
+            <div className="relative mx-auto max-w-7xl">{children}</div>
+          </main>
+          <AppMobileNav />
+        </div>
       </div>
-    </div>
+    </AppDataProvider>
   );
 }

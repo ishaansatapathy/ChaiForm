@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import type { RouterOutputs } from "@repo/trpc/client";
 
 export type SessionUser = RouterOutputs["auth"]["me"];
+export type FormsListPage = RouterOutputs["forms"]["list"];
+export type AnalyticsSummary = RouterOutputs["analytics"]["summary"];
 
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
@@ -15,8 +17,15 @@ function buildCookieHeader(
     .join("; ");
 }
 
-async function fetchAuthMe(cookieHeader: string): Promise<SessionUser | null> {
-  const url = `${API_BASE}/trpc/auth.me`;
+async function fetchTrpcQuery<T>(
+  procedure: string,
+  input: Record<string, unknown> | undefined,
+  cookieHeader: string,
+): Promise<T | null> {
+  const query = input ? encodeURIComponent(JSON.stringify(input)) : undefined;
+  const url = query
+    ? `${API_BASE}/trpc/${procedure}?input=${query}`
+    : `${API_BASE}/trpc/${procedure}`;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -26,7 +35,7 @@ async function fetchAuthMe(cookieHeader: string): Promise<SessionUser | null> {
         signal: AbortSignal.timeout(25_000),
       });
 
-      if (response.status === 401) return null;
+      if (response.status === 401 || response.status === 403) return null;
 
       if (!response.ok) {
         if (response.status >= 500 && attempt < 2) {
@@ -37,8 +46,8 @@ async function fetchAuthMe(cookieHeader: string): Promise<SessionUser | null> {
       }
 
       const payload: unknown = await response.json();
-      const user = (payload as { result?: { data?: SessionUser } }).result?.data;
-      return user ?? null;
+      const data = (payload as { result?: { data?: T } }).result?.data;
+      return data ?? null;
     } catch {
       if (attempt < 2) {
         await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
@@ -57,5 +66,23 @@ export async function fetchSessionUser(): Promise<SessionUser | null> {
   if (!cookieHeader.includes("jwt") && !cookieHeader.includes("jwt_refresh")) {
     return null;
   }
-  return fetchAuthMe(cookieHeader);
+  return fetchTrpcQuery<SessionUser>("auth.me", undefined, cookieHeader);
+}
+
+export async function fetchFormsList(limit = 100): Promise<FormsListPage | null> {
+  const cookieStore = await cookies();
+  const cookieHeader = buildCookieHeader(cookieStore);
+  if (!cookieHeader.includes("jwt") && !cookieHeader.includes("jwt_refresh")) {
+    return null;
+  }
+  return fetchTrpcQuery<FormsListPage>("forms.list", { limit }, cookieHeader);
+}
+
+export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary | null> {
+  const cookieStore = await cookies();
+  const cookieHeader = buildCookieHeader(cookieStore);
+  if (!cookieHeader.includes("jwt") && !cookieHeader.includes("jwt_refresh")) {
+    return null;
+  }
+  return fetchTrpcQuery<AnalyticsSummary>("analytics.summary", {}, cookieHeader);
 }
