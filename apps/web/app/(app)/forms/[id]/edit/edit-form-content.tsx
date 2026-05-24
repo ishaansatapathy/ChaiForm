@@ -10,6 +10,7 @@ import { FormBuilderPreview } from "~/components/forms/form-builder-preview";
 import { FormThemePicker } from "~/components/forms/form-theme-picker";
 import { Highlight } from "~/components/app/highlight";
 import type { FormThemeId } from "~/lib/form-themes";
+import { updateFormAction } from "~/app/(app)/forms/actions";
 import { getTrpcErrorMessage, runWithRetry, useWarmApi } from "~/lib/warm-api";
 import type { FormDetail } from "~/lib/fetch-session";
 import { trpc } from "~/trpc/client";
@@ -25,9 +26,11 @@ type EditFormContentProps = {
 export default function EditFormContent({ formId, initialForm }: EditFormContentProps) {
   const router = useRouter();
   const utils = trpc.useUtils();
-  useWarmApi();
   const [saving, setSaving] = useState(false);
+  const updateForm = trpc.forms.update.useMutation();
   const { data: user } = trpc.auth.me.useQuery({});
+
+  useWarmApi();
 
   const {
     data: form,
@@ -43,16 +46,6 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
       staleTime: 30_000,
     },
   );
-
-  const updateForm = trpc.forms.update.useMutation({
-    onSuccess: async () => {
-      await utils.forms.list.invalidate();
-      await utils.forms.getById.invalidate({ formId });
-      await utils.analytics.summary.invalidate();
-      toast.success("Form updated");
-      router.push("/dashboard");
-    },
-  });
 
   const deleteForm = trpc.forms.delete.useMutation({
     onSuccess: async () => {
@@ -129,6 +122,8 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
     }
 
     setSaving(true);
+    toast.message("Saving changes… may take up to a minute if the server was idle.");
+
     const payload = {
       formId,
       title: title.trim(),
@@ -140,11 +135,25 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
     };
 
     try {
-      await runWithRetry(() => updateForm.mutateAsync(payload), {
-        onRetry: (attempt) => {
-          toast.message(`Server waking up… retry ${attempt}/3`);
+      await runWithRetry(
+        async () => {
+          try {
+            return await updateFormAction(payload);
+          } catch {
+            return await updateForm.mutateAsync(payload);
+          }
         },
-      });
+        {
+          onRetry: (attempt) => {
+            toast.message(`Server waking up… retry ${attempt}/5`);
+          },
+        },
+      );
+      await utils.forms.list.invalidate();
+      await utils.forms.getById.invalidate({ formId });
+      await utils.analytics.summary.invalidate();
+      toast.success("Form updated");
+      router.push("/dashboard");
     } catch (error) {
       toast.error(getTrpcErrorMessage(error));
     } finally {
@@ -222,10 +231,10 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving || updateForm.isPending}
+              disabled={saving}
               className="btn-omni font-display w-full rounded-2xl py-3.5 text-sm font-black tracking-[0.18em] uppercase disabled:opacity-50"
             >
-              {saving || updateForm.isPending ? "Saving…" : "Save Changes"}
+              {saving ? "Saving…" : "Save Changes"}
             </button>
           </div>
 
