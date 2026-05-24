@@ -100,3 +100,30 @@ _*_ref/
 
 *.tsbuildinfo
 
+
+
+# Videos & recordings
+
+*.mp4
+
+*.mov
+
+*.webm
+
+Recording*
+
+
+
+# Font source/zip files
+
+*.zip
+
+*.ttf
+
+*.otf
+
+
+
+# Ref/scratch folders
+
+ChaiPoll/

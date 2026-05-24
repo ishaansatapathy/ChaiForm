@@ -5,7 +5,7 @@ import type { RouterOutputs } from "@repo/trpc/client";
 type PublicField = RouterOutputs["forms"]["getPublic"]["fields"][number];
 
 const inputClassName =
-  "w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm outline-none focus:border-lime-400/40";
+  "w-full rounded-2xl border border-white/10 bg-white/3 px-4 py-3 text-sm outline-none focus:border-lime-400/40";
 
 export function FormFieldInput({
   field,
@@ -48,7 +48,7 @@ export function FormFieldInput({
                 className={`h-11 w-11 rounded-xl border text-sm font-bold transition-colors ${
                   active
                     ? "border-lime-400 bg-lime-400/20 text-lime-300"
-                    : "border-white/10 bg-white/[0.02] text-white/50 hover:border-lime-400/30"
+                    : "border-white/10 bg-white/2 text-white/50 hover:border-lime-400/30"
                 }`}
               >
                 {rating}

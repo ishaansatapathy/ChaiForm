@@ -86,9 +86,6 @@ export default function AnalyticsContent() {
         <Header />
         <div className="text-center">
           <p className="text-white/50">No analytics yet — create a form and collect responses first.</p>
-          <p className="mt-2 text-xs text-white/35">
-            Tip: run <code className="text-lime-400/80">pnpm db:seed</code> after sign-up for demo charts.
-          </p>
           <Link href="/forms/new" className="font-annotate mt-4 inline-block text-xl text-lime-400">
             Create a form →
           </Link>

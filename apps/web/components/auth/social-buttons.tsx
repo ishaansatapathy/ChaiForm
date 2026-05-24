@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { trpc } from "~/trpc/client";
 
 function GoogleIcon() {
@@ -14,6 +16,7 @@ function GoogleIcon() {
 }
 
 export function SocialButtons() {
+  const [redirecting, setRedirecting] = useState(false);
   const {
     data: providers,
     isLoading,
@@ -28,12 +31,15 @@ export function SocialButtons() {
   const canUseGoogle = Boolean(google?.authUrl);
 
   const handleGoogle = () => {
-    if (!google?.authUrl) return;
+    if (!google?.authUrl || redirecting) return;
+    setRedirecting(true);
     window.location.assign(google.authUrl);
   };
 
   const hint =
-    isLoading
+    redirecting
+      ? "Redirecting to Google…"
+      : isLoading
       ? "Connecting to auth server…"
       : isError
         ? "API unreachable — start backend on port 8000"
@@ -46,11 +52,13 @@ export function SocialButtons() {
       <button
         type="button"
         onClick={handleGoogle}
-        disabled={isLoading || !canUseGoogle}
+        disabled={isLoading || redirecting || !canUseGoogle}
         className="group flex w-full items-center justify-center gap-3 rounded-2xl border border-white/6 bg-[#141414] py-3.5 text-[11px] font-bold text-white/70 transition-colors hover:bg-[#1a1a1a] hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
       >
         <GoogleIcon />
-        <span>{google?.displayText ?? "Continue with Google"}</span>
+        <span>
+          {redirecting ? "Opening Google…" : (google?.displayText ?? "Continue with Google")}
+        </span>
       </button>
 
       {hint && (

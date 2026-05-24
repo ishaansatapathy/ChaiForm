@@ -51,6 +51,8 @@ html {
 
 :root {
   --radius: 0.625rem;
+  --landing-bg: #020202;
+  --landing-surface: #0a0a0a;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -152,6 +154,35 @@ html {
 
 .font-brush {
   font-family: var(--font-brush), "Rubik Dirt", sans-serif;
+}
+
+.font-rock {
+  font-family: var(--font-rock), "Rock Salt", cursive;
+}
+
+.font-marker {
+  font-family: var(--font-marker), "Permanent Marker", cursive;
+}
+
+.font-kaushan {
+  font-family: var(--font-kaushan), "Kaushan Script", cursive;
+}
+
+.hero-copy-title {
+  text-shadow: 0 0 40px rgb(112 180 4 / 0.12);
+}
+
+.hero-copy-smear::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0.06em;
+  z-index: -1;
+  width: 102%;
+  height: 0.22em;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgb(112 180 4 / 0.45), rgb(112 180 4 / 0.08));
+  transform: rotate(-1deg);
 }
 
 /* === Auth card — flat ChaiPoll style (no glass / scanline) ================== */
@@ -709,4 +740,235 @@ html {
   transform: skewX(2.5deg);
 }
 
+/* === Hero landing wallpaper — full bleed, no letterbox ===================== */
+.hero-wallpaper {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 52%;
+  transform: scale(1.12);
+  transform-origin: 50% 52%;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 58%, rgb(0 0 0 / 55%) 78%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 58%, rgb(0 0 0 / 55%) 78%, transparent 100%);
+}
+
+.hero-seam-blend {
+  height: min(34vh, 280px);
+}
+
+.hero-edge-fade {
+  background: linear-gradient(to left, var(--landing-bg) 0%, rgb(2 2 2 / 96%) 38%, rgb(2 2 2 / 55%) 68%, transparent 100%);
+}
+
+.hero-seam-blur {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  opacity: 0.55;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgb(0 0 0 / 70%) 45%, #000 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgb(0 0 0 / 70%) 45%, #000 100%);
+}
+
+.hero-seam-fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgb(2 2 2 / 20%) 28%,
+    rgb(2 2 2 / 62%) 58%,
+    var(--landing-bg) 100%
+  );
+}
+
+.workflow-seam-top {
+  height: min(22vh, 180px);
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgb(2 2 2 / 45%) 42%,
+    var(--landing-bg) 100%
+  );
+}
+
+.workflow-section {
+  margin-top: calc(min(14vh, 112px) * -1);
+  padding-top: min(14vh, 112px);
+}
+
+.hero-wallpaper-bg {
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: contain;
+}
+
+.landing-page {
+  --ben10-green: #70b404;
+  --ben10-green-rgb: 112 180 4;
+  --ben10-green-soft: #9ed926;
+  --ben10-green-dim: #8ec42d;
+  --ben10-green-glow: #b8f038;
+  background: var(--landing-bg);
+  color: #fff;
+}
+
+.landing-label {
+  color: var(--ben10-green);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}
+
+.landing-body {
+  color: rgb(255 255 255 / 0.92);
+}
+
+.landing-muted {
+  color: rgb(255 255 255 / 0.78);
+}
+
+.landing-accent-text {
+  color: var(--ben10-green-soft);
+}
+
+.landing-highlight {
+  border-color: rgb(var(--ben10-green-rgb) / 0.42) !important;
+  background: rgb(var(--ben10-green-rgb) / 0.07) !important;
+  color: var(--ben10-green-soft) !important;
+}
+
+.landing-highlight > span[class*="absolute"] {
+  border-color: rgb(var(--ben10-green-rgb) / 0.62) !important;
+  background: #020202 !important;
+}
+
+.landing-btn-primary {
+  border: 1px solid rgb(var(--ben10-green-rgb) / 0.55);
+  background: rgb(var(--ben10-green-rgb) / 0.1);
+  color: #fff;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.landing-btn-primary:hover {
+  border-color: var(--ben10-green);
+  background: rgb(var(--ben10-green-rgb) / 0.18);
+}
+
+.landing-btn-ghost {
+  border: 1px solid rgb(255 255 255 / 0.38);
+  color: #fff;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.landing-btn-ghost:hover {
+  border-color: rgb(var(--ben10-green-rgb) / 0.45);
+  background: rgb(var(--ben10-green-rgb) / 0.06);
+}
+
+.landing-page .landing-diagram {
+  border-color: rgb(var(--ben10-green-rgb) / 0.18);
+}
+
+.landing-page .workflow-step.is-active .workflow-step-num,
+.landing-page .workflow-step[data-active="true"] .workflow-step-num {
+  border-color: rgb(var(--ben10-green-rgb) / 0.55);
+  color: var(--ben10-green-soft);
+  background: rgb(var(--ben10-green-rgb) / 0.08);
+}
+
+/* Single fixed canvas — one continuous bg while scrolling (no per-section seams) */
+.landing-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--landing-bg);
+}
+
+.landing-page .hero-section,
+.landing-page .alien-scroll,
+.landing-page .alien-section {
+  background: transparent;
+}
+
+.landing-copy-off .landing-copy {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.landing-diagrams-off .landing-diagram,
+.landing-diagrams-off .sticky-scroll-section {
+  display: none !important;
+}
+
+.alien-char {
+  will-change: transform, opacity;
+}
+
+.alien-char-img {
+  will-change: filter, transform;
+}
+
+.alien-char-img--screen {
+  mix-blend-mode: screen;
+}
+
+.alien-copy .alien-copy-line,
+.alien-copy .alien-index,
+.alien-copy .alien-rule {
+  will-change: transform, opacity;
+}
+
+.alien-section + .alien-section::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 50%;
+  width: clamp(120px, 18vw, 240px);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.workflow-step {
+  opacity: 0.38;
+  will-change: transform, opacity;
+}
+
+.landing-reveal {
+  opacity: 0;
+}
+
+.sticky-slide,
+.sticky-preview {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+
+.sticky-slide.is-active,
+.sticky-preview.is-active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.sticky-preview > * {
+  height: 100%;
+  width: 100%;
+}
+
+.landing-diagram,
+.landing-ui-panel {
+  min-height: 0;
+}
 
