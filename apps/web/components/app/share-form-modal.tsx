@@ -27,8 +27,8 @@ export function ShareFormModal({ open, shareUrl, formTitle, onClose }: ShareForm
       width: 320,
       margin: 1,
       color: {
-        dark: "#0a0a0a",
-        light: "#d9f99d",
+        dark: "#000000",
+        light: "#ffffff",
       },
       errorCorrectionLevel: "H",
     })
@@ -98,7 +98,7 @@ export function ShareFormModal({ open, shareUrl, formTitle, onClose }: ShareForm
         </p>
 
         <div className="mt-6 flex flex-col items-center gap-4">
-          <div className="rounded-3xl border border-lime-400/25 bg-lime-400/5 p-4 shadow-[0_0_30px_rgba(74,222,128,0.12)]">
+          <div className="rounded-3xl border border-white/15 bg-white p-4">
             {qrDataUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
