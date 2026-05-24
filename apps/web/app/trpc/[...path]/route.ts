@@ -2,6 +2,12 @@ import { type NextRequest, NextResponse } from "next/server";
 
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
+/** Render cold starts exceed Vercel Hobby limits — keep per-attempt timeout short and retry. */
+export const maxDuration = 60;
+
+const ATTEMPTS = 5;
+const ATTEMPT_TIMEOUT_MS = 12_000;
+
 /** Proxy tRPC so auth Set-Cookie headers reach the browser (rewrites drop them). */
 async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
@@ -22,28 +28,34 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
       : undefined;
 
   let upstreamRes: Response | null = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
     try {
       upstreamRes = await fetch(upstream, {
         method: request.method,
         headers,
         body,
         redirect: "manual",
-        signal: AbortSignal.timeout(25_000),
+        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
       });
 
       if (upstreamRes.status < 500) break;
 
-      if (attempt < 2) {
-        await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+      if (attempt < ATTEMPTS - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
       }
     } catch {
-      if (attempt < 2) {
-        await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+      if (attempt < ATTEMPTS - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
         continue;
       }
       return NextResponse.json(
-        { error: { message: "API unavailable", code: -32004, data: { code: "TIMEOUT" } } },
+        {
+          error: {
+            message: "API is waking up — please try again in a few seconds.",
+            code: -32004,
+            data: { code: "TIMEOUT" },
+          },
+        },
         { status: 503 },
       );
     }
@@ -51,7 +63,13 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
 
   if (!upstreamRes) {
     return NextResponse.json(
-      { error: { message: "API unavailable", code: -32004, data: { code: "TIMEOUT" } } },
+      {
+        error: {
+          message: "API is waking up — please try again in a few seconds.",
+          code: -32004,
+          data: { code: "TIMEOUT" },
+        },
+      },
       { status: 503 },
     );
   }

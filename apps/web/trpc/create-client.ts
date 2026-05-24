@@ -10,7 +10,7 @@ export const createTRPCHttpBatchClientClient = (opts?: CreateTRPCHttpBatchClient
   return c({
     url: env.NEXT_PUBLIC_API_URL ?? "/trpc",
     fetch(url, options) {
-      const timeoutSignal = AbortSignal.timeout(30_000);
+      const timeoutSignal = AbortSignal.timeout(90_000);
       const signal =
         options?.signal && typeof AbortSignal.any === "function"
           ? AbortSignal.any([options.signal, timeoutSignal])

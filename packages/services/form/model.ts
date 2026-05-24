@@ -93,7 +93,7 @@ export const createFormInputSchema = z.object({
   description: z.string().max(2000).optional(),
   visibility: z.enum(["public", "unlisted", "draft"]).default("public"),
   theme: formThemeSchema.default("default"),
-  fields: z.array(formFieldInputSchema).min(1),
+  fields: z.array(formFieldInputSchema).min(1).max(50),
 });
 
 export const updateFormInputSchema = z.object({
@@ -103,7 +103,7 @@ export const updateFormInputSchema = z.object({
   visibility: z.enum(["public", "unlisted", "draft"]).optional(),
   theme: formThemeSchema.optional(),
   slug: z.string().min(1).max(80).optional(),
-  fields: z.array(formFieldInputSchema).min(1).optional(),
+  fields: z.array(formFieldInputSchema).min(1).max(50).optional(),
 });
 
 export const formOutputSchema = z.object({
@@ -160,19 +160,22 @@ export const submissionAnswerSchema = z.object({
 
 export const submitFormInputSchema = z.object({
   formId: z.string().uuid(),
-  answers: z.array(
-    z.object({
-      fieldId: z.string().uuid(),
-      value: z.string(),
-    }),
-  ),
-  /** Honeypot — must stay empty; bots often fill hidden fields */
-  website: z
-    .string()
-    .optional()
-    .refine((value) => !value || value.length === 0, {
-      message: "Submission rejected",
-    }),
+  answers: z
+    .array(
+      z.object({
+        fieldId: z.string().uuid(),
+        value: z.string().max(5000),
+      }),
+    )
+    .max(50)
+    .refine(
+      (answers) => new Set(answers.map((answer) => answer.fieldId)).size === answers.length,
+      { message: "Duplicate field answers are not allowed" },
+    ),
+  /** Honeypot — must always be sent and stay empty */
+  website: z.string().max(500).refine((value) => value.length === 0, {
+    message: "Submission rejected",
+  }),
 });
 
 export const submissionOutputSchema = z.object({

@@ -1,6 +1,7 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { OpenApiMeta } from "trpc-to-openapi";
 import { AuthError } from "@repo/services/auth/errors";
+import { ZodError } from "zod";
 
 import { createContext } from "./context";
 
@@ -9,11 +10,13 @@ export const tRPCContext = initTRPC
   .context<typeof createContext>()
   .create({
     errorFormatter({ shape, error }) {
+      const zodError =
+        error.cause instanceof ZodError ? error.cause.flatten().fieldErrors : null;
       return {
         ...shape,
         data: {
           ...shape.data,
-          zodError: error.cause instanceof Error ? error.cause.message : null,
+          zodError,
         },
       };
     },

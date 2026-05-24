@@ -88,11 +88,11 @@ export const ALIEN_SCROLL_SECTIONS: AlienScrollSection[] = [
 
     uiPanel: "logic",
 
-    eyebrow: "Rules",
+    eyebrow: "Flow",
 
-    heading: "Upgrade every\nquestion.",
+    heading: "One question\nat a time.",
 
-    body: "Required answers, follow-ups, smart branches — your form adapts as people respond.",
+    body: "Typeform-style respondent UX — progress bar, keyboard Enter, and a focused question per step.",
 
     tag: "Arm",
 

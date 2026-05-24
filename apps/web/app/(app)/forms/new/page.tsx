@@ -6,8 +6,12 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { FormBuilderFields, type DraftField } from "~/components/forms/form-builder-fields";
+import { FormBuilderPreview } from "~/components/forms/form-builder-preview";
+import { FormThemePicker } from "~/components/forms/form-theme-picker";
 import { Highlight } from "~/components/app/highlight";
 import { FORM_TEMPLATES } from "~/lib/form-templates";
+import type { FormThemeId } from "~/lib/form-themes";
+import { getTrpcErrorMessage, runWithRetry, useWarmApi } from "~/lib/warm-api";
 import { trpc } from "~/trpc/client";
 import type { RouterInputs } from "@repo/trpc/client";
 
@@ -21,6 +25,9 @@ const createInitialDraftFields = (): DraftField[] => [
 export default function CreateFormPage() {
   const router = useRouter();
   const utils = trpc.useUtils();
+  useWarmApi();
+  const [saving, setSaving] = useState(false);
+
   const createForm = trpc.forms.create.useMutation({
     onSuccess: async () => {
       await utils.forms.list.invalidate();
@@ -28,12 +35,12 @@ export default function CreateFormPage() {
       toast.success("Form saved");
       router.push("/dashboard");
     },
-    onError: (err) => toast.error(err.message),
   });
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"public" | "unlisted" | "draft">("public");
+  const [theme, setTheme] = useState<FormThemeId>("default");
   const [fields, setFields] = useState<DraftField[]>(createInitialDraftFields);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
 
@@ -53,18 +60,32 @@ export default function CreateFormPage() {
     toast.success(`${template.label} template loaded — edit and save when ready`);
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!title.trim()) {
       toast.error("Add a form title first");
       return;
     }
-    createForm.mutate({
+
+    setSaving(true);
+    const payload = {
       title: title.trim(),
       description: description.trim() || undefined,
       visibility,
-      theme: "default",
+      theme,
       fields: fields as CreateFormFields,
-    });
+    };
+
+    try {
+      await runWithRetry(() => createForm.mutateAsync(payload), {
+        onRetry: (attempt) => {
+          toast.message(`Server waking up… retry ${attempt}/3`);
+        },
+      });
+    } catch (error) {
+      toast.error(getTrpcErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -106,10 +127,11 @@ export default function CreateFormPage() {
           <FormBuilderFields fields={fields} onChange={setFields} />
         </div>
 
-        <aside className="lg:sticky lg:top-10 lg:self-start">
+        <aside className="space-y-4 lg:sticky lg:top-10 lg:self-start">
           <div className="app-surface rounded-[40px] p-6">
             <h3 className="font-display mb-4 text-lg font-bold text-white">Publish</h3>
-            <label className="mb-2 block text-[10px] font-bold tracking-[0.25em] text-white/40 uppercase">
+            <FormThemePicker value={theme} onChange={setTheme} />
+            <label className="mb-2 mt-6 block text-[10px] font-bold tracking-[0.25em] text-white/40 uppercase">
               Visibility
             </label>
             <select
@@ -124,10 +146,10 @@ export default function CreateFormPage() {
             <button
               type="button"
               onClick={handlePublish}
-              disabled={createForm.isPending}
+              disabled={saving || createForm.isPending}
               className="btn-omni font-display w-full rounded-2xl py-3.5 text-sm font-black tracking-[0.18em] uppercase disabled:opacity-50"
             >
-              {createForm.isPending ? "Saving…" : "Save Form"}
+              {saving || createForm.isPending ? "Saving…" : "Save Form"}
             </button>
 
             <div className="mt-6 border-t border-white/8 pt-6">
@@ -155,6 +177,8 @@ export default function CreateFormPage() {
               </div>
             </div>
           </div>
+
+          <FormBuilderPreview title={title} description={description} themeId={theme} fields={fields} />
         </aside>
       </div>
     </section>
