@@ -46,16 +46,19 @@ async function pingHealth(): Promise<boolean> {
   }
 }
 
-/** Wait until Render responds — each ping is a fresh Vercel request (10s budget). */
+/** Wait until server responds — skip warmup entirely if first ping succeeds. */
 export async function warmApiUntilReady(
   onProgress?: (message: string) => void,
-  maxAttempts = 12,
+  maxAttempts = 4,
 ): Promise<boolean> {
+  // Quick check — if the server responds immediately, skip the warmup loop.
+  if (await pingHealth()) return true;
+
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     onProgress?.(`Connecting to server (${attempt}/${maxAttempts})…`);
     if (await pingHealth()) return true;
     if (attempt < maxAttempts) {
-      await sleep(5_000);
+      await sleep(3_000);
     }
   }
   return false;
@@ -68,7 +71,7 @@ async function saveViaApi(action: SaveAction, input: Record<string, unknown>) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action, input }),
     cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(30_000),
   });
 
   let payload: { error?: string; retryable?: boolean; form?: unknown } = {};
@@ -96,16 +99,19 @@ export async function saveFormWithColdStart<T>(
 ): Promise<T> {
   const onProgress = opts?.onProgress;
 
-  onProgress?.("Waking server…");
-  const ready = await warmApiUntilReady(onProgress, 12);
+  const ready = await warmApiUntilReady(undefined, 4);
   if (!ready) {
-    throw new SaveFormError(
-      "Server is still waking up. Wait 30 seconds and tap Save again.",
-      true,
-    );
+    onProgress?.("Waking server…");
+    const retryReady = await warmApiUntilReady(onProgress, 4);
+    if (!retryReady) {
+      throw new SaveFormError(
+        "Server is not responding. Check that the API is running and try again.",
+        true,
+      );
+    }
   }
 
-  const totalAttempts = 6;
+  const totalAttempts = 3;
 
   return runWithRetry(
     async () => {
@@ -116,7 +122,7 @@ export async function saveFormWithColdStart<T>(
     },
     {
       attempts: totalAttempts,
-      delaysMs: [0, 4_000, 6_000, 8_000, 10_000, 12_000],
+      delaysMs: [0, 3_000, 5_000],
       onRetry: (attempt) => onProgress?.(`Saving… retry ${attempt}/${totalAttempts}`),
       isRetryable: isSaveRetryable,
     },

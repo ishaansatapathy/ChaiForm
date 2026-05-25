@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
-export const maxDuration = 10;
+export const maxDuration = 30;
 
 type SaveAction = "create" | "update";
 
@@ -19,7 +19,7 @@ async function postTrpcMutation(
     },
     body: JSON.stringify({ json: input }),
     cache: "no-store",
-    signal: AbortSignal.timeout(8_000),
+    signal: AbortSignal.timeout(25_000),
   });
 
   const payload: unknown = await response.json();
