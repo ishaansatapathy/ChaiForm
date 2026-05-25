@@ -35,7 +35,7 @@ export function getTrpcErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) return "Something went wrong. Try again.";
   const message = error.message;
   if (isRetryableTrpcError(error)) {
-    return "Server is waking up — wait a few seconds and try again.";
+    return "Could not reach the server. Please wait a moment and try again.";
   }
   if (message.startsWith("[")) {
     return "Could not save. Please try again.";
