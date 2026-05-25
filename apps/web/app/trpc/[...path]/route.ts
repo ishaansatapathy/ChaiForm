@@ -97,18 +97,34 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
   }
 
   const bodyText = await upstreamRes.text();
-  const response = new NextResponse(bodyText, {
-    status: upstreamRes.status,
-    statusText: upstreamRes.statusText,
-    headers: {
-      "content-type": upstreamRes.headers.get("content-type") ?? "application/json",
-    },
-  });
+  const contentType = upstreamRes.headers.get("content-type") ?? "application/json";
 
-  const cacheControl = upstreamRes.headers.get("cache-control");
-  if (cacheControl) {
-    response.headers.set("cache-control", cacheControl);
+  let response: NextResponse;
+  if (contentType.includes("application/json")) {
+    try {
+      const json = JSON.parse(bodyText) as unknown;
+      response = NextResponse.json(json, {
+        status: upstreamRes.status,
+        statusText: upstreamRes.statusText,
+      });
+    } catch {
+      response = new NextResponse(bodyText, {
+        status: upstreamRes.status,
+        statusText: upstreamRes.statusText,
+        headers: { "content-type": contentType },
+      });
+    }
+  } else {
+    response = new NextResponse(bodyText, {
+      status: upstreamRes.status,
+      statusText: upstreamRes.statusText,
+      headers: { "content-type": contentType },
+    });
   }
+
+  // Prevent Vercel/CDN from gzip-transforming a plain body (ERR_CONTENT_DECODING_FAILED).
+  response.headers.set("Cache-Control", "no-store, no-transform");
+  response.headers.delete("content-encoding");
 
   appendSetCookies(response, upstreamRes);
   return response;
