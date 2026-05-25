@@ -1,4 +1,4 @@
-import { jsonb, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { jsonb, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 import { formsTable } from "./form";
 
@@ -14,6 +14,7 @@ export const submissionsTable = pgTable("submissions", {
   formId: uuid("form_id")
     .notNull()
     .references(() => formsTable.id, { onDelete: "cascade" }),
+  respondentKey: varchar("respondent_key", { length: 64 }),
   answers: jsonb("answers").$type<SubmissionAnswerJson[]>().notNull(),
   submittedAt: timestamp("submitted_at").defaultNow(),
 });

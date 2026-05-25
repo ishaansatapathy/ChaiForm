@@ -8,7 +8,12 @@ import { toast } from "sonner";
 import { FormBuilderFields, type DraftField } from "~/components/forms/form-builder-fields";
 import { FormBuilderPreview } from "~/components/forms/form-builder-preview";
 import { FormThemePicker } from "~/components/forms/form-theme-picker";
+import { DeleteFormButton } from "~/components/app/delete-form-button";
+import { AllowMultipleResponsesToggle } from "~/components/app/allow-multiple-responses-toggle";
+import { FormRetentionPicker } from "~/components/app/form-retention-picker";
 import { Highlight } from "~/components/app/highlight";
+import type { FormRetentionOption } from "~/lib/form-retention";
+import { presetFromExpiresAt } from "~/lib/form-retention";
 import type { FormThemeId } from "~/lib/form-themes";
 import { getSaveErrorMessage, saveFormWithColdStart } from "~/lib/save-form";
 import { useWarmApi } from "~/lib/warm-api";
@@ -46,16 +51,6 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
     },
   );
 
-  const deleteForm = trpc.forms.delete.useMutation({
-    onSuccess: async () => {
-      await utils.forms.list.invalidate();
-      await utils.analytics.summary.invalidate();
-      toast.success("Form deleted");
-      router.push("/dashboard");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
   const [title, setTitle] = useState(initialForm?.title ?? "");
   const [description, setDescription] = useState(initialForm?.description ?? "");
   const [slug, setSlug] = useState(initialForm?.slug ?? "");
@@ -63,6 +58,12 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
     initialForm?.visibility ?? "public",
   );
   const [theme, setTheme] = useState<FormThemeId>((initialForm?.theme as FormThemeId) ?? "default");
+  const [retention, setRetention] = useState<FormRetentionOption>(
+    presetFromExpiresAt(initialForm?.expiresAt),
+  );
+  const [allowMultipleSubmissions, setAllowMultipleSubmissions] = useState(
+    initialForm?.allowMultipleSubmissions ?? true,
+  );
   const [fields, setFields] = useState<DraftField[]>((initialForm?.fields as DraftField[]) ?? []);
   const [hydratedFormId, setHydratedFormId] = useState<string | null>(initialForm?.id ?? null);
 
@@ -73,6 +74,8 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
     setSlug(form.slug ?? "");
     setVisibility(form.visibility);
     setTheme(form.theme as FormThemeId);
+    setRetention(presetFromExpiresAt(form.expiresAt));
+    setAllowMultipleSubmissions(form.allowMultipleSubmissions ?? true);
     setFields(form.fields as DraftField[]);
     setHydratedFormId(form.id);
   }, [form, hydratedFormId]);
@@ -129,6 +132,8 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
       slug: slug.trim() !== (resolvedForm.slug ?? "") ? slug.trim() : undefined,
       visibility,
       theme,
+      retention,
+      allowMultipleSubmissions,
       fields: fields as UpdateFormFields,
     };
 
@@ -215,6 +220,17 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
               />
               {slug && <span className="block font-mono text-[10px] text-white/35">/f/s/{slug}</span>}
             </label>
+            <FormRetentionPicker
+              value={retention}
+              onChange={setRetention}
+              expiresAt={resolvedForm.expiresAt}
+            />
+            <div className="mb-6 mt-6">
+              <AllowMultipleResponsesToggle
+                value={allowMultipleSubmissions}
+                onChange={setAllowMultipleSubmissions}
+              />
+            </div>
             <button
               type="button"
               onClick={handleSave}
@@ -227,18 +243,12 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
 
           <FormBuilderPreview title={title} description={description} themeId={theme} fields={fields} />
 
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm("Delete this form and all submissions?")) {
-                deleteForm.mutate({ formId });
-              }
-            }}
-            disabled={deleteForm.isPending}
+          <DeleteFormButton
+            formId={formId}
+            formTitle={title || resolvedForm.title}
             className="w-full rounded-2xl border border-red-400/30 py-3 text-sm font-bold text-red-300 hover:bg-red-400/10 disabled:opacity-50"
-          >
-            Delete form
-          </button>
+            label="Delete form"
+          />
         </aside>
       </div>
     </section>

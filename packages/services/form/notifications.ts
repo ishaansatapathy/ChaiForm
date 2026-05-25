@@ -57,3 +57,54 @@ export async function notifyCreatorOfSubmission(input: NotifyCreatorInput): Prom
 
   await sendEmail({ email: owner.email, subject, html, text });
 }
+
+type NotifyFormDeletedInput = {
+  ownerUserId: string;
+  formTitle: string;
+  formId: string;
+  submissionCount: number;
+  reason: "manual" | "expired";
+  expiredAt?: Date | null;
+};
+
+export async function notifyCreatorOfFormDeletion(input: NotifyFormDeletedInput): Promise<void> {
+  const [owner] = await db
+    .select({ email: usersTable.email, fullName: usersTable.fullName })
+    .from(usersTable)
+    .where(eq(usersTable.id, input.ownerUserId))
+    .limit(1);
+
+  if (!owner?.email) return;
+
+  const dashboardUrl = `${env.CLIENT_URL}/dashboard`;
+  const reasonLine =
+    input.reason === "expired"
+      ? `Your retention period ended${input.expiredAt ? ` on ${input.expiredAt.toLocaleDateString()}` : ""}.`
+      : "You deleted it from ChaiForm.";
+
+  const subject =
+    input.reason === "expired"
+      ? `Form expired and removed: "${input.formTitle}"`
+      : `Form deleted: "${input.formTitle}"`;
+
+  const text = [
+    `Hi ${owner.fullName},`,
+    "",
+    `Your form "${input.formTitle}" has been deleted.`,
+    reasonLine,
+    "",
+    `${input.submissionCount} response(s) were removed with the form.`,
+    "",
+    `Create a new form: ${dashboardUrl}`,
+  ].join("\n");
+
+  const html = `
+    <p>Hi ${owner.fullName},</p>
+    <p>Your form <strong>${input.formTitle}</strong> has been deleted.</p>
+    <p>${reasonLine}</p>
+    <p><strong>${input.submissionCount}</strong> response(s) were removed with the form.</p>
+    <p><a href="${dashboardUrl}">Back to dashboard</a></p>
+  `;
+
+  await sendEmail({ email: owner.email, subject, html, text });
+}

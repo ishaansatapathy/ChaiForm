@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
   const formId = body.formId;
   const answers = body.answers;
   const website = body.website ?? "";
+  const respondentKey = body.respondentKey;
 
   if (typeof formId !== "string" || !Array.isArray(answers)) {
     return NextResponse.json({ error: "Invalid submission payload." }, { status: 400 });
@@ -27,7 +28,12 @@ export async function POST(request: NextRequest) {
         "content-type": "application/json",
         "accept-encoding": "identity",
       },
-      body: JSON.stringify({ formId, answers, website }),
+      body: JSON.stringify({
+        formId,
+        answers,
+        website,
+        ...(typeof respondentKey === "string" ? { respondentKey } : {}),
+      }),
       cache: "no-store",
       signal: AbortSignal.timeout(12_000),
     });

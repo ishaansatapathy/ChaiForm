@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 import { formThemeSchema } from "./themes";
+import { formRetentionPresets } from "./retention";
+
+export const formRetentionSchema = z.enum(formRetentionPresets);
 
 const fieldBaseInputSchema = z.object({
   id: z.string().min(1),
@@ -93,6 +96,8 @@ export const createFormInputSchema = z.object({
   description: z.string().max(2000).optional(),
   visibility: z.enum(["public", "unlisted", "draft"]).default("public"),
   theme: formThemeSchema.default("default"),
+  retention: formRetentionSchema.default("forever"),
+  allowMultipleSubmissions: z.boolean().default(true),
   fields: z.array(formFieldInputSchema).min(1).max(50),
 });
 
@@ -103,6 +108,8 @@ export const updateFormInputSchema = z.object({
   visibility: z.enum(["public", "unlisted", "draft"]).optional(),
   theme: formThemeSchema.optional(),
   slug: z.string().min(1).max(80).optional(),
+  retention: formRetentionSchema.optional(),
+  allowMultipleSubmissions: z.boolean().optional(),
   fields: z.array(formFieldInputSchema).min(1).max(50).optional(),
 });
 
@@ -117,6 +124,8 @@ export const formOutputSchema = z.object({
   submissionCount: z.number().int(),
   viewCount: z.number().int(),
   completionRate: z.number(),
+  allowMultipleSubmissions: z.boolean(),
+  expiresAt: z.string().nullable(),
   createdAt: z.string().nullable(),
   updatedAt: z.string().nullable(),
 });
@@ -132,6 +141,7 @@ export const publicFormOutputSchema = z.object({
   title: z.string(),
   description: z.string().nullable(),
   theme: formThemeSchema,
+  allowMultipleSubmissions: z.boolean(),
   fields: z.array(formFieldSchema),
 });
 
@@ -160,6 +170,7 @@ export const submissionAnswerSchema = z.object({
 
 export const submitFormInputSchema = z.object({
   formId: z.string().uuid(),
+  respondentKey: z.string().uuid().optional(),
   answers: z
     .array(
       z.object({

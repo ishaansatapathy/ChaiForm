@@ -6,7 +6,9 @@ import { BarChart3, Eye, FileText, Globe, Link2, Lock, Pencil, Share2 } from "lu
 
 import type { RouterOutputs } from "@repo/trpc/client";
 
+import { DeleteFormButton } from "~/components/app/delete-form-button";
 import { ShareFormModal } from "~/components/app/share-form-modal";
+import { formatExpiresAt, isFormExpired } from "~/lib/form-retention";
 import { getFormSharePath, getFormShareUrl } from "~/lib/form-share-url";
 
 type FormListItem = RouterOutputs["forms"]["list"]["items"][number];
@@ -22,6 +24,8 @@ export function FormCard({ form }: { form: FormListItem }) {
   const sharePath = getFormSharePath(form);
   const shareUrl = getFormShareUrl(form);
   const [shareOpen, setShareOpen] = useState(false);
+  const expiryLabel = formatExpiresAt(form.expiresAt);
+  const expired = isFormExpired(form.expiresAt);
 
   return (
     <article className="app-surface group rounded-xl p-5 transition-all duration-300 hover:border-lime-400/20">
@@ -32,11 +36,21 @@ export function FormCard({ form }: { form: FormListItem }) {
           <vis.icon size={10} />
           {vis.label}
         </span>
-        {form.visibility !== "draft" && (
+        {form.visibility !== "draft" && !expired && (
           <span className="rounded-full border border-lime-400/25 bg-lime-400/5 px-2.5 py-0.5 text-[9px] font-bold tracking-[0.2em] text-lime-400 uppercase">
             Live
           </span>
         )}
+        {expiryLabel ? (
+          <span className="rounded-full border border-amber-400/20 bg-amber-400/5 px-2.5 py-0.5 text-[9px] font-bold tracking-[0.2em] text-amber-300 uppercase">
+            {expired ? "Expired" : `Until ${expiryLabel}`}
+          </span>
+        ) : null}
+        {!form.allowMultipleSubmissions ? (
+          <span className="rounded-full border border-cyan-400/20 bg-cyan-400/5 px-2.5 py-0.5 text-[9px] font-bold tracking-[0.2em] text-cyan-300 uppercase">
+            1 response only
+          </span>
+        ) : null}
       </div>
 
       <h3 className="font-display text-xl font-bold tracking-tight text-white">{form.title}</h3>
@@ -88,6 +102,13 @@ export function FormCard({ form }: { form: FormListItem }) {
         >
           Open form
         </Link>
+        <span className="text-white/15">·</span>
+        <DeleteFormButton
+          formId={form.id}
+          formTitle={form.title}
+          label="Delete"
+          className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-red-300 uppercase transition-colors hover:text-red-200"
+        />
       </div>
 
       <ShareFormModal

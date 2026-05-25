@@ -155,6 +155,23 @@ export const formsRouter = router({
       }
     }),
 
+  hasSubmitted: publicProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/submitted/{formId}"), tags: TAGS } })
+    .input(
+      z.object({
+        formId: z.string().uuid(),
+        respondentKey: z.string().uuid(),
+      }),
+    )
+    .output(z.object({ submitted: z.boolean() }))
+    .query(async ({ input }) => {
+      try {
+        return await formService.hasSubmitted(input.formId, input.respondentKey);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
   listSubmissions: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/{formId}/submissions"), tags: TAGS, protect: true } })
     .input(

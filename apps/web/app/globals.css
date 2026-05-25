@@ -745,11 +745,8 @@ html {
 }
 
 .analytics-scroll-panel {
-  height: 11rem;
-  max-height: 11rem;
-  min-height: 11rem;
   overflow-x: hidden;
-  overflow-y: scroll;
+  overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
@@ -758,10 +755,21 @@ html {
   background: rgba(0, 0, 0, 0.25);
   padding: 0.25rem;
 }
+.analytics-scroll-panel--forms {
+  max-height: 9rem;
+}
+@media (min-width: 1024px) {
+  .analytics-scroll-panel--forms {
+    max-height: 11rem;
+  }
+}
 .analytics-scroll-panel--submissions {
-  height: 14rem;
-  max-height: 14rem;
-  min-height: 14rem;
+  max-height: 12rem;
+}
+@media (min-width: 1024px) {
+  .analytics-scroll-panel--submissions {
+    max-height: 14rem;
+  }
 }
 .analytics-scroll-panel::-webkit-scrollbar {
   width: 6px;

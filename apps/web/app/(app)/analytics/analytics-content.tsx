@@ -33,8 +33,6 @@ const QUERY_OPTS = {
   staleTime: 30_000,
 } as const;
 
-const FORMS_PER_PAGE = 6;
-
 function buildOverTimeFromSubmissions(
   items: { submittedAt: string | null }[],
   days = 30,
@@ -135,7 +133,6 @@ export default function AnalyticsContent({
   const [apiSummary, setApiSummary] = useState<SummaryData | null>(
     initialSummary ?? initialBundle?.summary ?? null,
   );
-  const [formsListPage, setFormsListPage] = useState(0);
   const [formBundleLoading, setFormBundleLoading] = useState(false);
 
   const forms = apiForms?.items ?? formsPage?.items ?? initialForms?.items ?? [];
@@ -229,14 +226,6 @@ export default function AnalyticsContent({
     if (!activeFormId) return;
     void loadFormBundle(activeFormId);
   }, [activeFormId, loadFormBundle]);
-
-  useEffect(() => {
-    if (!activeFormId || forms.length === 0) return;
-    const index = forms.findIndex((form) => form.id === activeFormId);
-    if (index >= 0) {
-      setFormsListPage(Math.floor(index / FORMS_PER_PAGE));
-    }
-  }, [activeFormId, forms]);
 
   const {
     data: summary,
@@ -365,13 +354,6 @@ export default function AnalyticsContent({
   const chartLoading = (overTimeLoading || formBundleLoading) && !resolvedOverTime;
   const chartHasData = resolvedOverTime ? chartHasActivity(resolvedOverTime.points) : false;
 
-  const totalFormPages = Math.max(1, Math.ceil(forms.length / FORMS_PER_PAGE));
-  const safeFormsPage = Math.min(formsListPage, totalFormPages - 1);
-  const visibleForms = forms.slice(
-    safeFormsPage * FORMS_PER_PAGE,
-    safeFormsPage * FORMS_PER_PAGE + FORMS_PER_PAGE,
-  );
-
   const handleExportCsv = async () => {
     if (!activeForm || !activeFormId) return;
     setExporting(true);
@@ -432,7 +414,7 @@ export default function AnalyticsContent({
             type="button"
             onClick={() => {
               void refetchSummary();
-              void loadFormBundle(activeFormId);
+              if (activeFormId) void loadFormBundle(activeFormId);
             }}
             className="btn-omni font-display mt-4 inline-flex rounded-xl px-5 py-2 text-xs font-black tracking-wide uppercase"
           >
@@ -465,149 +447,49 @@ export default function AnalyticsContent({
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
-        <aside className="min-w-0 space-y-4 lg:sticky lg:top-8 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-hidden">
-          <div className="app-surface rounded-3xl p-4">
-            <div className="mb-3 flex items-center justify-between gap-2 px-2">
-              <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Forms</p>
-              <span className="font-mono text-[9px] text-white/25">
-                {forms.length} · p{safeFormsPage + 1}/{totalFormPages}
-              </span>
-            </div>
-            <div
-              className="analytics-scroll-panel space-y-1 pr-1"
-              style={{ height: "11rem", maxHeight: "11rem", overflowY: "scroll" }}
-            >
-              {visibleForms.map((form) => (
-                <button
-                  key={form.id}
-                  type="button"
-                  disabled={formBundleLoading && form.id === activeFormId}
-                  onClick={() => {
-                    setSelectedFormId(form.id);
-                    setSelectedSubmissionId(undefined);
-                    setSelectedFieldId(undefined);
-                  }}
-                  className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-60 ${
-                    form.id === activeFormId
-                      ? "bg-lime-400/10 text-lime-400"
-                      : "text-white/45 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  <span className="block truncate">{form.title}</span>
-                  <span className="mt-0.5 block font-mono text-[9px] text-white/30">
-                    {form.submissionCount} responses
-                    {form.createdAt
-                      ? ` · ${new Date(form.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
-                      : ""}
-                    {formBundleLoading && form.id === activeFormId ? " · loading…" : ""}
-                  </span>
-                </button>
-              ))}
-            </div>
-            {totalFormPages > 1 ? (
-              <div className="mt-3 flex items-center justify-between gap-2 px-1">
-                <button
-                  type="button"
-                  disabled={safeFormsPage === 0}
-                  onClick={() => setFormsListPage((page) => Math.max(0, page - 1))}
-                  className="rounded-lg border border-white/10 px-2 py-1 font-mono text-[9px] tracking-wider text-white/45 uppercase transition-colors hover:border-lime-400/30 hover:text-lime-400 disabled:opacity-30"
-                >
-                  Prev
-                </button>
-                <span className="font-mono text-[9px] text-white/30">
-                  {safeFormsPage + 1} / {totalFormPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={safeFormsPage >= totalFormPages - 1}
-                  onClick={() =>
-                    setFormsListPage((page) => Math.min(totalFormPages - 1, page + 1))
-                  }
-                  className="rounded-lg border border-white/10 px-2 py-1 font-mono text-[9px] tracking-wider text-white/45 uppercase transition-colors hover:border-lime-400/30 hover:text-lime-400 disabled:opacity-30"
-                >
-                  Next
-                </button>
-              </div>
-            ) : null}
-          </div>
+      <div className="mb-6 lg:hidden">
+        <FormsPanel
+          forms={forms}
+          activeFormId={activeFormId}
+          formBundleLoading={formBundleLoading}
+          onSelectForm={(formId) => {
+            setSelectedFormId(formId);
+            setSelectedSubmissionId(undefined);
+            setSelectedFieldId(undefined);
+          }}
+        />
+      </div>
 
-          <div className="app-surface rounded-3xl p-4">
-            <div className="mb-3 flex items-center justify-between gap-2 px-2">
-              <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Submissions</p>
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                disabled={submissions.length === 0 || exporting}
-                className="font-mono rounded-lg border border-lime-400/25 px-2 py-1 text-[9px] tracking-widest text-lime-400/90 uppercase transition-colors hover:bg-lime-400/10 disabled:opacity-40"
-              >
-                {exporting ? "Exporting…" : "Export CSV"}
-              </button>
-            </div>
-            <input
-              value={submissionSearch}
-              onChange={(e) => setSubmissionSearch(e.target.value)}
-              placeholder="Filter by answer…"
-              className="mb-3 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
-            />
-            <div className="analytics-scroll-panel analytics-scroll-panel--submissions pr-1">
-            {showSubmissionsLoading ? (
-              <p className="px-2 text-sm text-white/40">Loading…</p>
-            ) : submissionsError && submissions.length === 0 ? (
-              <div className="px-2 text-center">
-                <p className="text-sm text-white/50">Could not load submissions.</p>
-                <button
-                  type="button"
-                  onClick={() => refetchSubmissions()}
-                  className="mt-3 text-xs font-bold tracking-wider text-lime-400 uppercase"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : submissions.length === 0 ? (
-              <p className="px-2 text-sm text-white/40">No submissions yet.</p>
-            ) : (
-              <>
-                <div className="space-y-1">
-                  {submissions.map((item, index) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() =>
-                        setSelectedSubmissionId(
-                          item.id === activeSubmissionId ? undefined : item.id,
-                        )
-                      }
-                      className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
-                        item.id === activeSubmissionId
-                          ? "bg-lime-400/10 text-lime-400"
-                          : "text-white/45 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      Participant {submissions.length - index}
-                      <span className="mt-0.5 block font-mono text-[9px] text-white/30">
-                        {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : "—"}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                {submissionsPage?.nextCursor && (
-                  <button
-                    type="button"
-                    onClick={() => setSubmissionCursor(submissionsPage.nextCursor ?? undefined)}
-                    disabled={submissionsLoading}
-                    className="mt-3 w-full rounded-xl border border-white/10 py-2 text-xs font-bold tracking-wider text-white/50 uppercase transition-colors hover:border-lime-400/30 hover:text-lime-400 disabled:opacity-40"
-                  >
-                    {submissionsLoading ? "Loading…" : "Load more"}
-                  </button>
-                )}
-              </>
-            )}
-            </div>
-          </div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
+        <aside className="hidden min-w-0 flex-col gap-4 lg:sticky lg:top-8 lg:flex lg:max-h-[calc(100vh-6rem)] lg:self-start">
+          <FormsPanel
+            forms={forms}
+            activeFormId={activeFormId}
+            formBundleLoading={formBundleLoading}
+            onSelectForm={(formId) => {
+              setSelectedFormId(formId);
+              setSelectedSubmissionId(undefined);
+              setSelectedFieldId(undefined);
+            }}
+          />
+          <SubmissionsPanel
+            submissions={submissions}
+            activeSubmissionId={activeSubmissionId}
+            submissionSearch={submissionSearch}
+            showSubmissionsLoading={showSubmissionsLoading}
+            submissionsError={submissionsError}
+            submissionsLoading={submissionsLoading}
+            submissionsPage={submissionsPage}
+            exporting={exporting}
+            onSearchChange={setSubmissionSearch}
+            onSelectSubmission={setSelectedSubmissionId}
+            onExportCsv={handleExportCsv}
+            onLoadMore={() => setSubmissionCursor(submissionsPage?.nextCursor ?? undefined)}
+            onRetry={() => refetchSubmissions()}
+          />
         </aside>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <div className="app-surface rounded-3xl p-6">
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="font-display text-lg font-bold text-white">Submissions over time</h3>
@@ -754,6 +636,24 @@ export default function AnalyticsContent({
         </div>
       </div>
 
+      <div className="mt-6 lg:hidden">
+        <SubmissionsPanel
+          submissions={submissions}
+          activeSubmissionId={activeSubmissionId}
+          submissionSearch={submissionSearch}
+          showSubmissionsLoading={showSubmissionsLoading}
+          submissionsError={submissionsError}
+          submissionsLoading={submissionsLoading}
+          submissionsPage={submissionsPage}
+          exporting={exporting}
+          onSearchChange={setSubmissionSearch}
+          onSelectSubmission={setSelectedSubmissionId}
+          onExportCsv={handleExportCsv}
+          onLoadMore={() => setSubmissionCursor(submissionsPage?.nextCursor ?? undefined)}
+          onRetry={() => refetchSubmissions()}
+        />
+      </div>
+
       {allSubmissions.length > 0 && resolvedFormFields && (
         <div className="mt-8">
           <AnalyticsDetailPanel
@@ -771,6 +671,155 @@ export default function AnalyticsContent({
         </div>
       )}
     </section>
+  );
+}
+
+function FormsPanel({
+  forms,
+  activeFormId,
+  formBundleLoading,
+  onSelectForm,
+}: {
+  forms: FormListItem[];
+  activeFormId?: string;
+  formBundleLoading: boolean;
+  onSelectForm: (formId: string) => void;
+}) {
+  return (
+    <div className="app-surface rounded-3xl p-4">
+      <div className="mb-3 flex items-center justify-between gap-2 px-2">
+        <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Forms</p>
+        <span className="font-mono text-[9px] text-white/25">{forms.length} total</span>
+      </div>
+      <div className="analytics-scroll-panel analytics-scroll-panel--forms space-y-1 pr-1">
+        {forms.map((form) => (
+          <button
+            key={form.id}
+            type="button"
+            disabled={formBundleLoading && form.id === activeFormId}
+            onClick={() => onSelectForm(form.id)}
+            className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-60 ${
+              form.id === activeFormId
+                ? "bg-lime-400/10 text-lime-400"
+                : "text-white/45 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <span className="block truncate">{form.title}</span>
+            <span className="mt-0.5 block font-mono text-[9px] text-white/30">
+              {form.submissionCount} responses
+              {form.createdAt
+                ? ` · ${new Date(form.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+                : ""}
+              {formBundleLoading && form.id === activeFormId ? " · loading…" : ""}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SubmissionsPanel({
+  submissions,
+  activeSubmissionId,
+  submissionSearch,
+  showSubmissionsLoading,
+  submissionsError,
+  submissionsLoading,
+  submissionsPage,
+  exporting,
+  onSearchChange,
+  onSelectSubmission,
+  onExportCsv,
+  onLoadMore,
+  onRetry,
+}: {
+  submissions: SubmissionItem[];
+  activeSubmissionId?: string;
+  submissionSearch: string;
+  showSubmissionsLoading: boolean;
+  submissionsError: boolean;
+  submissionsLoading: boolean;
+  submissionsPage?: { nextCursor: string | null };
+  exporting: boolean;
+  onSearchChange: (value: string) => void;
+  onSelectSubmission: (id: string | undefined) => void;
+  onExportCsv: () => void;
+  onLoadMore: () => void;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="app-surface rounded-3xl p-4">
+      <div className="mb-3 flex items-center justify-between gap-2 px-2">
+        <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Submissions</p>
+        <button
+          type="button"
+          onClick={onExportCsv}
+          disabled={submissions.length === 0 || exporting}
+          className="font-mono rounded-lg border border-lime-400/25 px-2 py-1 text-[9px] tracking-widest text-lime-400/90 uppercase transition-colors hover:bg-lime-400/10 disabled:opacity-40"
+        >
+          {exporting ? "Exporting…" : "Export CSV"}
+        </button>
+      </div>
+      <input
+        value={submissionSearch}
+        onChange={(e) => onSearchChange(e.target.value)}
+        placeholder="Filter by answer…"
+        className="mb-3 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
+      />
+      <div className="analytics-scroll-panel analytics-scroll-panel--submissions pr-1">
+        {showSubmissionsLoading ? (
+          <p className="px-2 text-sm text-white/40">Loading…</p>
+        ) : submissionsError && submissions.length === 0 ? (
+          <div className="px-2 text-center">
+            <p className="text-sm text-white/50">Could not load submissions.</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-3 text-xs font-bold tracking-wider text-lime-400 uppercase"
+            >
+              Retry
+            </button>
+          </div>
+        ) : submissions.length === 0 ? (
+          <p className="px-2 text-sm text-white/40">No submissions yet.</p>
+        ) : (
+          <>
+            <div className="space-y-1">
+              {submissions.map((item, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() =>
+                    onSelectSubmission(item.id === activeSubmissionId ? undefined : item.id)
+                  }
+                  className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
+                    item.id === activeSubmissionId
+                      ? "bg-lime-400/10 text-lime-400"
+                      : "text-white/45 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  Participant {submissions.length - index}
+                  <span className="mt-0.5 block font-mono text-[9px] text-white/30">
+                    {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : "—"}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {submissionsPage?.nextCursor && (
+              <button
+                type="button"
+                onClick={onLoadMore}
+                disabled={submissionsLoading}
+                className="mt-3 w-full rounded-xl border border-white/10 py-2 text-xs font-bold tracking-wider text-white/50 uppercase transition-colors hover:border-lime-400/30 hover:text-lime-400 disabled:opacity-40"
+              >
+                {submissionsLoading ? "Loading…" : "Load more"}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

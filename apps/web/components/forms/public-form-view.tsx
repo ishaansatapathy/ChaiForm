@@ -8,6 +8,12 @@ import { toast } from "sonner";
 import { FormFieldInput } from "~/components/forms/form-field-input";
 import { isMultiCheckboxConfig } from "~/lib/checkbox-value";
 import { getFormTheme } from "~/lib/form-themes";
+import {
+  checkRemoteSubmission,
+  getRespondentKey,
+  hasLocalSubmission,
+  markFormSubmitted,
+} from "~/lib/respondent-key";
 import { runWithRetry, useWarmApi } from "~/lib/warm-api";
 
 type PublicForm = RouterOutputs["forms"]["getPublic"];
@@ -38,6 +44,8 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const router = useRouter();
   const theme = getFormTheme(form.theme);
   const [submitting, setSubmitting] = useState(false);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [checkingSubmission, setCheckingSubmission] = useState(!form.allowMultipleSubmissions);
 
   useWarmApi();
 
@@ -66,6 +74,25 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
     }).catch(() => undefined);
   }, [form.id]);
 
+  useEffect(() => {
+    if (form.allowMultipleSubmissions) {
+      setCheckingSubmission(false);
+      return;
+    }
+
+    if (hasLocalSubmission(form.id)) {
+      setAlreadySubmitted(true);
+      setCheckingSubmission(false);
+      return;
+    }
+
+    const respondentKey = getRespondentKey(form.id);
+    void checkRemoteSubmission(form.id, respondentKey).then((submitted) => {
+      setAlreadySubmitted(submitted);
+      setCheckingSubmission(false);
+    });
+  }, [form.allowMultipleSubmissions, form.id]);
+
   const validateCurrentStep = () => {
     if (!currentField) return true;
     const value = values[currentField.id] ?? "";
@@ -88,9 +115,11 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const handleSubmit = async () => {
     if (!validateCurrentStep()) return;
     const honeypot = honeypotRef.current?.value ?? "";
+    const respondentKey = getRespondentKey(form.id);
     const payload = {
       formId: form.id,
       website: honeypot,
+      ...(form.allowMultipleSubmissions ? {} : { respondentKey }),
       answers: fields.map((field) => ({
         fieldId: field.id,
         value: values[field.id] ?? "",
@@ -131,6 +160,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
           onRetry: (attempt) => toast.message(`Submitting… retry ${attempt}/4`),
         },
       );
+      markFormSubmitted(form.id);
       router.push(thankYouPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not submit this form.";
@@ -164,11 +194,26 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
           <h1 className="font-display text-2xl font-black tracking-tight sm:text-3xl">
             {form.title}
           </h1>
-          {form.description && step === 0 && (
-            <p className="mt-2 text-sm text-white/50">{form.description}</p>
-          )}
+        {form.description && step === 0 && !alreadySubmitted && (
+          <p className="mt-2 text-sm text-white/50">{form.description}</p>
+        )}
         </div>
 
+        {checkingSubmission ? (
+          <p className="text-sm text-white/45">Checking your response status…</p>
+        ) : alreadySubmitted ? (
+          <div className="app-surface rounded-[32px] border border-amber-400/20 bg-amber-400/5 p-8 text-center">
+            <p className="font-display text-2xl font-bold text-white">Already submitted</p>
+            <p className="mt-3 text-sm leading-relaxed text-white/60">
+              You&apos;ve already sent a response to this form. You can&apos;t submit it again or edit
+              your previous answers here.
+            </p>
+            <p className="mt-4 text-sm text-white/45">
+              Need to change something? Contact the form owner and ask them to send you a new link.
+            </p>
+          </div>
+        ) : (
+          <>
         {fields.length > 0 && (
           <div className="mb-6 h-1.5 shrink-0 overflow-hidden rounded-full bg-white/10">
             <div
@@ -244,6 +289,8 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
           onFocus={(event) => event.currentTarget.removeAttribute("readonly")}
           className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0"
         />
+          </>
+        )}
       </div>
     </div>
   );
