@@ -159,13 +159,12 @@ export default function AnalyticsContent({
 
   const {
     data: summary,
-    isLoading: summaryLoading,
     isError: summaryError,
     refetch: refetchSummary,
   } = trpc.analytics.summary.useQuery(
     { formId: activeFormId },
     {
-      enabled: Boolean(user && activeFormId),
+      enabled: Boolean(activeFormId),
       initialData: isInitialForm ? (initialBundle?.summary ?? undefined) : undefined,
       ...QUERY_OPTS,
     },
@@ -174,7 +173,7 @@ export default function AnalyticsContent({
   const { data: overTime, isLoading: overTimeLoading } = trpc.analytics.submissionsOverTime.useQuery(
     { formId: activeFormId!, days: 30 },
     {
-      enabled: Boolean(user && activeFormId),
+      enabled: Boolean(activeFormId),
       initialData: isInitialForm ? (initialBundle?.overTime ?? undefined) : undefined,
       ...QUERY_OPTS,
     },
@@ -183,7 +182,7 @@ export default function AnalyticsContent({
   const { data: formFields } = trpc.analytics.listFormFields.useQuery(
     { formId: activeFormId! },
     {
-      enabled: Boolean(user && activeFormId),
+      enabled: Boolean(activeFormId),
       initialData: isInitialForm ? (initialBundle?.formFields ?? undefined) : undefined,
       ...QUERY_OPTS,
     },
@@ -201,7 +200,7 @@ export default function AnalyticsContent({
   } = trpc.analytics.fieldBreakdown.useQuery(
     { formId: activeFormId!, fieldId: activeFieldId! },
     {
-      enabled: Boolean(user && activeFormId && activeFieldId),
+      enabled: Boolean(activeFormId && activeFieldId),
       initialData: isInitialField ? (initialBundle?.fieldBreakdown ?? undefined) : undefined,
       ...QUERY_OPTS,
     },
@@ -220,7 +219,7 @@ export default function AnalyticsContent({
       search: submissionSearch.trim() || undefined,
     },
     {
-      enabled: Boolean(user && activeFormId),
+      enabled: Boolean(activeFormId),
       initialData:
         isInitialForm && !submissionCursor
           ? (initialBundle?.submissions ?? undefined)
@@ -232,7 +231,7 @@ export default function AnalyticsContent({
   const { data: allSubmissionsPage } = trpc.forms.listSubmissions.useQuery(
     { formId: activeFormId!, limit: 100 },
     {
-      enabled: Boolean(user && activeFormId),
+      enabled: Boolean(activeFormId),
       initialData: isInitialForm ? (initialBundle?.allSubmissions ?? undefined) : undefined,
       ...QUERY_OPTS,
     },
@@ -378,7 +377,7 @@ export default function AnalyticsContent({
               <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Forms</p>
               <span className="font-mono text-[9px] text-white/25">{forms.length}</span>
             </div>
-            <div className="h-48 space-y-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-color:rgba(255,255,255,0.15)_transparent] [scrollbar-width:thin]">
+            <div className="flex h-48 flex-col space-y-1 overflow-y-auto overscroll-contain pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-track]:bg-transparent">
               {forms.map((form) => (
                 <button
                   key={form.id}
@@ -421,7 +420,7 @@ export default function AnalyticsContent({
               placeholder="Filter by answer…"
               className="mb-3 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
             />
-            <div className="h-56 overflow-y-auto overscroll-contain pr-1 [scrollbar-color:rgba(255,255,255,0.15)_transparent] [scrollbar-width:thin]">
+            <div className="flex h-56 flex-col overflow-y-auto overscroll-contain pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-track]:bg-transparent">
             {showSubmissionsLoading ? (
               <p className="px-2 text-sm text-white/40">Loading…</p>
             ) : submissionsError && submissions.length === 0 ? (
