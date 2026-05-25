@@ -744,6 +744,29 @@ html {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+.analytics-scroll-panel {
+  max-height: 11rem;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.analytics-scroll-panel--submissions {
+  max-height: 14rem;
+}
+.analytics-scroll-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.analytics-scroll-panel::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.15);
+}
+.analytics-scroll-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* === Cinematic Glitch & Tilts ============================================= */
 @keyframes glitch-text {
   0% {
