@@ -74,16 +74,21 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
     );
   }
 
-  const response = new NextResponse(upstreamRes.body, {
+  // Node fetch decompresses gzip/br bodies but may leave content-encoding headers intact.
+  // Forwarding those headers causes browsers to fail with ERR_CONTENT_DECODING_FAILED.
+  const bodyBytes = await upstreamRes.arrayBuffer();
+  const response = new NextResponse(bodyBytes, {
     status: upstreamRes.status,
     statusText: upstreamRes.statusText,
+    headers: {
+      "content-type": upstreamRes.headers.get("content-type") ?? "application/json",
+    },
   });
 
-  upstreamRes.headers.forEach((value, key) => {
-    const lower = key.toLowerCase();
-    if (lower === "set-cookie" || lower === "transfer-encoding") return;
-    response.headers.set(key, value);
-  });
+  const cacheControl = upstreamRes.headers.get("cache-control");
+  if (cacheControl) {
+    response.headers.set("cache-control", cacheControl);
+  }
 
   const setCookies =
     typeof upstreamRes.headers.getSetCookie === "function"
