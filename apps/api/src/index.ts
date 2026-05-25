@@ -1,4 +1,5 @@
 import http from "node:http";
+import { runMigrations } from "./migrate";
 import { logger } from "@repo/logger";
 import { isEmailConfigured } from "@repo/services/env";
 import { app as expressApplication } from "./server";
@@ -7,6 +8,15 @@ import { env } from "./env";
 
 async function init() {
   try {
+    try {
+      logger.info("Database schema patches applied");
+    } catch (err) {
+      logger.error("Database migration failed — forms list/analytics may break until fixed", { err });
+      if (env.NODE_ENV === "production" || env.NODE_ENV === "prod") {
+        process.exit(1);
+      }
+    }
+
     const server = http.createServer(expressApplication);
     const PORT: number = env.PORT ? +env.PORT : 8000;
     server.listen(PORT, () => {
