@@ -9,6 +9,7 @@ import { FormBuilderFields, type DraftField } from "~/components/forms/form-buil
 import { FormBuilderPreview } from "~/components/forms/form-builder-preview";
 import { FormThemePicker } from "~/components/forms/form-theme-picker";
 import { DeleteFormButton } from "~/components/app/delete-form-button";
+import { AllowAnonymousResponsesToggle } from "~/components/app/allow-anonymous-responses-toggle";
 import { AllowMultipleResponsesToggle } from "~/components/app/allow-multiple-responses-toggle";
 import { FormRetentionPicker } from "~/components/app/form-retention-picker";
 import { Highlight } from "~/components/app/highlight";
@@ -64,6 +65,9 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
   const [allowMultipleSubmissions, setAllowMultipleSubmissions] = useState(
     initialForm?.allowMultipleSubmissions ?? true,
   );
+  const [allowAnonymousResponses, setAllowAnonymousResponses] = useState(
+    !(initialForm?.requireAuthentication ?? false),
+  );
   const [fields, setFields] = useState<DraftField[]>((initialForm?.fields as DraftField[]) ?? []);
   const [hydratedFormId, setHydratedFormId] = useState<string | null>(initialForm?.id ?? null);
 
@@ -76,6 +80,7 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
     setTheme(form.theme as FormThemeId);
     setRetention(presetFromExpiresAt(form.expiresAt));
     setAllowMultipleSubmissions(form.allowMultipleSubmissions ?? true);
+    setAllowAnonymousResponses(!(form.requireAuthentication ?? false));
     setFields(form.fields as DraftField[]);
     setHydratedFormId(form.id);
   }, [form, hydratedFormId]);
@@ -134,6 +139,7 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
       theme,
       retention,
       allowMultipleSubmissions,
+      requireAuthentication: !allowAnonymousResponses,
       fields: fields as UpdateFormFields,
     };
 
@@ -229,6 +235,12 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
               <AllowMultipleResponsesToggle
                 value={allowMultipleSubmissions}
                 onChange={setAllowMultipleSubmissions}
+              />
+            </div>
+            <div className="mb-6">
+              <AllowAnonymousResponsesToggle
+                value={allowAnonymousResponses}
+                onChange={setAllowAnonymousResponses}
               />
             </div>
             <button

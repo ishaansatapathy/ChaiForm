@@ -23,13 +23,17 @@ export function hasLocalSubmission(formId: string) {
   return window.localStorage.getItem(`${SUBMITTED_PREFIX}${formId}`) === "1";
 }
 
-export async function checkRemoteSubmission(formId: string, respondentKey: string) {
-  if (!respondentKey) return false;
-
+export async function checkRemoteSubmission(formId: string, respondentKey?: string) {
   try {
-    const input = encodeURIComponent(JSON.stringify({ formId, respondentKey }));
+    const input = encodeURIComponent(
+      JSON.stringify({
+        formId,
+        ...(respondentKey ? { respondentKey } : {}),
+      }),
+    );
     const response = await fetch(`/trpc/forms.hasSubmitted?input=${input}`, {
       cache: "no-store",
+      credentials: "include",
     });
     if (!response.ok) return false;
     const payload = (await response.json()) as { result?: { data?: { submitted?: boolean } } };

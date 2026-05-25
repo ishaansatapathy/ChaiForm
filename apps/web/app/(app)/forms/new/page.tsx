@@ -9,6 +9,7 @@ import { FormBuilderFields, type DraftField } from "~/components/forms/form-buil
 import { FormBuilderPreview } from "~/components/forms/form-builder-preview";
 import { FormThemePicker } from "~/components/forms/form-theme-picker";
 import { FormRetentionPicker } from "~/components/app/form-retention-picker";
+import { AllowAnonymousResponsesToggle } from "~/components/app/allow-anonymous-responses-toggle";
 import { AllowMultipleResponsesToggle } from "~/components/app/allow-multiple-responses-toggle";
 import { Highlight } from "~/components/app/highlight";
 import type { FormRetentionOption } from "~/lib/form-retention";
@@ -40,6 +41,7 @@ export default function CreateFormPage() {
   const [theme, setTheme] = useState<FormThemeId>("default");
   const [retention, setRetention] = useState<FormRetentionOption>("forever");
   const [allowMultipleSubmissions, setAllowMultipleSubmissions] = useState(true);
+  const [allowAnonymousResponses, setAllowAnonymousResponses] = useState(true);
   const [fields, setFields] = useState<DraftField[]>(createInitialDraftFields);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
 
@@ -74,6 +76,7 @@ export default function CreateFormPage() {
       theme,
       retention,
       allowMultipleSubmissions,
+      requireAuthentication: !allowAnonymousResponses,
       fields: fields as CreateFormFields,
     };
 
@@ -155,6 +158,12 @@ export default function CreateFormPage() {
               <AllowMultipleResponsesToggle
                 value={allowMultipleSubmissions}
                 onChange={setAllowMultipleSubmissions}
+              />
+            </div>
+            <div className="mb-6">
+              <AllowAnonymousResponsesToggle
+                value={allowAnonymousResponses}
+                onChange={setAllowAnonymousResponses}
               />
             </div>
             <button
