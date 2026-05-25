@@ -490,11 +490,12 @@ export default function AnalyticsContent({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
-        <aside className="hidden min-w-0 flex-col gap-4 lg:sticky lg:top-8 lg:flex lg:max-h-[calc(100vh-6rem)] lg:self-start">
+        <aside className="hidden min-w-0 flex-col gap-4 overflow-hidden lg:sticky lg:top-8 lg:flex lg:max-h-[calc(100vh-6rem)] lg:self-start">
           <FormsPanel
             forms={forms}
             activeFormId={activeFormId}
             formBundleLoading={formBundleLoading}
+            fillSidebar
             onSelectForm={(formId) => {
               setSelectedFormId(formId);
               setSelectedSubmissionId(undefined);
@@ -707,24 +708,30 @@ function FormsPanel({
   forms,
   activeFormId,
   formBundleLoading,
+  fillSidebar = false,
   onSelectForm,
 }: {
   forms: FormListItem[];
   activeFormId?: string;
   formBundleLoading: boolean;
+  fillSidebar?: boolean;
   onSelectForm: (formId: string) => void;
 }) {
   const hasMany = forms.length > 5;
   return (
-    <div className="app-surface rounded-3xl p-4">
+    <div className={`app-surface rounded-3xl p-4 ${fillSidebar ? "flex min-h-0 flex-1 flex-col" : ""}`}>
       <div className="mb-3 flex items-center justify-between gap-2 px-1">
         <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Forms</p>
         <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[9px] text-white/40">
           {forms.length}
         </span>
       </div>
-      <div className="relative">
-        <div className="analytics-scroll-panel analytics-scroll-panel--forms space-y-0.5 pr-1">
+      <div className={`relative ${fillSidebar ? "flex min-h-0 flex-1 flex-col" : ""}`}>
+        <div
+          className={`analytics-scroll-panel analytics-scroll-panel--forms space-y-0.5 pr-1 ${
+            fillSidebar ? "flex-1" : ""
+          }`}
+        >
           {forms.map((form) => (
             <button
               key={form.id}
