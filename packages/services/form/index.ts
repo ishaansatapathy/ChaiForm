@@ -20,7 +20,7 @@ import type {
 } from "./model";
 import { createUniqueSlug } from "./slug";
 import { notifyCreatorOfFormDeletion, notifyCreatorOfSubmission } from "./notifications";
-import { expiresAtFromRetention, isFormExpired } from "./retention";
+import { expiresAtFromRetention, expiresAtFromRetentionChange, isFormExpired } from "./retention";
 import { validateSubmissionAnswers } from "./validation";
 
 export class FormError extends Error {
@@ -210,6 +210,11 @@ class FormService {
     return expiredRows.length;
   }
 
+  /** Run from cron/keep-warm — never during form list reads. */
+  async purgeExpiredFormsJob() {
+    return this.purgeExpiredForms();
+  }
+
   async createForm(userId: string, input: CreateFormInput) {
     const fields = this.normalizeInputFields(input.fields);
     const slug = await createUniqueSlug(input.title);
@@ -246,6 +251,11 @@ class FormService {
       slug = await createUniqueSlug(input.slug.trim(), input.formId);
     }
 
+    let expiresAt = existing.expiresAt;
+    if (input.retention !== undefined) {
+      expiresAt = expiresAtFromRetentionChange(input.retention);
+    }
+
     const [updated] = await db.transaction(async (tx) => {
       const [row] = await tx
         .update(formsTable)
@@ -255,10 +265,7 @@ class FormService {
           visibility: input.visibility ?? existing.visibility,
           theme: input.theme ?? existing.theme ?? "default",
           slug,
-          expiresAt:
-            input.retention !== undefined
-              ? expiresAtFromRetention(input.retention)
-              : existing.expiresAt,
+          expiresAt,
           allowMultipleSubmissions:
             input.allowMultipleSubmissions ?? existing.allowMultipleSubmissions ?? true,
           requireAuthentication:
@@ -330,8 +337,6 @@ class FormService {
   }
 
   async listForms(userId: string, pagination: PaginationInput = { limit: 20 }) {
-    await this.purgeExpiredForms();
-
     const limit = pagination.limit ?? 20;
 
     const conditions = [eq(formsTable.userId, userId)];
@@ -371,8 +376,6 @@ class FormService {
   }
 
   async recordView(formId: string) {
-    await this.purgeExpiredForms();
-
     const [row] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
     this.assertFormAvailable(row);
@@ -438,8 +441,6 @@ class FormService {
   }
 
   async hasSubmitted(formId: string, respondentKey: string | undefined, submitterUserId?: string | null) {
-    await this.purgeExpiredForms();
-
     const [formRow] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
     if (!formRow) throw new FormError("NOT_FOUND", "Form not found");
     if (formRow.allowMultipleSubmissions) {
@@ -457,8 +458,6 @@ class FormService {
   }
 
   async getPublicForm(formId: string) {
-    await this.purgeExpiredForms();
-
     const [row] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
     this.assertFormAvailable(row);
@@ -478,8 +477,6 @@ class FormService {
   }
 
   async getPublicFormBySlug(slug: string) {
-    await this.purgeExpiredForms();
-
     const normalizedSlug = slug.trim().toLowerCase();
     if (!normalizedSlug) throw new FormError("NOT_FOUND", "Form not found");
 
@@ -506,8 +503,6 @@ class FormService {
   }
 
   async listPublicForms(pagination: PaginationInput = { limit: 20 }) {
-    await this.purgeExpiredForms();
-
     const limit = pagination.limit ?? 20;
 
     const conditions = [
@@ -568,8 +563,6 @@ class FormService {
     if (input.website.length > 0) {
       throw new FormError("BAD_REQUEST", "Submission rejected");
     }
-
-    await this.purgeExpiredForms();
 
     const [formRow] = await db.select().from(formsTable).where(eq(formsTable.id, input.formId)).limit(1);
     if (!formRow) throw new FormError("NOT_FOUND", "Form not found");

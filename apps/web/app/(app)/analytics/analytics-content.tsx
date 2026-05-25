@@ -110,7 +110,7 @@ export default function AnalyticsContent({
   const { data: user } = trpc.auth.me.useQuery({});
   const utils = trpc.useUtils();
   const [exporting, setExporting] = useState(false);
-  const { data: formsPage, isLoading: formsLoading } = trpc.forms.list.useQuery(
+  const { data: formsPage, isLoading: formsLoading, isError: formsListError } = trpc.forms.list.useQuery(
     { limit: 100 },
     {
       initialData: initialForms ?? undefined,
@@ -333,6 +333,7 @@ export default function AnalyticsContent({
       : null;
   const resolvedSummary =
     summary ??
+    apiSummary ??
     activeApiBundle?.summary ??
     (forms.length > 0 ? buildFallbackSummary(forms, activeForm) : null);
   const resolvedOverTime = activeApiBundle?.overTime ?? overTime ?? fallbackOverTime;
@@ -390,14 +391,31 @@ export default function AnalyticsContent({
   }
 
   if (forms.length === 0) {
+    const serverFormCount =
+      resolvedSummary?.totalForms ?? apiSummary?.totalForms ?? initialSummary?.totalForms ?? 0;
+    const listFailedButFormsExist = formsListError && serverFormCount > 0;
+
     return (
       <section className="py-4">
         <Header />
         <div className="text-center">
-          <p className="text-white/50">No analytics yet — create a form and collect responses first.</p>
-          <Link href="/forms/new" className="font-annotate mt-4 inline-block text-xl text-lime-400">
-            Create a form →
-          </Link>
+          {listFailedButFormsExist ? (
+            <>
+              <p className="text-white/70">
+                Found {serverFormCount} form(s) in the database, but the list could not load.
+              </p>
+              <p className="mt-2 text-sm text-white/45">
+                Run production DB migrations (`pnpm db:migrate`) then refresh this page.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-white/50">No analytics yet — create a form and collect responses first.</p>
+              <Link href="/forms/new" className="font-annotate mt-4 inline-block text-xl text-lime-400">
+                Create a form →
+              </Link>
+            </>
+          )}
         </div>
       </section>
     );
