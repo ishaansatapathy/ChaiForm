@@ -12,8 +12,6 @@ import * as trpcExpress from "@trpc/server/adapters/express";
 
 import { generateOpenApiDocument, createOpenApiExpressMiddleware } from "trpc-to-openapi";
 
-import { apiReference } from "@scalar/express-api-reference";
-
 import { serverRouter, openApiRouter, createContext } from "@repo/trpc/server";
 
 import { env } from "./env";
@@ -90,7 +88,15 @@ app.get("/openapi.json", (_req, res) => {
 
 logger.debug(`docs: ${env.BASE_URL}/docs`);
 
-app.use("/docs", apiReference({ url: "/openapi.json" }));
+import("@scalar/express-api-reference")
+  .then(({ apiReference }) => {
+    app.use("/docs", apiReference({ url: "/openapi.json" }));
+  })
+  .catch((error) => {
+    logger.warn("API docs disabled", {
+      message: error instanceof Error ? error.message : error,
+    });
+  });
 
 app.use("/auth", googleAuthRouter);
 
