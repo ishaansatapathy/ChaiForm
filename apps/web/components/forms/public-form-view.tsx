@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { FormFieldInput } from "~/components/forms/form-field-input";
 import { isMultiCheckboxConfig } from "~/lib/checkbox-value";
 import { getFormTheme } from "~/lib/form-themes";
+import { runWithRetry, useWarmApi } from "~/lib/warm-api";
 import { trpc } from "~/trpc/client";
 
 type PublicForm = RouterOutputs["forms"]["getPublic"];
@@ -38,29 +39,9 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const router = useRouter();
   const theme = getFormTheme(form.theme);
   const recordView = trpc.forms.recordView.useMutation();
-  const submit = trpc.forms.submit.useMutation({
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(2000 * (attemptIndex + 1), 8000),
-    onSuccess: () => {
-      router.push(thankYouPath);
-    },
-    onError: (err) => {
-      const raw = err.message.toLowerCase();
-      const isNetwork =
-        raw.includes("failed to fetch") ||
-        raw.includes("network") ||
-        raw.includes("timeout") ||
-        raw.includes("load failed") ||
-        raw.includes("waking up") ||
-        raw.includes("api unavailable");
-      const message = isNetwork
-        ? "Could not reach the server. Please wait a moment and try again."
-        : err.message.startsWith("[")
-          ? "Could not submit this form. Please try again."
-          : err.message;
-      toast.error(message);
-    },
-  });
+  const [submitting, setSubmitting] = useState(false);
+
+  useWarmApi();
 
   const [values, setValues] = useState<Record<string, string>>({});
   const [step, setStep] = useState(0);
@@ -103,17 +84,58 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
     setStep((prev) => Math.min(prev + 1, fields.length - 1));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateCurrentStep()) return;
     const honeypot = honeypotRef.current?.value ?? "";
-    submit.mutate({
+    const payload = {
       formId: form.id,
       website: honeypot,
       answers: fields.map((field) => ({
         fieldId: field.id,
         value: values[field.id] ?? "",
       })),
-    });
+    };
+
+    setSubmitting(true);
+    try {
+      await runWithRetry(
+        async () => {
+          const response = await fetch("/api/submit-form", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+            cache: "no-store",
+            signal: AbortSignal.timeout(20_000),
+          });
+
+          let result: { error?: string; retryable?: boolean } = {};
+          try {
+            result = (await response.json()) as typeof result;
+          } catch {
+            throw new Error("Server returned an invalid response.");
+          }
+
+          if (!response.ok || result.error) {
+            const message = result.error ?? "Could not submit this form.";
+            if (!result.retryable && response.status < 500) {
+              throw new Error(message);
+            }
+            throw new Error(message);
+          }
+        },
+        {
+          attempts: 4,
+          delaysMs: [0, 4_000, 6_000, 8_000],
+          onRetry: (attempt) => toast.message(`Submitting… retry ${attempt}/4`),
+        },
+      );
+      router.push(thankYouPath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not submit this form.";
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
@@ -183,10 +205,10 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
               <button
                 type="button"
                 onClick={handleContinue}
-                disabled={submit.isPending}
+                disabled={submitting}
                 className="btn-omni font-display flex-1 rounded-2xl py-3.5 text-sm font-black tracking-[0.18em] uppercase disabled:opacity-50 sm:flex-none sm:px-10"
               >
-                {submit.isPending ? "Submitting…" : isLastStep ? "Submit" : "Continue"}
+                {submitting ? "Submitting…" : isLastStep ? "Submit" : "Continue"}
               </button>
               <p className="w-full font-mono text-[10px] tracking-wider text-white/30 uppercase">
                 Question {step + 1} of {fields.length} · Press Enter ↵

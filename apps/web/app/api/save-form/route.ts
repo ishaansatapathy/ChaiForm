@@ -15,9 +15,10 @@ async function postTrpcMutation(
     method: "POST",
     headers: {
       "content-type": "application/json",
+      "accept-encoding": "identity",
       ...(cookieHeader ? { cookie: cookieHeader } : {}),
     },
-    body: JSON.stringify({ json: input }),
+    body: JSON.stringify(input),
     cache: "no-store",
     signal: AbortSignal.timeout(25_000),
   });

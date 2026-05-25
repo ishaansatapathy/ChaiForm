@@ -110,11 +110,12 @@ async function fetchTrpcMutation<T>(
     try {
       const response = await fetch(url, {
         method: "POST",
-        headers: {
+      headers: {
           "content-type": "application/json",
+          "accept-encoding": "identity",
           ...(cookieHeader ? { cookie: cookieHeader } : {}),
         },
-        body: JSON.stringify({ json: input }),
+        body: JSON.stringify(input),
         cache: "no-store",
         signal: AbortSignal.timeout(45_000),
       });

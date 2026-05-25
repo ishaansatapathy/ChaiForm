@@ -8,12 +8,16 @@ export async function GET(request: NextRequest) {
 
   try {
     const upstreamRes = await fetch(`${API_BASE}/trpc/auth.me?input=%7B%7D`, {
-      headers: cookie ? { cookie } : undefined,
+      headers: {
+        ...(cookie ? { cookie } : {}),
+        "accept-encoding": "identity",
+      },
       cache: "no-store",
       signal: AbortSignal.timeout(25_000),
     });
 
-    const response = new NextResponse(upstreamRes.body, {
+    const bodyText = await upstreamRes.text();
+    const response = new NextResponse(bodyText, {
       status: upstreamRes.status,
       statusText: upstreamRes.statusText,
       headers: {
