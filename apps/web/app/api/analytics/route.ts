@@ -1,6 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { fetchAnalyticsBundle, fetchFormsList } from "~/lib/fetch-session";
+import {
+  fetchAnalyticsBundle,
+  fetchAnalyticsSummary,
+  fetchFormsList,
+} from "~/lib/fetch-session";
 
 export const maxDuration = 30;
 
@@ -13,8 +17,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ bundle });
     }
 
-    const forms = await fetchFormsList(100);
-    return NextResponse.json({ forms });
+    const [forms, summary] = await Promise.all([
+      fetchFormsList(100),
+      fetchAnalyticsSummary(),
+    ]);
+    return NextResponse.json({ forms, summary });
   } catch {
     return NextResponse.json({ error: "Could not load analytics." }, { status: 503 });
   }
