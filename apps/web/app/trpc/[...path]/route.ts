@@ -2,18 +2,12 @@ import { type NextRequest, NextResponse } from "next/server";
 
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
-/** Render cold starts exceed Vercel Hobby limits — keep per-attempt timeout short and retry. */
 export const maxDuration = 60;
 
 const ATTEMPTS = 3;
 const ATTEMPT_TIMEOUT_MS = 25_000;
 
-/** Proxy tRPC so auth Set-Cookie headers reach the browser (rewrites drop them). */
-async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
-  const { path } = await context.params;
-  const pathname = path.join("/");
-  const upstream = `${API_BASE}/trpc/${pathname}${request.nextUrl.search}`;
-
+function buildUpstreamHeaders(request: NextRequest): Headers {
   const headers = new Headers();
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
@@ -21,6 +15,35 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
   if (cookie) headers.set("cookie", cookie);
   const accept = request.headers.get("accept");
   if (accept) headers.set("accept", accept);
+  // Avoid gzip/br from Render — Node fetch auto-decompresses but length/header mismatches
+  // break browsers with ERR_CONTENT_DECODING_FAILED when re-proxied through Vercel.
+  headers.set("accept-encoding", "identity");
+  return headers;
+}
+
+function appendSetCookies(response: NextResponse, upstreamRes: Response) {
+  const setCookies =
+    typeof upstreamRes.headers.getSetCookie === "function"
+      ? upstreamRes.headers.getSetCookie()
+      : [];
+
+  if (setCookies.length > 0) {
+    for (const setCookie of setCookies) {
+      response.headers.append("set-cookie", setCookie);
+    }
+    return;
+  }
+
+  const single = upstreamRes.headers.get("set-cookie");
+  if (single) response.headers.set("set-cookie", single);
+}
+
+/** Proxy tRPC so auth Set-Cookie headers reach the browser (rewrites drop them). */
+async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const { path } = await context.params;
+  const pathname = path.join("/");
+  const upstream = `${API_BASE}/trpc/${pathname}${request.nextUrl.search}`;
+  const headers = buildUpstreamHeaders(request);
 
   const body =
     request.method !== "GET" && request.method !== "HEAD"
@@ -35,6 +58,7 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
         headers,
         body,
         redirect: "manual",
+        cache: "no-store",
         signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
       });
 
@@ -74,10 +98,8 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
     );
   }
 
-  // Node fetch decompresses gzip/br bodies but may leave content-encoding headers intact.
-  // Forwarding those headers causes browsers to fail with ERR_CONTENT_DECODING_FAILED.
-  const bodyBytes = await upstreamRes.arrayBuffer();
-  const response = new NextResponse(bodyBytes, {
+  const bodyText = await upstreamRes.text();
+  const response = new NextResponse(bodyText, {
     status: upstreamRes.status,
     statusText: upstreamRes.statusText,
     headers: {
@@ -90,20 +112,7 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
     response.headers.set("cache-control", cacheControl);
   }
 
-  const setCookies =
-    typeof upstreamRes.headers.getSetCookie === "function"
-      ? upstreamRes.headers.getSetCookie()
-      : [];
-
-  if (setCookies.length > 0) {
-    for (const setCookie of setCookies) {
-      response.headers.append("set-cookie", setCookie);
-    }
-  } else {
-    const single = upstreamRes.headers.get("set-cookie");
-    if (single) response.headers.set("set-cookie", single);
-  }
-
+  appendSetCookies(response, upstreamRes);
   return response;
 }
 
