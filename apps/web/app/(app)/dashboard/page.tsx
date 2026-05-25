@@ -40,12 +40,15 @@ export default function DashboardPage() {
   );
 
   const forms = formsPage?.items ?? initialForms?.items ?? [];
+  const serverFormCount = analytics?.totalForms ?? initialAnalytics?.totalForms ?? 0;
+  const formsCount = Math.max(serverFormCount, forms.length);
+  const listFailedButFormsExist = isError && forms.length === 0 && serverFormCount > 0;
   const publishedCount = forms.filter((f) => f.visibility !== "draft").length;
   const totalResponses = analytics?.totalSubmissions ?? initialAnalytics?.totalSubmissions ?? 0;
   const loadingForms = isLoading && forms.length === 0 && !isError;
 
   const statItems = [
-    { label: "Forms Created", value: forms.length.toString(), icon: BarChart2, trend: "All time" },
+    { label: "Forms Created", value: formsCount.toString(), icon: BarChart2, trend: "All time" },
     { label: "Published", value: publishedCount.toString(), icon: Activity, trend: "Live" },
     { label: "Total Responses", value: String(totalResponses), icon: BarChart2, trend: "All forms" },
   ];
@@ -103,6 +106,21 @@ export default function DashboardPage() {
 
       <div>
         <h2 className="font-display mb-6 text-2xl font-bold text-white">Your Forms</h2>
+        {listFailedButFormsExist ? (
+          <div className="app-surface mb-6 rounded-3xl border border-amber-400/20 p-5">
+            <p className="text-sm text-amber-200/90">
+              Your forms are still in the database ({serverFormCount} found), but the list could not load.
+              This usually means the production database migration has not run yet.
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="btn-omni font-display mt-4 inline-flex rounded-xl px-5 py-2 text-xs font-black tracking-wide uppercase"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
         {loadingForms ? (
           <p className="text-white/40">Loading forms…</p>
         ) : isError && forms.length === 0 ? (

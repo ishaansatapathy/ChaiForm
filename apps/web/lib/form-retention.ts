@@ -9,14 +9,20 @@ export const FORM_RETENTION_OPTIONS = [
 
 export type FormRetentionOption = (typeof FORM_RETENTION_OPTIONS)[number]["value"];
 
-export function presetFromExpiresAt(expiresAt: string | null | undefined): FormRetentionOption {
+export function presetFromExpiresAt(
+  expiresAt: string | null | undefined,
+  createdAt?: string | null,
+): FormRetentionOption {
   if (!expiresAt) return "forever";
 
-  const daysLeft = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000);
-  if (daysLeft <= 7) return "7d";
-  if (daysLeft <= 30) return "30d";
-  if (daysLeft <= 90) return "90d";
-  if (daysLeft <= 180) return "180d";
+  const expiryMs = new Date(expiresAt).getTime();
+  const referenceMs = createdAt ? new Date(createdAt).getTime() : Date.now();
+  const totalDays = Math.ceil((expiryMs - referenceMs) / 86_400_000);
+
+  if (totalDays <= 7) return "7d";
+  if (totalDays <= 30) return "30d";
+  if (totalDays <= 90) return "90d";
+  if (totalDays <= 180) return "180d";
   return "365d";
 }
 

@@ -60,8 +60,9 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
   );
   const [theme, setTheme] = useState<FormThemeId>((initialForm?.theme as FormThemeId) ?? "default");
   const [retention, setRetention] = useState<FormRetentionOption>(
-    presetFromExpiresAt(initialForm?.expiresAt),
+    presetFromExpiresAt(initialForm?.expiresAt, initialForm?.createdAt),
   );
+  const [retentionDirty, setRetentionDirty] = useState(false);
   const [allowMultipleSubmissions, setAllowMultipleSubmissions] = useState(
     initialForm?.allowMultipleSubmissions ?? true,
   );
@@ -78,7 +79,8 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
     setSlug(form.slug ?? "");
     setVisibility(form.visibility);
     setTheme(form.theme as FormThemeId);
-    setRetention(presetFromExpiresAt(form.expiresAt));
+    setRetention(presetFromExpiresAt(form.expiresAt, form.createdAt));
+    setRetentionDirty(false);
     setAllowMultipleSubmissions(form.allowMultipleSubmissions ?? true);
     setAllowAnonymousResponses(!(form.requireAuthentication ?? false));
     setFields(form.fields as DraftField[]);
@@ -137,7 +139,7 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
       slug: slug.trim() !== (resolvedForm.slug ?? "") ? slug.trim() : undefined,
       visibility,
       theme,
-      retention,
+      ...(retentionDirty ? { retention } : {}),
       allowMultipleSubmissions,
       requireAuthentication: !allowAnonymousResponses,
       fields: fields as UpdateFormFields,
@@ -228,7 +230,10 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
             </label>
             <FormRetentionPicker
               value={retention}
-              onChange={setRetention}
+              onChange={(value) => {
+                setRetention(value);
+                setRetentionDirty(true);
+              }}
               expiresAt={resolvedForm.expiresAt}
             />
             <div className="mb-6 mt-6">
