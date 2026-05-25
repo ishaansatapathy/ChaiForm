@@ -162,6 +162,7 @@ class FormService {
       viewCount: row.viewCount ?? 0,
       completionRate: completionRate(submissionCount, row.viewCount ?? 0),
       allowMultipleSubmissions: row.allowMultipleSubmissions ?? true,
+      requireAuthentication: row.requireAuthentication ?? false,
       expiresAt: toIso(row.expiresAt),
       createdAt: toIso(row.createdAt),
       updatedAt: toIso(row.updatedAt),
@@ -225,6 +226,7 @@ class FormService {
         viewCount: 0,
         expiresAt: expiresAtFromRetention(input.retention ?? "forever"),
         allowMultipleSubmissions: input.allowMultipleSubmissions ?? true,
+        requireAuthentication: input.requireAuthentication ?? false,
       })
       .returning();
 
@@ -259,6 +261,8 @@ class FormService {
               : existing.expiresAt,
           allowMultipleSubmissions:
             input.allowMultipleSubmissions ?? existing.allowMultipleSubmissions ?? true,
+          requireAuthentication:
+            input.requireAuthentication ?? existing.requireAuthentication ?? false,
           updatedAt: new Date(),
         })
         .where(eq(formsTable.id, input.formId))
@@ -386,7 +390,19 @@ class FormService {
     respondentKey: string | undefined,
     emailFieldIds: string[],
     emailValue: string | undefined,
+    submitterUserId: string | undefined,
   ) {
+    if (submitterUserId) {
+      const [byUser] = await db
+        .select({ id: submissionsTable.id })
+        .from(submissionsTable)
+        .where(
+          and(eq(submissionsTable.formId, formId), eq(submissionsTable.submitterUserId, submitterUserId)),
+        )
+        .limit(1);
+      if (byUser) return byUser;
+    }
+
     if (respondentKey) {
       const [byKey] = await db
         .select({ id: submissionsTable.id })
@@ -421,7 +437,7 @@ class FormService {
     return null;
   }
 
-  async hasSubmitted(formId: string, respondentKey: string) {
+  async hasSubmitted(formId: string, respondentKey: string | undefined, submitterUserId?: string | null) {
     await this.purgeExpiredForms();
 
     const [formRow] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
@@ -430,7 +446,13 @@ class FormService {
       return { submitted: false as const };
     }
 
-    const existing = await this.findExistingSubmission(formId, respondentKey, [], undefined);
+    const existing = await this.findExistingSubmission(
+      formId,
+      respondentKey,
+      [],
+      undefined,
+      submitterUserId ?? undefined,
+    );
     return { submitted: Boolean(existing) };
   }
 
@@ -450,6 +472,7 @@ class FormService {
       description: row.description ?? null,
       theme: row.theme ?? "default",
       allowMultipleSubmissions: row.allowMultipleSubmissions ?? true,
+      requireAuthentication: row.requireAuthentication ?? false,
       fields,
     };
   }
@@ -477,6 +500,7 @@ class FormService {
       description: row.description ?? null,
       theme: row.theme ?? "default",
       allowMultipleSubmissions: row.allowMultipleSubmissions ?? true,
+      requireAuthentication: row.requireAuthentication ?? false,
       fields,
     };
   }
@@ -540,7 +564,7 @@ class FormService {
     return row;
   }
 
-  async submitForm(input: SubmitFormInput) {
+  async submitForm(input: SubmitFormInput, submitterUserId?: string | null) {
     if (input.website.length > 0) {
       throw new FormError("BAD_REQUEST", "Submission rejected");
     }
@@ -550,6 +574,10 @@ class FormService {
     const [formRow] = await db.select().from(formsTable).where(eq(formsTable.id, input.formId)).limit(1);
     if (!formRow) throw new FormError("NOT_FOUND", "Form not found");
     this.assertFormAvailable(formRow);
+
+    if (formRow.requireAuthentication && !submitterUserId) {
+      throw new FormError("FORBIDDEN", "Sign in to ChaiForm to submit this form.");
+    }
 
     const form = await this.getPublicForm(input.formId);
     let validated: Record<string, string>;
@@ -568,7 +596,7 @@ class FormService {
     }));
 
     if (!formRow.allowMultipleSubmissions) {
-      if (!input.respondentKey || !isUuid(input.respondentKey)) {
+      if (!formRow.requireAuthentication && (!input.respondentKey || !isUuid(input.respondentKey))) {
         throw new FormError(
           "BAD_REQUEST",
           "This form only accepts one response per person. Refresh the page and try again.",
@@ -585,6 +613,7 @@ class FormService {
         input.respondentKey,
         emailFieldIds,
         emailValue,
+        submitterUserId ?? undefined,
       );
 
       if (existing) {
@@ -600,6 +629,7 @@ class FormService {
         .insert(submissionsTable)
         .values({
           formId: form.id,
+          submitterUserId: submitterUserId ?? null,
           respondentKey: input.respondentKey ?? null,
           answers,
         })

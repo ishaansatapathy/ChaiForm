@@ -2,7 +2,8 @@
 
 import type { RouterOutputs } from "@repo/trpc/client";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { FormFieldInput } from "~/components/forms/form-field-input";
@@ -15,6 +16,7 @@ import {
   markFormSubmitted,
 } from "~/lib/respondent-key";
 import { runWithRetry, useWarmApi } from "~/lib/warm-api";
+import { trpc } from "~/trpc/client";
 
 type PublicForm = RouterOutputs["forms"]["getPublic"];
 
@@ -42,10 +44,16 @@ function isFieldEmpty(field: PublicForm["fields"][number], value: string) {
 
 export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const theme = getFormTheme(form.theme);
   const [submitting, setSubmitting] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [checkingSubmission, setCheckingSubmission] = useState(!form.allowMultipleSubmissions);
+
+  const { data: user, isLoading: authLoading } = trpc.auth.me.useQuery(
+    {},
+    { retry: false, staleTime: 30_000, enabled: form.requireAuthentication },
+  );
 
   useWarmApi();
 
@@ -80,6 +88,19 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
       return;
     }
 
+    if (form.requireAuthentication) {
+      if (authLoading) return;
+      if (!user) {
+        setCheckingSubmission(false);
+        return;
+      }
+      void checkRemoteSubmission(form.id).then((submitted) => {
+        setAlreadySubmitted(submitted);
+        setCheckingSubmission(false);
+      });
+      return;
+    }
+
     if (hasLocalSubmission(form.id)) {
       setAlreadySubmitted(true);
       setCheckingSubmission(false);
@@ -91,7 +112,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
       setAlreadySubmitted(submitted);
       setCheckingSubmission(false);
     });
-  }, [form.allowMultipleSubmissions, form.id]);
+  }, [form.allowMultipleSubmissions, form.requireAuthentication, form.id, user, authLoading]);
 
   const validateCurrentStep = () => {
     if (!currentField) return true;
@@ -115,11 +136,13 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const handleSubmit = async () => {
     if (!validateCurrentStep()) return;
     const honeypot = honeypotRef.current?.value ?? "";
-    const respondentKey = getRespondentKey(form.id);
+    const respondentKey = form.requireAuthentication ? undefined : getRespondentKey(form.id);
     const payload = {
       formId: form.id,
       website: honeypot,
-      ...(form.allowMultipleSubmissions ? {} : { respondentKey }),
+      ...(form.allowMultipleSubmissions || form.requireAuthentication
+        ? {}
+        : { respondentKey }),
       answers: fields.map((field) => ({
         fieldId: field.id,
         value: values[field.id] ?? "",
@@ -133,6 +156,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
           const response = await fetch("/api/submit-form", {
             method: "POST",
             headers: { "content-type": "application/json" },
+            credentials: "include",
             body: JSON.stringify(payload),
             cache: "no-store",
             signal: AbortSignal.timeout(20_000),
@@ -178,6 +202,9 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
     handleContinue();
   };
 
+  const signInHref = `/sign-in?next=${encodeURIComponent(pathname || "/")}`;
+  const needsSignIn = form.requireAuthentication && !authLoading && !user;
+
   return (
     <div
       className={`relative flex min-h-[100dvh] flex-col overflow-hidden px-4 py-8 text-white sm:py-10 ${theme.pageBg}`}
@@ -194,13 +221,34 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
           <h1 className="font-display text-2xl font-black tracking-tight sm:text-3xl">
             {form.title}
           </h1>
-        {form.description && step === 0 && !alreadySubmitted && (
+        {form.description && step === 0 && !alreadySubmitted && !needsSignIn && (
           <p className="mt-2 text-sm text-white/50">{form.description}</p>
         )}
         </div>
 
-        {checkingSubmission ? (
-          <p className="text-sm text-white/45">Checking your response status…</p>
+        {checkingSubmission || authLoading ? (
+          <p className="text-sm text-white/45">
+            {authLoading ? "Checking sign-in status…" : "Checking your response status…"}
+          </p>
+        ) : needsSignIn ? (
+          <div className="app-surface rounded-[32px] border border-cyan-400/20 bg-cyan-400/5 p-8 text-center">
+            <p className="font-display text-2xl font-bold text-white">Sign in required</p>
+            <p className="mt-3 text-sm leading-relaxed text-white/60">
+              The form owner only accepts responses from signed-in ChaiForm users.
+            </p>
+            <Link
+              href={signInHref}
+              className="btn-omni font-display mt-6 inline-flex rounded-2xl px-8 py-3 text-sm font-black tracking-[0.18em] uppercase"
+            >
+              Sign in to continue
+            </Link>
+            <p className="mt-4 text-xs text-white/35">
+              Don&apos;t have an account?{" "}
+              <Link href={`/sign-up?next=${encodeURIComponent(pathname || "/")}`} className="text-lime-400">
+                Create one
+              </Link>
+            </p>
+          </div>
         ) : alreadySubmitted ? (
           <div className="app-surface rounded-[32px] border border-amber-400/20 bg-amber-400/5 p-8 text-center">
             <p className="font-display text-2xl font-bold text-white">Already submitted</p>

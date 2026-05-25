@@ -147,9 +147,9 @@ export const formsRouter = router({
     .meta({ openapi: { method: "POST", path: getPath("/submit"), tags: TAGS } })
     .input(submitFormInputSchema)
     .output(submissionOutputSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
-        return await formService.submitForm(input);
+        return await formService.submitForm(input, ctx.user?.id ?? null);
       } catch (error) {
         mapFormError(error);
       }
@@ -160,13 +160,17 @@ export const formsRouter = router({
     .input(
       z.object({
         formId: z.string().uuid(),
-        respondentKey: z.string().uuid(),
+        respondentKey: z.string().uuid().optional(),
       }),
     )
     .output(z.object({ submitted: z.boolean() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       try {
-        return await formService.hasSubmitted(input.formId, input.respondentKey);
+        return await formService.hasSubmitted(
+          input.formId,
+          input.respondentKey,
+          ctx.user?.id ?? null,
+        );
       } catch (error) {
         mapFormError(error);
       }

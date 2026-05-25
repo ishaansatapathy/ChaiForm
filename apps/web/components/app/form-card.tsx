@@ -51,6 +51,11 @@ export function FormCard({ form }: { form: FormListItem }) {
             1 response only
           </span>
         ) : null}
+        {form.requireAuthentication ? (
+          <span className="rounded-full border border-violet-400/20 bg-violet-400/5 px-2.5 py-0.5 text-[9px] font-bold tracking-[0.2em] text-violet-300 uppercase">
+            Sign-in required
+          </span>
+        ) : null}
       </div>
 
       <h3 className="font-display text-xl font-bold tracking-tight text-white">{form.title}</h3>

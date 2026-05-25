@@ -22,11 +22,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const cookieHeader = request.headers.get("cookie") ?? "";
     const upstreamRes = await fetch(`${API_BASE}/trpc/forms.submit`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "accept-encoding": "identity",
+        ...(cookieHeader ? { cookie: cookieHeader } : {}),
       },
       body: JSON.stringify({
         formId,

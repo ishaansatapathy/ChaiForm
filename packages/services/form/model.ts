@@ -98,6 +98,7 @@ export const createFormInputSchema = z.object({
   theme: formThemeSchema.default("default"),
   retention: formRetentionSchema.default("forever"),
   allowMultipleSubmissions: z.boolean().default(true),
+  requireAuthentication: z.boolean().default(false),
   fields: z.array(formFieldInputSchema).min(1).max(50),
 });
 
@@ -110,6 +111,7 @@ export const updateFormInputSchema = z.object({
   slug: z.string().min(1).max(80).optional(),
   retention: formRetentionSchema.optional(),
   allowMultipleSubmissions: z.boolean().optional(),
+  requireAuthentication: z.boolean().optional(),
   fields: z.array(formFieldInputSchema).min(1).max(50).optional(),
 });
 
@@ -125,6 +127,7 @@ export const formOutputSchema = z.object({
   viewCount: z.number().int(),
   completionRate: z.number(),
   allowMultipleSubmissions: z.boolean(),
+  requireAuthentication: z.boolean(),
   expiresAt: z.string().nullable(),
   createdAt: z.string().nullable(),
   updatedAt: z.string().nullable(),
@@ -142,6 +145,7 @@ export const publicFormOutputSchema = z.object({
   description: z.string().nullable(),
   theme: formThemeSchema,
   allowMultipleSubmissions: z.boolean(),
+  requireAuthentication: z.boolean(),
   fields: z.array(formFieldSchema),
 });
 

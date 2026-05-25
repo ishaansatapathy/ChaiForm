@@ -21,6 +21,7 @@ export const formsTable = pgTable("forms", {
   viewCount: integer("view_count").default(0).notNull(),
   expiresAt: timestamp("expires_at"),
   allowMultipleSubmissions: boolean("allow_multiple_submissions").default(true).notNull(),
+  requireAuthentication: boolean("require_authentication").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
 });
