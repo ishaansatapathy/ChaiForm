@@ -26,11 +26,42 @@ import { toast } from "sonner";
 type SubmissionItem = RouterOutputs["forms"]["listSubmissions"]["items"][number];
 type FormListItem = FormsListPage["items"][number];
 type SummaryData = RouterOutputs["analytics"]["summary"];
+type OverTimeData = RouterOutputs["analytics"]["submissionsOverTime"];
 
 const QUERY_OPTS = {
   retry: 2,
   staleTime: 30_000,
 } as const;
+
+function buildOverTimeFromSubmissions(
+  items: { submittedAt: string | null }[],
+  days = 30,
+): OverTimeData {
+  const since = new Date();
+  since.setDate(since.getDate() - days + 1);
+  since.setHours(0, 0, 0, 0);
+
+  const countByDate = new Map<string, number>();
+  for (const item of items) {
+    if (!item.submittedAt) continue;
+    const key = item.submittedAt.slice(0, 10);
+    countByDate.set(key, (countByDate.get(key) ?? 0) + 1);
+  }
+
+  const points: OverTimeData["points"] = [];
+  for (let i = 0; i < days; i += 1) {
+    const date = new Date(since);
+    date.setDate(since.getDate() + i);
+    const key = date.toISOString().slice(0, 10);
+    points.push({ date: key, count: countByDate.get(key) ?? 0 });
+  }
+
+  return { points };
+}
+
+function chartHasActivity(points: OverTimeData["points"]) {
+  return points.some((point) => point.count > 0);
+}
 
 function buildFallbackSummary(
   forms: FormListItem[],
@@ -98,10 +129,10 @@ export default function AnalyticsContent({
   );
   const [apiForms, setApiForms] = useState<FormsListPage | null>(initialForms ?? null);
   const [apiBundle, setApiBundle] = useState<AnalyticsBundle | null>(initialBundle ?? null);
+  const [bundleFormId, setBundleFormId] = useState<string | undefined>(initialFormId);
   const [apiSummary, setApiSummary] = useState<SummaryData | null>(
     initialSummary ?? initialBundle?.summary ?? null,
   );
-  const [bundleRefreshing, setBundleRefreshing] = useState(false);
 
   const forms = apiForms?.items ?? formsPage?.items ?? initialForms?.items ?? [];
 
@@ -111,7 +142,13 @@ export default function AnalyticsContent({
   useEffect(() => {
     setSubmissionCursor(undefined);
     setSelectedSubmissionId(undefined);
-  }, [activeFormId, submissionSearch]);
+    setSelectedFieldId(undefined);
+    setLoadedSubmissions([]);
+  }, [activeFormId]);
+
+  useEffect(() => {
+    setSubmissionCursor(undefined);
+  }, [submissionSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,7 +171,6 @@ export default function AnalyticsContent({
   useEffect(() => {
     if (!activeFormId) return;
     let cancelled = false;
-    setBundleRefreshing(true);
     void fetch(`/api/analytics?formId=${activeFormId}`, { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return null;
@@ -143,15 +179,13 @@ export default function AnalyticsContent({
       .then((data) => {
         if (cancelled || !data?.bundle) return;
         setApiBundle(data.bundle);
+        setBundleFormId(activeFormId);
         if (data.bundle.summary) setApiSummary(data.bundle.summary);
         if (data.bundle.submissions?.items && !submissionCursor && !submissionSearch.trim()) {
           setLoadedSubmissions(data.bundle.submissions.items);
         }
       })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setBundleRefreshing(false);
-      });
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -170,7 +204,8 @@ export default function AnalyticsContent({
     },
   );
 
-  const { data: overTime, isLoading: overTimeLoading } = trpc.analytics.submissionsOverTime.useQuery(
+  const { data: overTime, isLoading: overTimeLoading, isError: overTimeError } =
+    trpc.analytics.submissionsOverTime.useQuery(
     { formId: activeFormId!, days: 30 },
     {
       enabled: Boolean(activeFormId),
@@ -236,34 +271,52 @@ export default function AnalyticsContent({
       ...QUERY_OPTS,
     },
   );
-  const allSubmissions = allSubmissionsPage?.items ?? apiBundle?.allSubmissions?.items ?? initialBundle?.allSubmissions?.items ?? [];
+  const allSubmissions =
+    allSubmissionsPage?.items ??
+    (bundleFormId === activeFormId ? apiBundle?.allSubmissions?.items : undefined) ??
+    (isInitialForm ? initialBundle?.allSubmissions?.items : undefined) ??
+    [];
 
   useEffect(() => {
-    if (!submissionsPage) return;
+    if (!submissionsPage || submissionsLoading) return;
     setLoadedSubmissions((prev) =>
       submissionCursor ? [...prev, ...submissionsPage.items] : submissionsPage.items,
     );
-  }, [submissionsPage, submissionCursor]);
+  }, [submissionsPage, submissionCursor, submissionsLoading]);
 
   const activeForm = forms.find((form) => form.id === activeFormId);
+  const activeApiBundle = bundleFormId === activeFormId ? apiBundle : null;
+  const submissionItemsForChart =
+    allSubmissionsPage?.items ??
+    (bundleFormId === activeFormId ? apiBundle?.allSubmissions?.items : undefined) ??
+    submissionsPage?.items ??
+    loadedSubmissions;
+  const fallbackOverTime =
+    submissionItemsForChart.length > 0
+      ? buildOverTimeFromSubmissions(submissionItemsForChart)
+      : null;
   const resolvedSummary =
-    apiBundle?.summary ?? apiSummary ?? summary ?? (forms.length > 0 ? buildFallbackSummary(forms, activeForm) : null);
-  const resolvedOverTime = apiBundle?.overTime ?? overTime;
-  const resolvedFormFields = apiBundle?.formFields ?? formFields;
+    summary ??
+    activeApiBundle?.summary ??
+    (forms.length > 0 ? buildFallbackSummary(forms, activeForm) : null);
+  const resolvedOverTime = activeApiBundle?.overTime ?? overTime ?? fallbackOverTime;
+  const resolvedFormFields = activeApiBundle?.formFields ?? formFields;
   const resolvedActiveFieldId = selectedFieldId ?? resolvedFormFields?.fields[0]?.id;
   const apiFieldBreakdown =
-    apiBundle?.fieldBreakdown?.fieldId === resolvedActiveFieldId
-      ? apiBundle?.fieldBreakdown
+    activeApiBundle?.fieldBreakdown?.fieldId === resolvedActiveFieldId
+      ? activeApiBundle?.fieldBreakdown
       : undefined;
   const resolvedFieldBreakdown = apiFieldBreakdown ?? fieldBreakdown;
 
-  const submissions = loadedSubmissions;
+  const submissions =
+    loadedSubmissions.length > 0 ? loadedSubmissions : (submissionsPage?.items ?? []);
   const activeSubmissionId = selectedSubmissionId;
 
   const statsLoading = formsLoading && forms.length === 0;
   const showSubmissionsLoading =
-    (submissionsLoading || bundleRefreshing) && submissions.length === 0 && !submissionsError;
-  const chartLoading = overTimeLoading && !resolvedOverTime && !summaryError;
+    submissionsLoading && submissions.length === 0 && !submissionsError;
+  const chartLoading = overTimeLoading && !resolvedOverTime;
+  const chartHasData = resolvedOverTime ? chartHasActivity(resolvedOverTime.points) : false;
 
   const handleExportCsv = async () => {
     if (!activeForm || !activeFormId) return;
@@ -334,6 +387,7 @@ export default function AnalyticsContent({
                   .then((data) => {
                     if (data?.bundle) {
                       setApiBundle(data.bundle);
+                      setBundleFormId(activeFormId);
                       if (data.bundle.summary) setApiSummary(data.bundle.summary);
                     }
                   });
@@ -371,13 +425,13 @@ export default function AnalyticsContent({
       )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
-        <aside className="min-w-0 space-y-4 lg:sticky lg:top-8 lg:self-start">
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-8 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-hidden">
           <div className="app-surface rounded-3xl p-4">
             <div className="mb-3 flex items-center justify-between gap-2 px-2">
               <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Forms</p>
               <span className="font-mono text-[9px] text-white/25">{forms.length}</span>
             </div>
-            <div className="flex h-48 flex-col space-y-1 overflow-y-auto overscroll-contain pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-track]:bg-transparent">
+            <div className="analytics-scroll-panel space-y-1 pr-1">
               {forms.map((form) => (
                 <button
                   key={form.id}
@@ -396,6 +450,9 @@ export default function AnalyticsContent({
                   <span className="block truncate">{form.title}</span>
                   <span className="mt-0.5 block font-mono text-[9px] text-white/30">
                     {form.submissionCount} responses
+                    {form.createdAt
+                      ? ` · ${new Date(form.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+                      : ""}
                   </span>
                 </button>
               ))}
@@ -420,7 +477,7 @@ export default function AnalyticsContent({
               placeholder="Filter by answer…"
               className="mb-3 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
             />
-            <div className="flex h-56 flex-col overflow-y-auto overscroll-contain pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-track]:bg-transparent">
+            <div className="analytics-scroll-panel analytics-scroll-panel--submissions pr-1">
             {showSubmissionsLoading ? (
               <p className="px-2 text-sm text-white/40">Loading…</p>
             ) : submissionsError && submissions.length === 0 ? (
@@ -479,11 +536,18 @@ export default function AnalyticsContent({
 
         <div className="space-y-6">
           <div className="app-surface rounded-3xl p-6">
-            <h3 className="font-display mb-4 text-lg font-bold text-white">Submissions over time</h3>
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="font-display text-lg font-bold text-white">Submissions over time</h3>
+              {activeForm ? (
+                <p className="font-mono text-[10px] tracking-wider text-white/35 uppercase">
+                  {activeForm.title} · {activeForm.submissionCount} responses
+                </p>
+              ) : null}
+            </div>
             <div className="h-56">
               {!chartsMounted || chartLoading ? (
                 <ChartSkeleton />
-              ) : resolvedOverTime && resolvedOverTime.points.length > 0 ? (
+              ) : resolvedOverTime && chartHasData ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={resolvedOverTime.points}>
                     <CartesianGrid stroke="rgba(255,255,255,0.06)" />
@@ -496,9 +560,24 @@ export default function AnalyticsContent({
                     <Line type="monotone" dataKey="count" stroke="#4ade80" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
+              ) : overTimeError && (activeForm?.submissionCount ?? 0) > 0 && !fallbackOverTime ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                  <p className="text-sm text-white/50">Could not load chart data.</p>
+                  <button
+                    type="button"
+                    onClick={() => void utils.analytics.submissionsOverTime.invalidate({ formId: activeFormId!, days: 30 })}
+                    className="text-xs font-bold tracking-wider text-lime-400 uppercase"
+                  >
+                    Retry
+                  </button>
+                </div>
               ) : (
-                <p className="flex h-full items-center justify-center text-sm text-white/40">
-                  No submission data for this period yet.
+                <p className="flex h-full items-center justify-center text-center text-sm text-white/40">
+                  {(activeForm?.submissionCount ?? 0) === 0
+                    ? `No submissions on “${activeForm?.title ?? "this form"}” yet. Share the link to collect responses.`
+                    : resolvedOverTime && !chartHasData
+                      ? `${activeForm?.submissionCount ?? 0} responses exist, but none in the last 30 days.`
+                      : "No submission data for this period yet."}
                 </p>
               )}
             </div>
