@@ -100,7 +100,7 @@ export function AppShell({
     const message = unauthorized
       ? "Your session expired. Please sign in again."
       : isError
-        ? "The auth server is waking up (Render cold start). Wait a few seconds and retry."
+        ? "Could not reach the server. Please wait a moment and retry."
         : "Please sign in to continue.";
 
     return (

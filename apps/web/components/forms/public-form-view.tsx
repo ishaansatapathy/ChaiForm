@@ -39,13 +39,25 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const theme = getFormTheme(form.theme);
   const recordView = trpc.forms.recordView.useMutation();
   const submit = trpc.forms.submit.useMutation({
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(2000 * (attemptIndex + 1), 8000),
     onSuccess: () => {
       router.push(thankYouPath);
     },
     onError: (err) => {
-      const message = err.message.startsWith("[")
-        ? "Could not submit this form. Please try again."
-        : err.message;
+      const raw = err.message.toLowerCase();
+      const isNetwork =
+        raw.includes("failed to fetch") ||
+        raw.includes("network") ||
+        raw.includes("timeout") ||
+        raw.includes("load failed") ||
+        raw.includes("waking up") ||
+        raw.includes("api unavailable");
+      const message = isNetwork
+        ? "Could not reach the server. Please wait a moment and try again."
+        : err.message.startsWith("[")
+          ? "Could not submit this form. Please try again."
+          : err.message;
       toast.error(message);
     },
   });
