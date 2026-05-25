@@ -763,6 +763,13 @@ html {
     max-height: calc(100vh - 28rem);
     min-height: 10rem;
   }
+  /* When inside a flex-1 container (sidebar mode), let flexbox control height */
+  .flex-1 > .analytics-scroll-panel--forms,
+  .analytics-scroll-panel--forms.flex-1 {
+    max-height: none;
+    min-height: 0;
+    height: 100%;
+  }
 }
 .analytics-scroll-panel--submissions {
   max-height: 13rem;
