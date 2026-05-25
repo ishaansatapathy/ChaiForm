@@ -46,7 +46,10 @@ async function fetchTrpcQuery<T>(
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const response = await fetch(url, {
-        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+        headers: {
+          "accept-encoding": "identity",
+          ...(cookieHeader ? { cookie: cookieHeader } : {}),
+        },
         cache: "no-store",
         signal: AbortSignal.timeout(25_000),
       });

@@ -24,22 +24,49 @@ import type { RouterOutputs } from "@repo/trpc/client";
 import { toast } from "sonner";
 
 type SubmissionItem = RouterOutputs["forms"]["listSubmissions"]["items"][number];
+type FormListItem = FormsListPage["items"][number];
+type SummaryData = RouterOutputs["analytics"]["summary"];
 
 const QUERY_OPTS = {
   retry: 2,
   staleTime: 30_000,
 } as const;
 
+function buildFallbackSummary(
+  forms: FormListItem[],
+  activeForm?: FormListItem,
+): SummaryData {
+  return {
+    totalForms: forms.length,
+    totalSubmissions: forms.reduce((sum, form) => sum + (form.submissionCount ?? 0), 0),
+    submissionsLast7Days: 0,
+    averageCompletionRate: 0,
+    selectedForm: activeForm
+      ? {
+          id: activeForm.id,
+          title: activeForm.title,
+          submissionCount: activeForm.submissionCount,
+          viewCount: activeForm.viewCount,
+          completionRate: activeForm.completionRate,
+          fieldCount: activeForm.fields.length,
+          visibility: activeForm.visibility,
+        }
+      : null,
+  };
+}
+
 type AnalyticsContentProps = {
   initialForms?: FormsListPage | null;
   initialFormId?: string;
   initialBundle?: AnalyticsBundle | null;
+  initialSummary?: SummaryData | null;
 };
 
 export default function AnalyticsContent({
   initialForms: initialFormsProp,
   initialFormId,
   initialBundle,
+  initialSummary,
 }: AnalyticsContentProps) {
   const { initialForms: contextForms } = useAppData();
   const initialForms = initialFormsProp ?? contextForms;
@@ -71,7 +98,10 @@ export default function AnalyticsContent({
   );
   const [apiForms, setApiForms] = useState<FormsListPage | null>(initialForms ?? null);
   const [apiBundle, setApiBundle] = useState<AnalyticsBundle | null>(initialBundle ?? null);
-  const [apiRefreshing, setApiRefreshing] = useState(false);
+  const [apiSummary, setApiSummary] = useState<SummaryData | null>(
+    initialSummary ?? initialBundle?.summary ?? null,
+  );
+  const [bundleRefreshing, setBundleRefreshing] = useState(false);
 
   const forms = apiForms?.items ?? formsPage?.items ?? initialForms?.items ?? [];
 
@@ -86,9 +116,14 @@ export default function AnalyticsContent({
   useEffect(() => {
     let cancelled = false;
     void fetch("/api/analytics", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data: { forms?: FormsListPage }) => {
-        if (!cancelled && data.forms) setApiForms(data.forms);
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json() as Promise<{ forms?: FormsListPage; summary?: SummaryData }>;
+      })
+      .then((data) => {
+        if (cancelled || !data) return;
+        if (data.forms) setApiForms(data.forms);
+        if (data.summary) setApiSummary(data.summary);
       })
       .catch(() => undefined);
     return () => {
@@ -99,19 +134,23 @@ export default function AnalyticsContent({
   useEffect(() => {
     if (!activeFormId) return;
     let cancelled = false;
-    setApiRefreshing(true);
+    setBundleRefreshing(true);
     void fetch(`/api/analytics?formId=${activeFormId}`, { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data: { bundle?: AnalyticsBundle }) => {
-        if (cancelled || !data.bundle) return;
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json() as Promise<{ bundle?: AnalyticsBundle }>;
+      })
+      .then((data) => {
+        if (cancelled || !data?.bundle) return;
         setApiBundle(data.bundle);
+        if (data.bundle.summary) setApiSummary(data.bundle.summary);
         if (data.bundle.submissions?.items && !submissionCursor && !submissionSearch.trim()) {
           setLoadedSubmissions(data.bundle.submissions.items);
         }
       })
       .catch(() => undefined)
       .finally(() => {
-        if (!cancelled) setApiRefreshing(false);
+        if (!cancelled) setBundleRefreshing(false);
       });
     return () => {
       cancelled = true;
@@ -207,7 +246,9 @@ export default function AnalyticsContent({
     );
   }, [submissionsPage, submissionCursor]);
 
-  const resolvedSummary = apiBundle?.summary ?? summary;
+  const activeForm = forms.find((form) => form.id === activeFormId);
+  const resolvedSummary =
+    apiBundle?.summary ?? apiSummary ?? summary ?? (forms.length > 0 ? buildFallbackSummary(forms, activeForm) : null);
   const resolvedOverTime = apiBundle?.overTime ?? overTime;
   const resolvedFormFields = apiBundle?.formFields ?? formFields;
   const resolvedActiveFieldId = selectedFieldId ?? resolvedFormFields?.fields[0]?.id;
@@ -219,12 +260,11 @@ export default function AnalyticsContent({
 
   const submissions = loadedSubmissions;
   const activeSubmissionId = selectedSubmissionId;
-  const activeForm = forms.find((form) => form.id === activeFormId);
 
-  const statsLoading =
-    apiRefreshing || formsLoading || (summaryLoading && !resolvedSummary && !apiBundle?.summary);
+  const statsLoading = formsLoading && forms.length === 0;
   const showSubmissionsLoading =
-    (submissionsLoading || apiRefreshing) && submissions.length === 0 && !submissionsError;
+    (submissionsLoading || bundleRefreshing) && submissions.length === 0 && !submissionsError;
+  const chartLoading = overTimeLoading && !resolvedOverTime && !summaryError;
 
   const handleExportCsv = async () => {
     if (!activeForm || !activeFormId) return;
@@ -288,9 +328,15 @@ export default function AnalyticsContent({
               void refetchSummary();
               if (activeFormId) {
                 void fetch(`/api/analytics?formId=${activeFormId}`, { cache: "no-store" })
-                  .then((response) => response.json())
-                  .then((data: { bundle?: AnalyticsBundle }) => {
-                    if (data.bundle) setApiBundle(data.bundle);
+                  .then(async (response) => {
+                    if (!response.ok) return null;
+                    return response.json() as Promise<{ bundle?: AnalyticsBundle }>;
+                  })
+                  .then((data) => {
+                    if (data?.bundle) {
+                      setApiBundle(data.bundle);
+                      if (data.bundle.summary) setApiSummary(data.bundle.summary);
+                    }
                   });
               }
             }}
@@ -327,12 +373,12 @@ export default function AnalyticsContent({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
         <aside className="min-w-0 space-y-4 lg:sticky lg:top-8 lg:self-start">
-          <div className="app-surface flex max-h-[min(280px,38vh)] min-h-0 flex-col rounded-3xl p-4">
-            <div className="mb-3 flex shrink-0 items-center justify-between gap-2 px-2">
+          <div className="app-surface rounded-3xl p-4">
+            <div className="mb-3 flex items-center justify-between gap-2 px-2">
               <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Forms</p>
               <span className="font-mono text-[9px] text-white/25">{forms.length}</span>
             </div>
-            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-color:rgba(255,255,255,0.15)_transparent] [scrollbar-width:thin]">
+            <div className="h-48 space-y-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-color:rgba(255,255,255,0.15)_transparent] [scrollbar-width:thin]">
               {forms.map((form) => (
                 <button
                   key={form.id}
@@ -357,8 +403,8 @@ export default function AnalyticsContent({
             </div>
           </div>
 
-          <div className="app-surface flex max-h-[min(320px,42vh)] min-h-0 flex-col rounded-3xl p-4">
-            <div className="mb-3 flex shrink-0 items-center justify-between gap-2 px-2">
+          <div className="app-surface rounded-3xl p-4">
+            <div className="mb-3 flex items-center justify-between gap-2 px-2">
               <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Submissions</p>
               <button
                 type="button"
@@ -373,9 +419,9 @@ export default function AnalyticsContent({
               value={submissionSearch}
               onChange={(e) => setSubmissionSearch(e.target.value)}
               placeholder="Filter by answer…"
-              className="mb-3 w-full shrink-0 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
+              className="mb-3 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
             />
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-color:rgba(255,255,255,0.15)_transparent] [scrollbar-width:thin]">
+            <div className="h-56 overflow-y-auto overscroll-contain pr-1 [scrollbar-color:rgba(255,255,255,0.15)_transparent] [scrollbar-width:thin]">
             {showSubmissionsLoading ? (
               <p className="px-2 text-sm text-white/40">Loading…</p>
             ) : submissionsError && submissions.length === 0 ? (
@@ -436,7 +482,7 @@ export default function AnalyticsContent({
           <div className="app-surface rounded-3xl p-6">
             <h3 className="font-display mb-4 text-lg font-bold text-white">Submissions over time</h3>
             <div className="h-56">
-              {!chartsMounted || (overTimeLoading && !resolvedOverTime) ? (
+              {!chartsMounted || chartLoading ? (
                 <ChartSkeleton />
               ) : resolvedOverTime && resolvedOverTime.points.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
