@@ -42,7 +42,8 @@ export default function DashboardPage() {
   const forms = formsPage?.items ?? initialForms?.items ?? [];
   const serverFormCount = analytics?.totalForms ?? initialAnalytics?.totalForms ?? 0;
   const formsCount = Math.max(serverFormCount, forms.length);
-  const listFailedButFormsExist = isError && forms.length === 0 && serverFormCount > 0;
+  const listFailedButFormsExist =
+    forms.length === 0 && (isError || serverFormCount > 0 || totalResponses > 0);
   const publishedCount = forms.filter((f) => f.visibility !== "draft").length;
   const totalResponses = analytics?.totalSubmissions ?? initialAnalytics?.totalSubmissions ?? 0;
   const loadingForms = isLoading && forms.length === 0 && !isError;
@@ -109,8 +110,13 @@ export default function DashboardPage() {
         {listFailedButFormsExist ? (
           <div className="app-surface mb-6 rounded-3xl border border-amber-400/20 p-5">
             <p className="text-sm text-amber-200/90">
-              Your forms are still in the database ({serverFormCount} found), but the list could not load.
-              This usually means the production database migration has not run yet.
+              {serverFormCount > 0
+                ? `Your forms are still in the database (${serverFormCount} found), but the list could not load.`
+                : totalResponses > 0
+                  ? `You have ${totalResponses} response(s), but the forms list could not load.`
+                  : "The forms list could not load."}{" "}
+              Redeploy Railway so migrations run on startup, or run{" "}
+              <span className="font-mono text-amber-100/80">pnpm db:migrate</span> on Neon.
             </p>
             <button
               type="button"

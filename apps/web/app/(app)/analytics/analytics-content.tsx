@@ -393,19 +393,30 @@ export default function AnalyticsContent({
   if (forms.length === 0) {
     const serverFormCount =
       resolvedSummary?.totalForms ?? apiSummary?.totalForms ?? initialSummary?.totalForms ?? 0;
-    const listFailedButFormsExist = formsListError && serverFormCount > 0;
+    const serverSubmissionCount =
+      resolvedSummary?.totalSubmissions ??
+      apiSummary?.totalSubmissions ??
+      initialSummary?.totalSubmissions ??
+      0;
+    const listBroken =
+      formsListError || serverFormCount > 0 || serverSubmissionCount > 0;
 
     return (
       <section className="py-4">
         <Header />
         <div className="text-center">
-          {listFailedButFormsExist ? (
+          {listBroken ? (
             <>
               <p className="text-white/70">
-                Found {serverFormCount} form(s) in the database, but the list could not load.
+                {serverFormCount > 0
+                  ? `Found ${serverFormCount} form(s) in the database, but the list could not load.`
+                  : serverSubmissionCount > 0
+                    ? `Found ${serverSubmissionCount} response(s), but your forms list could not load.`
+                    : "Could not load your forms list."}
               </p>
               <p className="mt-2 text-sm text-white/45">
-                Run production DB migrations (`pnpm db:migrate`) then refresh this page.
+                The API needs a database update. Redeploy Railway (migrations run on startup) or run{" "}
+                <span className="font-mono text-white/60">pnpm db:migrate</span> on Neon, then refresh.
               </p>
             </>
           ) : (
