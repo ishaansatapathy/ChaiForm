@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 import { usersTable } from "./user";
 
@@ -19,6 +19,8 @@ export const formsTable = pgTable("forms", {
   theme: varchar("theme", { length: 30 }).$type<FormTheme>().default("default").notNull(),
   slug: varchar("slug", { length: 80 }),
   viewCount: integer("view_count").default(0).notNull(),
+  expiresAt: timestamp("expires_at"),
+  allowMultipleSubmissions: boolean("allow_multiple_submissions").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
 });

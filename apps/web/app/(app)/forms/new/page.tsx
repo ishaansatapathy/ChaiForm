@@ -8,7 +8,10 @@ import { toast } from "sonner";
 import { FormBuilderFields, type DraftField } from "~/components/forms/form-builder-fields";
 import { FormBuilderPreview } from "~/components/forms/form-builder-preview";
 import { FormThemePicker } from "~/components/forms/form-theme-picker";
+import { FormRetentionPicker } from "~/components/app/form-retention-picker";
+import { AllowMultipleResponsesToggle } from "~/components/app/allow-multiple-responses-toggle";
 import { Highlight } from "~/components/app/highlight";
+import type { FormRetentionOption } from "~/lib/form-retention";
 import { FORM_TEMPLATES } from "~/lib/form-templates";
 import type { FormThemeId } from "~/lib/form-themes";
 import { getSaveErrorMessage, saveFormWithColdStart } from "~/lib/save-form";
@@ -35,6 +38,8 @@ export default function CreateFormPage() {
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"public" | "unlisted" | "draft">("public");
   const [theme, setTheme] = useState<FormThemeId>("default");
+  const [retention, setRetention] = useState<FormRetentionOption>("forever");
+  const [allowMultipleSubmissions, setAllowMultipleSubmissions] = useState(true);
   const [fields, setFields] = useState<DraftField[]>(createInitialDraftFields);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
 
@@ -67,6 +72,8 @@ export default function CreateFormPage() {
       description: description.trim() || undefined,
       visibility,
       theme,
+      retention,
+      allowMultipleSubmissions,
       fields: fields as CreateFormFields,
     };
 
@@ -141,6 +148,15 @@ export default function CreateFormPage() {
               <option value="unlisted">Unlisted — link only</option>
               <option value="draft">Private — hidden from respondents</option>
             </select>
+            <div className="mb-6">
+              <FormRetentionPicker value={retention} onChange={setRetention} />
+            </div>
+            <div className="mb-6">
+              <AllowMultipleResponsesToggle
+                value={allowMultipleSubmissions}
+                onChange={setAllowMultipleSubmissions}
+              />
+            </div>
             <button
               type="button"
               onClick={handlePublish}

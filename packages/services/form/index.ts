@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, db, desc, eq, lt, sql } from "@repo/database";
+import { and, asc, db, desc, eq, gt, isNotNull, isNull, lt, or, sql } from "@repo/database";
 import {
   formFieldsTable,
   formsTable,
@@ -19,7 +19,8 @@ import type {
   UpdateFormInput,
 } from "./model";
 import { createUniqueSlug } from "./slug";
-import { notifyCreatorOfSubmission } from "./notifications";
+import { notifyCreatorOfFormDeletion, notifyCreatorOfSubmission } from "./notifications";
+import { expiresAtFromRetention, isFormExpired } from "./retention";
 import { validateSubmissionAnswers } from "./validation";
 
 export class FormError extends Error {
@@ -160,9 +161,52 @@ class FormService {
       submissionCount,
       viewCount: row.viewCount ?? 0,
       completionRate: completionRate(submissionCount, row.viewCount ?? 0),
+      allowMultipleSubmissions: row.allowMultipleSubmissions ?? true,
+      expiresAt: toIso(row.expiresAt),
       createdAt: toIso(row.createdAt),
       updatedAt: toIso(row.updatedAt),
     };
+  }
+
+  private assertFormAvailable(row: typeof formsTable.$inferSelect) {
+    if (row.visibility === "draft") {
+      throw new FormError("NOT_FOUND", "Form not available");
+    }
+    if (isFormExpired(row.expiresAt)) {
+      throw new FormError("NOT_FOUND", "This form has expired and is no longer accepting responses.");
+    }
+  }
+
+  private async purgeExpiredForms() {
+    const now = new Date();
+    const expiredRows = await db
+      .select({
+        form: formsTable,
+        submissionCount: sql<number>`count(${submissionsTable.id})::int`,
+      })
+      .from(formsTable)
+      .leftJoin(submissionsTable, eq(submissionsTable.formId, formsTable.id))
+      .where(and(isNotNull(formsTable.expiresAt), lt(formsTable.expiresAt, now)))
+      .groupBy(formsTable.id);
+
+    if (expiredRows.length === 0) return 0;
+
+    for (const row of expiredRows) {
+      void notifyCreatorOfFormDeletion({
+        ownerUserId: row.form.userId,
+        formTitle: row.form.title,
+        formId: row.form.id,
+        submissionCount: row.submissionCount ?? 0,
+        reason: "expired",
+        expiredAt: row.form.expiresAt,
+      }).catch(() => undefined);
+    }
+
+    await db
+      .delete(formsTable)
+      .where(and(isNotNull(formsTable.expiresAt), lt(formsTable.expiresAt, now)));
+
+    return expiredRows.length;
   }
 
   async createForm(userId: string, input: CreateFormInput) {
@@ -179,6 +223,8 @@ class FormService {
         theme: input.theme ?? "default",
         slug,
         viewCount: 0,
+        expiresAt: expiresAtFromRetention(input.retention ?? "forever"),
+        allowMultipleSubmissions: input.allowMultipleSubmissions ?? true,
       })
       .returning();
 
@@ -207,6 +253,12 @@ class FormService {
           visibility: input.visibility ?? existing.visibility,
           theme: input.theme ?? existing.theme ?? "default",
           slug,
+          expiresAt:
+            input.retention !== undefined
+              ? expiresAtFromRetention(input.retention)
+              : existing.expiresAt,
+          allowMultipleSubmissions:
+            input.allowMultipleSubmissions ?? existing.allowMultipleSubmissions ?? true,
           updatedAt: new Date(),
         })
         .where(eq(formsTable.id, input.formId))
@@ -243,7 +295,21 @@ class FormService {
   }
 
   async deleteForm(userId: string, formId: string) {
-    await this.getOwnedForm(userId, formId);
+    const row = await this.getOwnedForm(userId, formId);
+
+    const [countRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(submissionsTable)
+      .where(eq(submissionsTable.formId, formId));
+
+    void notifyCreatorOfFormDeletion({
+      ownerUserId: row.userId,
+      formTitle: row.title,
+      formId: row.id,
+      submissionCount: countRow?.count ?? 0,
+      reason: "manual",
+    }).catch(() => undefined);
+
     await db.delete(formsTable).where(eq(formsTable.id, formId));
     return { success: true as const };
   }
@@ -260,6 +326,8 @@ class FormService {
   }
 
   async listForms(userId: string, pagination: PaginationInput = { limit: 20 }) {
+    await this.purgeExpiredForms();
+
     const limit = pagination.limit ?? 20;
 
     const conditions = [eq(formsTable.userId, userId)];
@@ -299,10 +367,11 @@ class FormService {
   }
 
   async recordView(formId: string) {
+    await this.purgeExpiredForms();
+
     const [row] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
-    if (!row || row.visibility === "draft") {
-      throw new FormError("NOT_FOUND", "Form not found");
-    }
+    if (!row) throw new FormError("NOT_FOUND", "Form not found");
+    this.assertFormAvailable(row);
 
     await db
       .update(formsTable)
@@ -312,10 +381,65 @@ class FormService {
     return { success: true as const };
   }
 
+  private async findExistingSubmission(
+    formId: string,
+    respondentKey: string | undefined,
+    emailFieldIds: string[],
+    emailValue: string | undefined,
+  ) {
+    if (respondentKey) {
+      const [byKey] = await db
+        .select({ id: submissionsTable.id })
+        .from(submissionsTable)
+        .where(and(eq(submissionsTable.formId, formId), eq(submissionsTable.respondentKey, respondentKey)))
+        .limit(1);
+      if (byKey) return byKey;
+    }
+
+    const normalizedEmail = emailValue?.trim().toLowerCase();
+    if (normalizedEmail && emailFieldIds.length > 0) {
+      for (const fieldId of emailFieldIds) {
+        const [byEmail] = await db
+          .select({ id: submissionsTable.id })
+          .from(submissionsTable)
+          .innerJoin(
+            submissionResponsesTable,
+            eq(submissionResponsesTable.submissionId, submissionsTable.id),
+          )
+          .where(
+            and(
+              eq(submissionsTable.formId, formId),
+              eq(submissionResponsesTable.fieldId, fieldId),
+              sql`lower(${submissionResponsesTable.value}) = ${normalizedEmail}`,
+            ),
+          )
+          .limit(1);
+        if (byEmail) return byEmail;
+      }
+    }
+
+    return null;
+  }
+
+  async hasSubmitted(formId: string, respondentKey: string) {
+    await this.purgeExpiredForms();
+
+    const [formRow] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    if (!formRow) throw new FormError("NOT_FOUND", "Form not found");
+    if (formRow.allowMultipleSubmissions) {
+      return { submitted: false as const };
+    }
+
+    const existing = await this.findExistingSubmission(formId, respondentKey, [], undefined);
+    return { submitted: Boolean(existing) };
+  }
+
   async getPublicForm(formId: string) {
+    await this.purgeExpiredForms();
+
     const [row] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
-    if (row.visibility === "draft") throw new FormError("NOT_FOUND", "Form not available");
+    this.assertFormAvailable(row);
 
     const fields = await this.loadFields(row.id);
 
@@ -325,11 +449,14 @@ class FormService {
       title: row.title,
       description: row.description ?? null,
       theme: row.theme ?? "default",
+      allowMultipleSubmissions: row.allowMultipleSubmissions ?? true,
       fields,
     };
   }
 
   async getPublicFormBySlug(slug: string) {
+    await this.purgeExpiredForms();
+
     const normalizedSlug = slug.trim().toLowerCase();
     if (!normalizedSlug) throw new FormError("NOT_FOUND", "Form not found");
 
@@ -339,7 +466,7 @@ class FormService {
       .where(sql`lower(${formsTable.slug}) = ${normalizedSlug}`)
       .limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
-    if (row.visibility === "draft") throw new FormError("NOT_FOUND", "Form not available");
+    this.assertFormAvailable(row);
 
     const fields = await this.loadFields(row.id);
 
@@ -349,14 +476,20 @@ class FormService {
       title: row.title,
       description: row.description ?? null,
       theme: row.theme ?? "default",
+      allowMultipleSubmissions: row.allowMultipleSubmissions ?? true,
       fields,
     };
   }
 
   async listPublicForms(pagination: PaginationInput = { limit: 20 }) {
+    await this.purgeExpiredForms();
+
     const limit = pagination.limit ?? 20;
 
-    const conditions = [eq(formsTable.visibility, "public")];
+    const conditions = [
+      eq(formsTable.visibility, "public"),
+      or(isNull(formsTable.expiresAt), gt(formsTable.expiresAt, new Date())),
+    ];
     if (pagination.cursor) {
       const [cursorRow] = await db
         .select({ createdAt: formsTable.createdAt })
@@ -412,10 +545,11 @@ class FormService {
       throw new FormError("BAD_REQUEST", "Submission rejected");
     }
 
+    await this.purgeExpiredForms();
+
     const [formRow] = await db.select().from(formsTable).where(eq(formsTable.id, input.formId)).limit(1);
-    if (!formRow || formRow.visibility === "draft") {
-      throw new FormError("NOT_FOUND", "Form not found");
-    }
+    if (!formRow) throw new FormError("NOT_FOUND", "Form not found");
+    this.assertFormAvailable(formRow);
 
     const form = await this.getPublicForm(input.formId);
     let validated: Record<string, string>;
@@ -433,11 +567,40 @@ class FormService {
       value: validated[field.id] ?? "",
     }));
 
+    if (!formRow.allowMultipleSubmissions) {
+      if (!input.respondentKey || !isUuid(input.respondentKey)) {
+        throw new FormError(
+          "BAD_REQUEST",
+          "This form only accepts one response per person. Refresh the page and try again.",
+        );
+      }
+
+      const emailFieldIds = form.fields.filter((field) => field.type === "email").map((field) => field.id);
+      const emailValue = emailFieldIds
+        .map((fieldId) => validated[fieldId])
+        .find((value) => (value ?? "").trim().length > 0);
+
+      const existing = await this.findExistingSubmission(
+        form.id,
+        input.respondentKey,
+        emailFieldIds,
+        emailValue,
+      );
+
+      if (existing) {
+        throw new FormError(
+          "BAD_REQUEST",
+          "You have already submitted this form. Contact the form owner if you need to send another response.",
+        );
+      }
+    }
+
     const [created] = await db.transaction(async (tx) => {
       const [submission] = await tx
         .insert(submissionsTable)
         .values({
           formId: form.id,
+          respondentKey: input.respondentKey ?? null,
           answers,
         })
         .returning();
