@@ -16,8 +16,12 @@ export const createTRPCHttpBatchClientClient = (opts?: CreateTRPCHttpBatchClient
           ? AbortSignal.any([options.signal, timeoutSignal])
           : timeoutSignal;
 
+      const headers = new Headers(options?.headers);
+      headers.set("Accept-Encoding", "identity");
+
       return fetch(url, {
         ...options,
+        headers,
         credentials: "include",
         signal,
       });

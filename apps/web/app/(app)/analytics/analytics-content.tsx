@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Bar,
@@ -32,6 +32,8 @@ const QUERY_OPTS = {
   retry: 2,
   staleTime: 30_000,
 } as const;
+
+const FORMS_PER_PAGE = 6;
 
 function buildOverTimeFromSubmissions(
   items: { submittedAt: string | null }[],
@@ -133,8 +135,63 @@ export default function AnalyticsContent({
   const [apiSummary, setApiSummary] = useState<SummaryData | null>(
     initialSummary ?? initialBundle?.summary ?? null,
   );
+  const [formsListPage, setFormsListPage] = useState(0);
+  const [formBundleLoading, setFormBundleLoading] = useState(false);
 
   const forms = apiForms?.items ?? formsPage?.items ?? initialForms?.items ?? [];
+
+  const loadFormBundle = useCallback(
+    async (formId: string) => {
+      setFormBundleLoading(true);
+      try {
+        const response = await fetch(`/api/analytics?formId=${formId}`, { cache: "no-store" });
+        if (response.ok) {
+          const data = (await response.json()) as { bundle?: AnalyticsBundle };
+          if (data.bundle) {
+            setApiBundle(data.bundle);
+            setBundleFormId(formId);
+            if (data.bundle.summary) setApiSummary(data.bundle.summary);
+            if (data.bundle.submissions?.items) {
+              setLoadedSubmissions(data.bundle.submissions.items);
+            }
+            return;
+          }
+        }
+
+        const [summaryRes, overTimeRes, fieldsRes, subsRes, allSubsRes] = await Promise.all([
+          utils.analytics.summary.fetch({ formId }).catch(() => null),
+          utils.analytics.submissionsOverTime.fetch({ formId, days: 30 }).catch(() => null),
+          utils.analytics.listFormFields.fetch({ formId }).catch(() => null),
+          utils.forms.listSubmissions.fetch({ formId, limit: 15 }).catch(() => null),
+          utils.forms.listSubmissions.fetch({ formId, limit: 100 }).catch(() => null),
+        ]);
+
+        const firstFieldId = fieldsRes?.fields[0]?.id;
+        const breakdownRes = firstFieldId
+          ? await utils.analytics.fieldBreakdown
+              .fetch({ formId, fieldId: firstFieldId })
+              .catch(() => null)
+          : null;
+
+        setApiBundle({
+          summary: summaryRes,
+          overTime: overTimeRes,
+          formFields: fieldsRes,
+          fieldBreakdown: breakdownRes,
+          submissions: subsRes,
+          allSubmissions: allSubsRes,
+        });
+        setBundleFormId(formId);
+        if (summaryRes) setApiSummary(summaryRes);
+        if (subsRes?.items) setLoadedSubmissions(subsRes.items);
+      } catch {
+        toast.error("Could not load analytics for this form");
+      } finally {
+        setFormBundleLoading(false);
+      }
+    },
+    [utils],
+  );
 
   const activeFormId = selectedFormId ?? forms[0]?.id;
   const isInitialForm = activeFormId === initialFormId && !submissionCursor && !submissionSearch.trim();
@@ -170,26 +227,16 @@ export default function AnalyticsContent({
 
   useEffect(() => {
     if (!activeFormId) return;
-    let cancelled = false;
-    void fetch(`/api/analytics?formId=${activeFormId}`, { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return response.json() as Promise<{ bundle?: AnalyticsBundle }>;
-      })
-      .then((data) => {
-        if (cancelled || !data?.bundle) return;
-        setApiBundle(data.bundle);
-        setBundleFormId(activeFormId);
-        if (data.bundle.summary) setApiSummary(data.bundle.summary);
-        if (data.bundle.submissions?.items && !submissionCursor && !submissionSearch.trim()) {
-          setLoadedSubmissions(data.bundle.submissions.items);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [activeFormId, submissionCursor, submissionSearch]);
+    void loadFormBundle(activeFormId);
+  }, [activeFormId, loadFormBundle]);
+
+  useEffect(() => {
+    if (!activeFormId || forms.length === 0) return;
+    const index = forms.findIndex((form) => form.id === activeFormId);
+    if (index >= 0) {
+      setFormsListPage(Math.floor(index / FORMS_PER_PAGE));
+    }
+  }, [activeFormId, forms]);
 
   const {
     data: summary,
@@ -315,8 +362,15 @@ export default function AnalyticsContent({
   const statsLoading = formsLoading && forms.length === 0;
   const showSubmissionsLoading =
     submissionsLoading && submissions.length === 0 && !submissionsError;
-  const chartLoading = overTimeLoading && !resolvedOverTime;
+  const chartLoading = (overTimeLoading || formBundleLoading) && !resolvedOverTime;
   const chartHasData = resolvedOverTime ? chartHasActivity(resolvedOverTime.points) : false;
+
+  const totalFormPages = Math.max(1, Math.ceil(forms.length / FORMS_PER_PAGE));
+  const safeFormsPage = Math.min(formsListPage, totalFormPages - 1);
+  const visibleForms = forms.slice(
+    safeFormsPage * FORMS_PER_PAGE,
+    safeFormsPage * FORMS_PER_PAGE + FORMS_PER_PAGE,
+  );
 
   const handleExportCsv = async () => {
     if (!activeForm || !activeFormId) return;
@@ -378,20 +432,7 @@ export default function AnalyticsContent({
             type="button"
             onClick={() => {
               void refetchSummary();
-              if (activeFormId) {
-                void fetch(`/api/analytics?formId=${activeFormId}`, { cache: "no-store" })
-                  .then(async (response) => {
-                    if (!response.ok) return null;
-                    return response.json() as Promise<{ bundle?: AnalyticsBundle }>;
-                  })
-                  .then((data) => {
-                    if (data?.bundle) {
-                      setApiBundle(data.bundle);
-                      setBundleFormId(activeFormId);
-                      if (data.bundle.summary) setApiSummary(data.bundle.summary);
-                    }
-                  });
-              }
+              void loadFormBundle(activeFormId);
             }}
             className="btn-omni font-display mt-4 inline-flex rounded-xl px-5 py-2 text-xs font-black tracking-wide uppercase"
           >
@@ -429,19 +470,25 @@ export default function AnalyticsContent({
           <div className="app-surface rounded-3xl p-4">
             <div className="mb-3 flex items-center justify-between gap-2 px-2">
               <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Forms</p>
-              <span className="font-mono text-[9px] text-white/25">{forms.length}</span>
+              <span className="font-mono text-[9px] text-white/25">
+                {forms.length} · p{safeFormsPage + 1}/{totalFormPages}
+              </span>
             </div>
-            <div className="analytics-scroll-panel space-y-1 pr-1">
-              {forms.map((form) => (
+            <div
+              className="analytics-scroll-panel space-y-1 pr-1"
+              style={{ height: "11rem", maxHeight: "11rem", overflowY: "scroll" }}
+            >
+              {visibleForms.map((form) => (
                 <button
                   key={form.id}
                   type="button"
+                  disabled={formBundleLoading && form.id === activeFormId}
                   onClick={() => {
                     setSelectedFormId(form.id);
                     setSelectedSubmissionId(undefined);
                     setSelectedFieldId(undefined);
                   }}
-                  className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
+                  className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-60 ${
                     form.id === activeFormId
                       ? "bg-lime-400/10 text-lime-400"
                       : "text-white/45 hover:bg-white/5 hover:text-white"
@@ -453,10 +500,36 @@ export default function AnalyticsContent({
                     {form.createdAt
                       ? ` · ${new Date(form.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
                       : ""}
+                    {formBundleLoading && form.id === activeFormId ? " · loading…" : ""}
                   </span>
                 </button>
               ))}
             </div>
+            {totalFormPages > 1 ? (
+              <div className="mt-3 flex items-center justify-between gap-2 px-1">
+                <button
+                  type="button"
+                  disabled={safeFormsPage === 0}
+                  onClick={() => setFormsListPage((page) => Math.max(0, page - 1))}
+                  className="rounded-lg border border-white/10 px-2 py-1 font-mono text-[9px] tracking-wider text-white/45 uppercase transition-colors hover:border-lime-400/30 hover:text-lime-400 disabled:opacity-30"
+                >
+                  Prev
+                </button>
+                <span className="font-mono text-[9px] text-white/30">
+                  {safeFormsPage + 1} / {totalFormPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={safeFormsPage >= totalFormPages - 1}
+                  onClick={() =>
+                    setFormsListPage((page) => Math.min(totalFormPages - 1, page + 1))
+                  }
+                  className="rounded-lg border border-white/10 px-2 py-1 font-mono text-[9px] tracking-wider text-white/45 uppercase transition-colors hover:border-lime-400/30 hover:text-lime-400 disabled:opacity-30"
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="app-surface rounded-3xl p-4">
