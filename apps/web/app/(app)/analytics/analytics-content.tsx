@@ -61,7 +61,6 @@ export default function AnalyticsContent({
     },
   );
 
-  const forms = formsPage?.items ?? initialForms?.items ?? [];
   const [selectedFormId, setSelectedFormId] = useState<string | undefined>(initialFormId);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | undefined>();
   const [selectedFieldId, setSelectedFieldId] = useState<string | undefined>();
@@ -70,21 +69,54 @@ export default function AnalyticsContent({
   const [loadedSubmissions, setLoadedSubmissions] = useState<SubmissionItem[]>(
     initialBundle?.submissions?.items ?? [],
   );
+  const [apiForms, setApiForms] = useState<FormsListPage | null>(initialForms ?? null);
+  const [apiBundle, setApiBundle] = useState<AnalyticsBundle | null>(initialBundle ?? null);
+  const [apiRefreshing, setApiRefreshing] = useState(false);
+
+  const forms = apiForms?.items ?? formsPage?.items ?? initialForms?.items ?? [];
 
   const activeFormId = selectedFormId ?? forms[0]?.id;
   const isInitialForm = activeFormId === initialFormId && !submissionCursor && !submissionSearch.trim();
 
   useEffect(() => {
     setSubmissionCursor(undefined);
-    setLoadedSubmissions([]);
     setSelectedSubmissionId(undefined);
   }, [activeFormId, submissionSearch]);
 
   useEffect(() => {
-    if (isInitialForm && initialBundle?.submissions?.items) {
-      setLoadedSubmissions(initialBundle.submissions.items);
-    }
-  }, [isInitialForm, initialBundle?.submissions?.items]);
+    let cancelled = false;
+    void fetch("/api/analytics", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data: { forms?: FormsListPage }) => {
+        if (!cancelled && data.forms) setApiForms(data.forms);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeFormId) return;
+    let cancelled = false;
+    setApiRefreshing(true);
+    void fetch(`/api/analytics?formId=${activeFormId}`, { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data: { bundle?: AnalyticsBundle }) => {
+        if (cancelled || !data.bundle) return;
+        setApiBundle(data.bundle);
+        if (data.bundle.submissions?.items && !submissionCursor && !submissionSearch.trim()) {
+          setLoadedSubmissions(data.bundle.submissions.items);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setApiRefreshing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFormId, submissionCursor, submissionSearch]);
 
   const {
     data: summary,
@@ -166,7 +198,7 @@ export default function AnalyticsContent({
       ...QUERY_OPTS,
     },
   );
-  const allSubmissions = allSubmissionsPage?.items ?? initialBundle?.allSubmissions?.items ?? [];
+  const allSubmissions = allSubmissionsPage?.items ?? apiBundle?.allSubmissions?.items ?? initialBundle?.allSubmissions?.items ?? [];
 
   useEffect(() => {
     if (!submissionsPage) return;
@@ -175,12 +207,24 @@ export default function AnalyticsContent({
     );
   }, [submissionsPage, submissionCursor]);
 
+  const resolvedSummary = apiBundle?.summary ?? summary;
+  const resolvedOverTime = apiBundle?.overTime ?? overTime;
+  const resolvedFormFields = apiBundle?.formFields ?? formFields;
+  const resolvedActiveFieldId = selectedFieldId ?? resolvedFormFields?.fields[0]?.id;
+  const apiFieldBreakdown =
+    apiBundle?.fieldBreakdown?.fieldId === resolvedActiveFieldId
+      ? apiBundle?.fieldBreakdown
+      : undefined;
+  const resolvedFieldBreakdown = apiFieldBreakdown ?? fieldBreakdown;
+
   const submissions = loadedSubmissions;
   const activeSubmissionId = selectedSubmissionId;
   const activeForm = forms.find((form) => form.id === activeFormId);
 
-  const statsLoading = formsLoading || (summaryLoading && !summary);
-  const showSubmissionsLoading = submissionsLoading && submissions.length === 0 && !submissionsError;
+  const statsLoading =
+    apiRefreshing || formsLoading || (summaryLoading && !resolvedSummary && !apiBundle?.summary);
+  const showSubmissionsLoading =
+    (submissionsLoading || apiRefreshing) && submissions.length === 0 && !submissionsError;
 
   const handleExportCsv = async () => {
     if (!activeForm || !activeFormId) return;
@@ -235,12 +279,21 @@ export default function AnalyticsContent({
     <section className="py-4">
       <Header />
 
-      {summaryError && !summary ? (
+      {summaryError && !resolvedSummary ? (
         <div className="app-surface mb-8 rounded-2xl border border-red-400/20 p-5 text-center">
           <p className="text-sm text-white/70">Could not load analytics summary.</p>
           <button
             type="button"
-            onClick={() => refetchSummary()}
+            onClick={() => {
+              void refetchSummary();
+              if (activeFormId) {
+                void fetch(`/api/analytics?formId=${activeFormId}`, { cache: "no-store" })
+                  .then((response) => response.json())
+                  .then((data: { bundle?: AnalyticsBundle }) => {
+                    if (data.bundle) setApiBundle(data.bundle);
+                  });
+              }
+            }}
             className="btn-omni font-display mt-4 inline-flex rounded-xl px-5 py-2 text-xs font-black tracking-wide uppercase"
           >
             Retry
@@ -248,31 +301,35 @@ export default function AnalyticsContent({
         </div>
       ) : (
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Total forms" value={summary?.totalForms ?? 0} loading={statsLoading} />
+          <StatCard label="Total forms" value={resolvedSummary?.totalForms ?? 0} loading={statsLoading} />
           <StatCard
             label="Total responses"
-            value={summary?.totalSubmissions ?? activeForm?.submissionCount ?? 0}
+            value={resolvedSummary?.totalSubmissions ?? activeForm?.submissionCount ?? 0}
             loading={statsLoading}
           />
           <StatCard
             label="Last 7 days"
-            value={summary?.submissionsLast7Days ?? 0}
+            value={resolvedSummary?.submissionsLast7Days ?? 0}
             loading={statsLoading}
           />
           <StatCard
             label="Completion rate"
-            value={summary?.selectedForm?.completionRate ?? summary?.averageCompletionRate ?? 0}
+            value={
+              resolvedSummary?.selectedForm?.completionRate ??
+              resolvedSummary?.averageCompletionRate ??
+              0
+            }
             suffix="%"
             loading={statsLoading}
           />
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <aside className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-8 lg:self-start">
           <div className="app-surface rounded-3xl p-4">
             <p className="font-mono mb-3 px-2 text-[9px] tracking-[0.3em] text-white/35 uppercase">Forms</p>
-            <div className="space-y-1">
+            <div className="max-h-60 space-y-1 overflow-y-auto overscroll-contain">
               {forms.map((form) => (
                 <button
                   key={form.id}
@@ -288,7 +345,7 @@ export default function AnalyticsContent({
                       : "text-white/45 hover:bg-white/5 hover:text-white"
                   }`}
                 >
-                  {form.title}
+                  <span className="block truncate">{form.title}</span>
                   <span className="mt-0.5 block font-mono text-[9px] text-white/30">
                     {form.submissionCount} responses
                   </span>
@@ -374,11 +431,11 @@ export default function AnalyticsContent({
           <div className="app-surface rounded-3xl p-6">
             <h3 className="font-display mb-4 text-lg font-bold text-white">Submissions over time</h3>
             <div className="h-56">
-              {!chartsMounted || (overTimeLoading && !overTime) ? (
+              {!chartsMounted || (overTimeLoading && !resolvedOverTime) ? (
                 <ChartSkeleton />
-              ) : overTime && overTime.points.length > 0 ? (
+              ) : resolvedOverTime && resolvedOverTime.points.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={overTime.points}>
+                  <LineChart data={resolvedOverTime.points}>
                     <CartesianGrid stroke="rgba(255,255,255,0.06)" />
                     <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} />
                     <YAxis allowDecimals={false} tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} />
@@ -397,16 +454,16 @@ export default function AnalyticsContent({
             </div>
           </div>
 
-          {formFields && formFields.fields.length > 0 && (
+          {resolvedFormFields && resolvedFormFields.fields.length > 0 && (
             <div className="app-surface rounded-3xl p-6">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h3 className="font-display text-lg font-bold text-white">Field breakdown</h3>
                 <select
-                  value={activeFieldId ?? ""}
+                  value={resolvedActiveFieldId ?? ""}
                   onChange={(e) => setSelectedFieldId(e.target.value)}
                   className="form-select rounded-xl border border-white/10 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none"
                 >
-                  {formFields.fields.map((field) => (
+                  {resolvedFormFields.fields.map((field) => (
                     <option key={field.id} value={field.id}>
                       {field.label}
                     </option>
@@ -415,9 +472,9 @@ export default function AnalyticsContent({
               </div>
 
               <div className="min-h-56">
-              {!chartsMounted || (fieldBreakdownLoading && !fieldBreakdown) ? (
+              {!chartsMounted || (fieldBreakdownLoading && !resolvedFieldBreakdown) ? (
                 <ChartSkeleton />
-              ) : fieldBreakdownError && !fieldBreakdown ? (
+              ) : fieldBreakdownError && !resolvedFieldBreakdown ? (
                 <div className="text-center">
                   <p className="text-sm text-white/50">Could not load field breakdown.</p>
                   <button
@@ -428,19 +485,19 @@ export default function AnalyticsContent({
                     Retry
                   </button>
                 </div>
-              ) : fieldBreakdown ? (
+              ) : resolvedFieldBreakdown ? (
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-4 text-sm text-white/50">
-                    <span>{fieldBreakdown.totalResponses} responses</span>
-                    {fieldBreakdown.averageRating !== null && (
-                      <span>Avg rating: {fieldBreakdown.averageRating}</span>
+                    <span>{resolvedFieldBreakdown.totalResponses} responses</span>
+                    {resolvedFieldBreakdown.averageRating !== null && (
+                      <span>Avg rating: {resolvedFieldBreakdown.averageRating}</span>
                     )}
                   </div>
 
-                  {fieldBreakdown.optionCounts.length > 0 ? (
+                  {resolvedFieldBreakdown.optionCounts.length > 0 ? (
                     <div className="h-56">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={fieldBreakdown.optionCounts.slice(0, 12)}>
+                        <BarChart data={resolvedFieldBreakdown.optionCounts.slice(0, 12)}>
                           <CartesianGrid stroke="rgba(255,255,255,0.06)" />
                           <XAxis dataKey="option" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} />
                           <YAxis allowDecimals={false} tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} />
@@ -451,10 +508,10 @@ export default function AnalyticsContent({
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
-                  ) : fieldBreakdown.recentValues.length > 0 ? (
+                  ) : resolvedFieldBreakdown.recentValues.length > 0 ? (
                     <div className="space-y-2">
                       <p className="text-xs text-white/40">Recent answers</p>
-                      {fieldBreakdown.recentValues.map((value, index) => (
+                      {resolvedFieldBreakdown.recentValues.map((value, index) => (
                         <div
                           key={`${value}-${index}`}
                           className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75"
@@ -495,14 +552,16 @@ export default function AnalyticsContent({
         </div>
       </div>
 
-      {allSubmissions.length > 0 && formFields && (
+      {allSubmissions.length > 0 && resolvedFormFields && (
         <div className="mt-8">
           <AnalyticsDetailPanel
             key={activeFormId}
             formTitle={activeForm?.title ?? "Form"}
-            fields={formFields.fields}
+            fields={resolvedFormFields.fields}
             submissions={allSubmissions}
-            allSubmissionsCount={summary?.selectedForm?.submissionCount ?? allSubmissions.length}
+            allSubmissionsCount={
+              resolvedSummary?.selectedForm?.submissionCount ?? allSubmissions.length
+            }
             selectedSubmissionId={activeSubmissionId}
             onSelectSubmission={setSelectedSubmissionId}
             chartsMounted={chartsMounted}

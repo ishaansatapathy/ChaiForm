@@ -9,7 +9,6 @@ import { FormFieldInput } from "~/components/forms/form-field-input";
 import { isMultiCheckboxConfig } from "~/lib/checkbox-value";
 import { getFormTheme } from "~/lib/form-themes";
 import { runWithRetry, useWarmApi } from "~/lib/warm-api";
-import { trpc } from "~/trpc/client";
 
 type PublicForm = RouterOutputs["forms"]["getPublic"];
 
@@ -38,7 +37,6 @@ function isFieldEmpty(field: PublicForm["fields"][number], value: string) {
 export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const router = useRouter();
   const theme = getFormTheme(form.theme);
-  const recordView = trpc.forms.recordView.useMutation();
   const [submitting, setSubmitting] = useState(false);
 
   useWarmApi();
@@ -59,10 +57,13 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   }, []);
 
   useEffect(() => {
-    if (form.id) {
-      recordView.mutate({ formId: form.id });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!form.id) return;
+    void fetch("/api/record-view", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ formId: form.id }),
+      cache: "no-store",
+    }).catch(() => undefined);
   }, [form.id]);
 
   const validateCurrentStep = () => {
@@ -78,7 +79,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const handleContinue = () => {
     if (!validateCurrentStep()) return;
     if (isLastStep) {
-      handleSubmit();
+      void handleSubmit();
       return;
     }
     setStep((prev) => Math.min(prev + 1, fields.length - 1));
@@ -108,20 +109,21 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
             signal: AbortSignal.timeout(20_000),
           });
 
+          // Server may save even when response body is odd — treat HTTP 2xx as success.
+          if (response.ok) return;
+
           let result: { error?: string; retryable?: boolean } = {};
           try {
             result = (await response.json()) as typeof result;
           } catch {
-            throw new Error("Server returned an invalid response.");
+            throw new Error("Could not submit this form.");
           }
 
-          if (!response.ok || result.error) {
-            const message = result.error ?? "Could not submit this form.";
-            if (!result.retryable && response.status < 500) {
-              throw new Error(message);
-            }
+          const message = result.error ?? "Could not submit this form.";
+          if (!result.retryable && response.status < 500) {
             throw new Error(message);
           }
+          throw new Error(message);
         },
         {
           attempts: 4,
@@ -140,26 +142,35 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key !== "Enter" || event.shiftKey) return;
-    if (currentField?.type === "text" && (event.target as HTMLElement).tagName === "TEXTAREA") return;
+    if (currentField?.type === "text" && (event.target as HTMLElement).tagName === "TEXTAREA")
+      return;
     event.preventDefault();
     handleContinue();
   };
 
   return (
-    <div className={`relative flex min-h-screen flex-col px-4 py-12 text-white ${theme.pageBg}`}>
-      <div className={`pointer-events-none absolute inset-0 ${theme.glow}`} />
+    <div
+      className={`relative flex min-h-[100dvh] flex-col overflow-hidden px-4 py-8 text-white sm:py-10 ${theme.pageBg}`}
+    >
+      <div className={`pointer-events-none absolute inset-0 overflow-hidden ${theme.glow}`} />
 
-      <div className="relative mx-auto flex w-full max-w-xl flex-1 flex-col">
-        <div className="mb-8">
-          <p className={`font-mono mb-2 text-[10px] tracking-[0.3em] uppercase opacity-70 ${theme.accentSoft}`}>
+      <div className="relative mx-auto flex w-full max-w-lg flex-col">
+        <div className="mb-6 shrink-0">
+          <p
+            className={`font-mono mb-2 text-[10px] tracking-[0.3em] uppercase opacity-70 ${theme.accentSoft}`}
+          >
             ChaiForm · {theme.label}
           </p>
-          <h1 className="font-display text-3xl font-black tracking-tight md:text-4xl">{form.title}</h1>
-          {form.description && step === 0 && <p className="mt-3 text-white/50">{form.description}</p>}
+          <h1 className="font-display text-2xl font-black tracking-tight sm:text-3xl">
+            {form.title}
+          </h1>
+          {form.description && step === 0 && (
+            <p className="mt-2 text-sm text-white/50">{form.description}</p>
+          )}
         </div>
 
         {fields.length > 0 && (
-          <div className="mb-8 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div className="mb-6 h-1.5 shrink-0 overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-lime-400 transition-all duration-300"
               style={{ width: `${progress}%` }}
@@ -168,7 +179,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
         )}
 
         {currentField && (
-          <div className="flex flex-1 flex-col" onKeyDown={handleKeyDown}>
+          <div className="flex flex-col" onKeyDown={handleKeyDown}>
             {(() => {
               const multiCheckbox =
                 currentField.type === "checkbox" && isMultiCheckboxConfig(currentField.config);
@@ -177,7 +188,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
               return (
                 <Wrapper className="block space-y-3">
                   {(currentField.type !== "checkbox" || multiCheckbox) && (
-                    <span className="text-lg font-medium text-white/90">
+                    <span className="text-base font-medium text-white/90 sm:text-lg">
                       {currentField.label}
                       {currentField.required && <span className={theme.accentText}> *</span>}
                     </span>
@@ -186,13 +197,15 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
                     field={currentField}
                     theme={theme}
                     value={values[currentField.id] ?? ""}
-                    onChange={(value) => setValues((prev) => ({ ...prev, [currentField.id]: value }))}
+                    onChange={(value) =>
+                      setValues((prev) => ({ ...prev, [currentField.id]: value }))
+                    }
                   />
                 </Wrapper>
               );
             })()}
 
-            <div className="mt-auto flex flex-wrap items-center gap-3 pt-10">
+            <div className="mt-8 flex flex-wrap items-center gap-3">
               {step > 0 && (
                 <button
                   type="button"
@@ -206,7 +219,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
                 type="button"
                 onClick={handleContinue}
                 disabled={submitting}
-                className="btn-omni font-display flex-1 rounded-2xl py-3.5 text-sm font-black tracking-[0.18em] uppercase disabled:opacity-50 sm:flex-none sm:px-10"
+                className="btn-omni font-display rounded-2xl py-3.5 text-sm font-black tracking-[0.18em] uppercase disabled:opacity-50 sm:px-10"
               >
                 {submitting ? "Submitting…" : isLastStep ? "Submit" : "Continue"}
               </button>

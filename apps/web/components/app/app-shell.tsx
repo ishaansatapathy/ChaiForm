@@ -132,7 +132,7 @@ export function AppShell({
 
   return (
     <AppDataProvider initialForms={initialForms ?? null} initialAnalytics={initialAnalytics ?? null}>
-      <div className="relative min-h-screen">
+      <div className="relative min-h-screen overflow-x-hidden">
         <AppBackground />
         <HeroTimeGate user={resolvedUser} />
         <div className="relative z-10 flex flex-col lg:flex-row">

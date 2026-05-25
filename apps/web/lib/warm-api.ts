@@ -2,13 +2,11 @@
 
 import { useEffect } from "react";
 
-/** Ping tRPC health via same-origin proxy to wake Render before mutations. */
+/** Ping keep-warm route (avoids broken tRPC proxy on public pages). */
 export function useWarmApi() {
   useEffect(() => {
     const ping = () => {
-      void fetch("/trpc/health.getHealth?input=%7B%7D", { credentials: "include" }).catch(
-        () => undefined,
-      );
+      void fetch("/api/keep-warm", { cache: "no-store" }).catch(() => undefined);
     };
     ping();
     const interval = setInterval(ping, 25_000);

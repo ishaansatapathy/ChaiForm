@@ -46,9 +46,7 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
   const headers = buildUpstreamHeaders(request);
 
   const body =
-    request.method !== "GET" && request.method !== "HEAD"
-      ? await request.arrayBuffer()
-      : undefined;
+    request.method !== "GET" && request.method !== "HEAD" ? await request.arrayBuffer() : undefined;
 
   let upstreamRes: Response | null = null;
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
