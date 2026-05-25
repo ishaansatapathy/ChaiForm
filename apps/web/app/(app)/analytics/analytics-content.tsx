@@ -714,35 +714,67 @@ function FormsPanel({
   formBundleLoading: boolean;
   onSelectForm: (formId: string) => void;
 }) {
+  const hasMany = forms.length > 5;
   return (
     <div className="app-surface rounded-3xl p-4">
-      <div className="mb-3 flex items-center justify-between gap-2 px-2">
+      <div className="mb-3 flex items-center justify-between gap-2 px-1">
         <p className="font-mono text-[9px] tracking-[0.3em] text-white/35 uppercase">Forms</p>
-        <span className="font-mono text-[9px] text-white/25">{forms.length} total</span>
+        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[9px] text-white/40">
+          {forms.length}
+        </span>
       </div>
-      <div className="analytics-scroll-panel analytics-scroll-panel--forms space-y-1 pr-1">
-        {forms.map((form) => (
-          <button
-            key={form.id}
-            type="button"
-            disabled={formBundleLoading && form.id === activeFormId}
-            onClick={() => onSelectForm(form.id)}
-            className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-60 ${
-              form.id === activeFormId
-                ? "bg-lime-400/10 text-lime-400"
-                : "text-white/45 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <span className="block truncate">{form.title}</span>
-            <span className="mt-0.5 block font-mono text-[9px] text-white/30">
-              {form.submissionCount} responses
-              {form.createdAt
-                ? ` · ${new Date(form.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
-                : ""}
-              {formBundleLoading && form.id === activeFormId ? " · loading…" : ""}
-            </span>
-          </button>
-        ))}
+      <div className="relative">
+        <div className="analytics-scroll-panel analytics-scroll-panel--forms space-y-0.5 pr-1">
+          {forms.map((form) => (
+            <button
+              key={form.id}
+              type="button"
+              disabled={formBundleLoading && form.id === activeFormId}
+              onClick={() => onSelectForm(form.id)}
+              className={`group flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-all disabled:opacity-60 ${
+                form.id === activeFormId
+                  ? "bg-lime-400/10 ring-1 ring-lime-400/20"
+                  : "hover:bg-white/5"
+              }`}
+            >
+              <span
+                className={`mt-px h-1.5 w-1.5 shrink-0 rounded-full ${
+                  form.id === activeFormId ? "bg-lime-400" : "bg-white/20 group-hover:bg-white/40"
+                }`}
+              />
+              <span className="min-w-0 flex-1">
+                <span
+                  className={`block truncate text-xs font-medium ${
+                    form.id === activeFormId ? "text-lime-400" : "text-white/55 group-hover:text-white/80"
+                  }`}
+                >
+                  {form.title}
+                </span>
+                <span className="mt-0.5 block font-mono text-[9px] text-white/25">
+                  {form.submissionCount ?? 0} responses
+                  {form.createdAt
+                    ? ` · ${new Date(form.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+                    : ""}
+                  {formBundleLoading && form.id === activeFormId ? " · loading…" : ""}
+                </span>
+              </span>
+              {(form.submissionCount ?? 0) > 0 && (
+                <span
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[8px] ${
+                    form.id === activeFormId
+                      ? "bg-lime-400/15 text-lime-400"
+                      : "bg-white/5 text-white/30"
+                  }`}
+                >
+                  {form.submissionCount}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        {hasMany && (
+          <div className="pointer-events-none absolute right-1 bottom-0 left-0 h-8 rounded-b-xl bg-gradient-to-t from-black/60 to-transparent" />
+        )}
       </div>
     </div>
   );
