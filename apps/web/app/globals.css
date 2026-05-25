@@ -756,19 +756,20 @@ html {
   padding: 0.25rem;
 }
 .analytics-scroll-panel--forms {
-  max-height: 9rem;
+  max-height: 14rem;
 }
 @media (min-width: 1024px) {
   .analytics-scroll-panel--forms {
-    max-height: 11rem;
+    max-height: calc(100vh - 28rem);
+    min-height: 10rem;
   }
 }
 .analytics-scroll-panel--submissions {
-  max-height: 12rem;
+  max-height: 13rem;
 }
 @media (min-width: 1024px) {
   .analytics-scroll-panel--submissions {
-    max-height: 14rem;
+    max-height: 16rem;
   }
 }
 .analytics-scroll-panel::-webkit-scrollbar {
