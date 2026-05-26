@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 
 export type FieldType = "text" | "email" | "number" | "select" | "rating" | "date" | "checkbox";
 
@@ -37,6 +38,8 @@ function newFieldId() {
   return crypto.randomUUID();
 }
 
+const MAX_FIELDS = 50;
+
 interface FormBuilderFieldsProps {
   fields: DraftField[];
   onChange: (fields: DraftField[]) => void;
@@ -44,6 +47,10 @@ interface FormBuilderFieldsProps {
 
 export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) {
   const addField = () => {
+    if (fields.length >= MAX_FIELDS) {
+      toast.error(`Maximum ${MAX_FIELDS} questions per form`);
+      return;
+    }
     onChange([
       ...fields,
       {

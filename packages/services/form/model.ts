@@ -85,35 +85,71 @@ export const formFieldSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-export const paginationInputSchema = z.object({
-  limit: z.number().int().min(1).max(100).default(20),
-  cursor: z.string().uuid().optional(),
-  search: z.string().max(200).optional(),
-});
+export const paginationInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(100).default(20),
+    cursor: z.string().uuid().optional(),
+    search: z.string().max(200).optional(),
+  })
+  .strict();
 
-export const createFormInputSchema = z.object({
-  title: z.string().min(1).max(255),
-  description: z.string().max(2000).optional(),
-  visibility: z.enum(["public", "unlisted", "draft"]).default("public"),
-  theme: formThemeSchema.default("default"),
-  retention: formRetentionSchema.default("forever"),
-  allowMultipleSubmissions: z.boolean().default(true),
-  requireAuthentication: z.boolean().default(false),
-  fields: z.array(formFieldInputSchema).min(1).max(50),
-});
+function assertUniqueFieldIds(fields: { id: string }[]) {
+  const ids = fields.map((field) => field.id);
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Duplicate field IDs are not allowed");
+  }
+}
 
-export const updateFormInputSchema = z.object({
-  formId: z.string().uuid(),
-  title: z.string().min(1).max(255).optional(),
-  description: z.string().max(2000).optional(),
-  visibility: z.enum(["public", "unlisted", "draft"]).optional(),
-  theme: formThemeSchema.optional(),
-  slug: z.string().min(1).max(80).optional(),
-  retention: formRetentionSchema.optional(),
-  allowMultipleSubmissions: z.boolean().optional(),
-  requireAuthentication: z.boolean().optional(),
-  fields: z.array(formFieldInputSchema).min(1).max(50).optional(),
-});
+export const createFormInputSchema = z
+  .object({
+    title: z.string().min(1).max(255),
+    description: z.string().max(2000).optional(),
+    visibility: z.enum(["public", "unlisted", "draft"]).default("public"),
+    theme: formThemeSchema.default("default"),
+    retention: formRetentionSchema.default("forever"),
+    allowMultipleSubmissions: z.boolean().default(true),
+    requireAuthentication: z.boolean().default(false),
+    fields: z.array(formFieldInputSchema).min(1).max(50),
+  })
+  .strict()
+  .superRefine((input, ctx) => {
+    try {
+      assertUniqueFieldIds(input.fields);
+    } catch (error) {
+      ctx.addIssue({
+        code: "custom",
+        message: error instanceof Error ? error.message : "Duplicate field IDs",
+        path: ["fields"],
+      });
+    }
+  });
+
+export const updateFormInputSchema = z
+  .object({
+    formId: z.string().uuid(),
+    title: z.string().min(1).max(255).optional(),
+    description: z.string().max(2000).optional(),
+    visibility: z.enum(["public", "unlisted", "draft"]).optional(),
+    theme: formThemeSchema.optional(),
+    slug: z.string().min(1).max(80).optional(),
+    retention: formRetentionSchema.optional(),
+    allowMultipleSubmissions: z.boolean().optional(),
+    requireAuthentication: z.boolean().optional(),
+    fields: z.array(formFieldInputSchema).min(1).max(50).optional(),
+  })
+  .strict()
+  .superRefine((input, ctx) => {
+    if (!input.fields) return;
+    try {
+      assertUniqueFieldIds(input.fields);
+    } catch (error) {
+      ctx.addIssue({
+        code: "custom",
+        message: error instanceof Error ? error.message : "Duplicate field IDs",
+        path: ["fields"],
+      });
+    }
+  });
 
 export const formOutputSchema = z.object({
   id: z.string().uuid(),
@@ -129,6 +165,7 @@ export const formOutputSchema = z.object({
   allowMultipleSubmissions: z.boolean(),
   requireAuthentication: z.boolean(),
   expiresAt: z.string().nullable(),
+  schemaVersion: z.number().int().min(1).nullable(),
   createdAt: z.string().nullable(),
   updatedAt: z.string().nullable(),
 });
@@ -172,30 +209,36 @@ export const submissionAnswerSchema = z.object({
   value: z.string(),
 });
 
-export const submitFormInputSchema = z.object({
-  formId: z.string().uuid(),
-  respondentKey: z.string().uuid().optional(),
-  answers: z
-    .array(
-      z.object({
-        fieldId: z.string().uuid(),
-        value: z.string().max(5000),
-      }),
-    )
-    .max(50)
-    .refine(
-      (answers) => new Set(answers.map((answer) => answer.fieldId)).size === answers.length,
-      { message: "Duplicate field answers are not allowed" },
-    ),
-  /** Honeypot — must always be sent and stay empty */
-  website: z.string().max(500).refine((value) => value.length === 0, {
-    message: "Submission rejected",
-  }),
-});
+export const submitFormInputSchema = z
+  .object({
+    formId: z.string().uuid(),
+    respondentKey: z.string().uuid().optional(),
+    idempotencyKey: z.string().uuid().optional(),
+    answers: z
+      .array(
+        z
+          .object({
+            fieldId: z.string().uuid(),
+            value: z.string().max(5000),
+          })
+          .strict(),
+      )
+      .max(50)
+      .refine(
+        (answers) => new Set(answers.map((answer) => answer.fieldId)).size === answers.length,
+        { message: "Duplicate field answers are not allowed" },
+      ),
+    /** Honeypot — must always be sent and stay empty */
+    website: z.string().max(500).refine((value) => value.length === 0, {
+      message: "Submission rejected",
+    }),
+  })
+  .strict();
 
 export const submissionOutputSchema = z.object({
   id: z.string().uuid(),
   formId: z.string().uuid(),
+  formVersionId: z.string().uuid().nullable(),
   formTitle: z.string(),
   answers: z.array(submissionAnswerSchema),
   submittedAt: z.string().nullable(),

@@ -181,6 +181,16 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
         </Link>
       </div>
 
+      {(resolvedForm.submissionCount ?? 0) > 0 ? (
+        <div className="app-surface mb-8 rounded-2xl border border-amber-400/20 p-4">
+          <p className="text-sm text-amber-200/90">
+            This form has {resolvedForm.submissionCount} response
+            {resolvedForm.submissionCount === 1 ? "" : "s"}. Changing questions creates a new schema
+            version — older responses keep their original answers.
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
           <div className="app-surface rounded-[40px] p-8">

@@ -14,6 +14,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { sanitizeTrpcError } from "../../error-handler";
 import { router, verifiedProcedure } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
 
@@ -31,7 +32,7 @@ function mapError(error: unknown): never {
     } as const;
     throw new TRPCError({ code: codeMap[error.code], message: error.message });
   }
-  throw error;
+  sanitizeTrpcError(error);
 }
 
 export const analyticsRouter = router({

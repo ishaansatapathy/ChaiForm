@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Activity, BarChart2, Plus } from "lucide-react";
+
+import type { RouterOutputs } from "@repo/trpc/client";
 
 import { useAppData } from "~/components/app/app-data-provider";
 import { FormCard } from "~/components/app/form-card";
@@ -9,10 +12,17 @@ import { Highlight } from "~/components/app/highlight";
 import { getPublicDisplayName } from "~/lib/user-display-name";
 import { trpc } from "~/trpc/client";
 
+type FormListItem = RouterOutputs["forms"]["list"]["items"][number];
+const PAGE_SIZE = 20;
+
 export default function DashboardPage() {
   const { initialForms, initialAnalytics } = useAppData();
+  const utils = trpc.useUtils();
   const { data: user } = trpc.auth.me.useQuery({});
   const greetingName = user ? getPublicDisplayName(user) : "Hero";
+  const [pages, setPages] = useState<FormListItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null | undefined>(undefined);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const {
     data: formsPage,
@@ -20,7 +30,7 @@ export default function DashboardPage() {
     isError,
     refetch,
   } = trpc.forms.list.useQuery(
-    { limit: 100 },
+    { limit: PAGE_SIZE },
     {
       initialData: initialForms ?? undefined,
       enabled: Boolean(user),
@@ -28,6 +38,12 @@ export default function DashboardPage() {
       staleTime: 30_000,
     },
   );
+
+  useEffect(() => {
+    if (!formsPage) return;
+    setPages(formsPage.items);
+    setNextCursor(formsPage.nextCursor);
+  }, [formsPage]);
 
   const { data: analytics } = trpc.analytics.summary.useQuery(
     {},
@@ -39,14 +55,26 @@ export default function DashboardPage() {
     },
   );
 
-  const forms = formsPage?.items ?? initialForms?.items ?? [];
+  const forms = pages.length > 0 ? pages : (formsPage?.items ?? initialForms?.items ?? []);
   const serverFormCount = analytics?.totalForms ?? initialAnalytics?.totalForms ?? 0;
+  const totalResponses = analytics?.totalSubmissions ?? initialAnalytics?.totalSubmissions ?? 0;
   const formsCount = Math.max(serverFormCount, forms.length);
   const listFailedButFormsExist =
     forms.length === 0 && (isError || serverFormCount > 0 || totalResponses > 0);
   const publishedCount = forms.filter((f) => f.visibility !== "draft").length;
-  const totalResponses = analytics?.totalSubmissions ?? initialAnalytics?.totalSubmissions ?? 0;
   const loadingForms = isLoading && forms.length === 0 && !isError;
+
+  const loadMore = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const next = await utils.forms.list.fetch({ limit: PAGE_SIZE, cursor: nextCursor });
+      setPages((prev) => [...prev, ...next.items]);
+      setNextCursor(next.nextCursor);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const statItems = [
     { label: "Forms Created", value: formsCount.toString(), icon: BarChart2, trend: "All time" },
@@ -162,6 +190,18 @@ export default function DashboardPage() {
             {forms.map((form) => (
               <FormCard key={form.id} form={form} />
             ))}
+            {nextCursor ? (
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="btn-omni font-display inline-flex rounded-xl px-6 py-2.5 text-xs font-black tracking-wide uppercase disabled:opacity-50"
+                >
+                  {loadingMore ? "Loading…" : "Load more forms"}
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
       </div>

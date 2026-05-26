@@ -1,5 +1,6 @@
 import { jsonb, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
+import { formVersionsTable } from "./form-version";
 import { formsTable } from "./form";
 import { usersTable } from "./user";
 
@@ -15,8 +16,10 @@ export const submissionsTable = pgTable("submissions", {
   formId: uuid("form_id")
     .notNull()
     .references(() => formsTable.id, { onDelete: "cascade" }),
+  formVersionId: uuid("form_version_id").references(() => formVersionsTable.id, { onDelete: "set null" }),
   submitterUserId: uuid("submitter_user_id").references(() => usersTable.id, { onDelete: "set null" }),
   respondentKey: varchar("respondent_key", { length: 64 }),
+  idempotencyKey: varchar("idempotency_key", { length: 64 }),
   answers: jsonb("answers").$type<SubmissionAnswerJson[]>().notNull(),
   submittedAt: timestamp("submitted_at").defaultNow(),
 });

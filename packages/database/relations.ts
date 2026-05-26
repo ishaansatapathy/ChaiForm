@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 
 import { formFieldsTable } from "./models/form-field";
+import { formVersionsTable } from "./models/form-version";
 import { formsTable } from "./models/form";
 import { submissionsTable } from "./models/submission";
 import { submissionResponsesTable } from "./models/submission-response";
@@ -15,7 +16,20 @@ export const formsRelations = relations(formsTable, ({ one, many }) => ({
     fields: [formsTable.userId],
     references: [usersTable.id],
   }),
+  currentVersion: one(formVersionsTable, {
+    fields: [formsTable.currentVersionId],
+    references: [formVersionsTable.id],
+  }),
   fields: many(formFieldsTable),
+  submissions: many(submissionsTable),
+  versions: many(formVersionsTable),
+}));
+
+export const formVersionsRelations = relations(formVersionsTable, ({ one, many }) => ({
+  form: one(formsTable, {
+    fields: [formVersionsTable.formId],
+    references: [formsTable.id],
+  }),
   submissions: many(submissionsTable),
 }));
 
@@ -31,6 +45,10 @@ export const submissionsRelations = relations(submissionsTable, ({ one, many }) 
   form: one(formsTable, {
     fields: [submissionsTable.formId],
     references: [formsTable.id],
+  }),
+  formVersion: one(formVersionsTable, {
+    fields: [submissionsTable.formVersionId],
+    references: [formVersionsTable.id],
   }),
   responses: many(submissionResponsesTable),
 }));

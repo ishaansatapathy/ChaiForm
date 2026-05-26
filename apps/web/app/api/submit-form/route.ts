@@ -1,24 +1,35 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { checkRateLimit, getClientIp, readJsonBody } from "~/lib/rate-limit";
+
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
 export const maxDuration = 15;
 
 export async function POST(request: NextRequest) {
-  let body: Record<string, unknown>;
-  try {
-    body = (await request.json()) as Record<string, unknown>;
-  } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  const ip = getClientIp(request);
+  if (!checkRateLimit(`submit:${ip}`, 30, 15 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many submissions. Try again later." }, { status: 429 });
   }
 
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+  }
+
+  const body = parsed.body as Record<string, unknown>;
   const formId = body.formId;
   const answers = body.answers;
   const website = body.website ?? "";
   const respondentKey = body.respondentKey;
+  const idempotencyKey = body.idempotencyKey;
 
   if (typeof formId !== "string" || !Array.isArray(answers)) {
     return NextResponse.json({ error: "Invalid submission payload." }, { status: 400 });
+  }
+
+  if (typeof formId === "string" && !checkRateLimit(`submit-form:${formId}:${ip}`, 10, 15 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many submissions for this form." }, { status: 429 });
   }
 
   try {
@@ -35,6 +46,7 @@ export async function POST(request: NextRequest) {
         answers,
         website,
         ...(typeof respondentKey === "string" ? { respondentKey } : {}),
+        ...(typeof idempotencyKey === "string" ? { idempotencyKey } : {}),
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(12_000),

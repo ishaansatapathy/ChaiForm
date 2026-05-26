@@ -22,6 +22,8 @@ export const formsTable = pgTable("forms", {
   expiresAt: timestamp("expires_at"),
   allowMultipleSubmissions: boolean("allow_multiple_submissions").default(true).notNull(),
   requireAuthentication: boolean("require_authentication").default(false).notNull(),
+  currentVersionId: uuid("current_version_id"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
 });
