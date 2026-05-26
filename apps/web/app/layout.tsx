@@ -17,9 +17,9 @@ export const metadata: Metadata = {
   title: "ChaiForm",
   description: "Production-style form builder SaaS — create, publish and collect responses.",
   icons: {
-    icon: "/favicon.png?v=2",
-    shortcut: "/favicon.png?v=2",
-    apple: "/favicon.png?v=2",
+    icon: "/images/ben10/omnitrix-symbol.png?v=3",
+    shortcut: "/images/ben10/omnitrix-symbol.png?v=3",
+    apple: "/images/ben10/omnitrix-symbol.png?v=3",
   },
 };
 
@@ -38,9 +38,9 @@ export default function RootLayout({
             __html: "html,body{background:#020202!important;color:#fff}",
           }}
         />
-        <link rel="icon" href="/favicon.png?v=2" type="image/png" />
-        <link rel="shortcut icon" href="/favicon.png?v=2" type="image/png" />
-        <link rel="apple-touch-icon" href="/favicon.png?v=2" />
+        <link rel="icon" href="/images/ben10/omnitrix-symbol.png?v=3" type="image/png" />
+        <link rel="shortcut icon" href="/images/ben10/omnitrix-symbol.png?v=3" type="image/png" />
+        <link rel="apple-touch-icon" href="/images/ben10/omnitrix-symbol.png?v=3" />
         <link rel="preload" href="/images/ben10/landing-wallpaper.png" as="image" />
       </head>
       <body
