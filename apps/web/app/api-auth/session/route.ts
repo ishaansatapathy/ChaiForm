@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { appendProxiedSetCookies } from "~/lib/proxied-set-cookie";
+
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
 /** Refresh session cookies via auth.me — use when client tRPC session sync fails. */
@@ -25,19 +27,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const setCookies =
-      typeof upstreamRes.headers.getSetCookie === "function"
-        ? upstreamRes.headers.getSetCookie()
-        : [];
-
-    if (setCookies.length > 0) {
-      for (const setCookie of setCookies) {
-        response.headers.append("set-cookie", setCookie);
-      }
-    } else {
-      const single = upstreamRes.headers.get("set-cookie");
-      if (single) response.headers.set("set-cookie", single);
-    }
+    appendProxiedSetCookies(response.headers, upstreamRes.headers);
 
     return response;
   } catch {
