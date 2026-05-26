@@ -469,7 +469,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                   </label>
                 </div>
               ) : (
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-2">
                   <label className="block text-[10px] text-white/40">
                     Min length
                     <input
@@ -507,25 +507,6 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                           },
                         })
                       }
-                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
-                    />
-                  </label>
-                  <label className="block text-[10px] text-white/40">
-                    Regex pattern
-                    <input
-                      value={field.config?.validation?.pattern ?? ""}
-                      onChange={(event) =>
-                        updateField(field.id, {
-                          config: {
-                            ...field.config,
-                            validation: {
-                              ...field.config?.validation,
-                              pattern: emptyToUndefined(event.target.value),
-                            },
-                          },
-                        })
-                      }
-                      placeholder="^[A-Z0-9-]+$"
                       className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
                     />
                   </label>

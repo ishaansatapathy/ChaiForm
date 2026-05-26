@@ -74,18 +74,19 @@ export function DeleteFormButton({
         </button>
       </AlertDialogTrigger>
 
-      <AlertDialogContent className="overflow-hidden rounded-[32px] border border-red-400/25 bg-[#050505] p-0 text-white shadow-none sm:max-w-lg">
-        <div className="pointer-events-none absolute -top-24 -right-20 size-52 rounded-full border border-red-400/20 bg-red-400/8" />
-        <div className="pointer-events-none absolute -bottom-28 -left-20 size-56 rounded-full border border-lime-400/15 bg-lime-400/5" />
+      <AlertDialogContent className="overflow-hidden rounded-[32px] border border-lime-400/25 bg-[#030603] p-0 text-white shadow-none sm:max-w-lg">
+        <div className="pointer-events-none absolute -top-24 -right-20 size-52 rounded-full border border-lime-400/20 bg-lime-400/8" />
+        <div className="pointer-events-none absolute -bottom-28 -left-20 size-56 rounded-full border border-lime-400/15 bg-lime-400/7" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-lime-400/50 to-transparent" />
 
         <div className="relative p-7">
           <AlertDialogHeader className="text-left">
             <div className="mb-4 flex items-center justify-between gap-4">
-              <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-red-400/25 bg-red-400/10 text-red-300">
+              <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-lime-400/30 bg-lime-400/10 text-lime-300">
                 <AlertTriangle size={22} />
               </span>
-              <span className="font-mono rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[9px] tracking-[0.26em] text-white/35 uppercase">
-                Destructive action
+              <span className="font-mono rounded-full border border-lime-400/20 bg-lime-400/5 px-3 py-1 text-[9px] tracking-[0.26em] text-lime-300/70 uppercase">
+                Omnitrix lock
               </span>
             </div>
 
@@ -94,7 +95,7 @@ export function DeleteFormButton({
             </AlertDialogTitle>
             <AlertDialogDescription className="mt-3 text-sm leading-relaxed text-white/55">
               <span className="font-semibold text-white">&quot;{formTitle}&quot;</span> and its collected
-              responses will be removed from your dashboard.
+              responses will be removed from your dashboard. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -113,17 +114,17 @@ export function DeleteFormButton({
           </div>
 
           <AlertDialogFooter className="mt-7 gap-3 sm:justify-between">
-            <AlertDialogCancel className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-mono text-[11px] font-bold tracking-[0.18em] text-white/65 uppercase hover:bg-white/10 hover:text-white">
+            <AlertDialogCancel className="rounded-2xl border border-lime-400/20 bg-lime-400/5 px-5 py-3 font-mono text-[11px] font-bold tracking-[0.18em] text-lime-200/75 uppercase hover:bg-lime-400/10 hover:text-lime-100">
               Cancel
             </AlertDialogCancel>
             <button
               type="button"
               onClick={handleDelete}
               disabled={deleteForm.isPending}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-400/35 bg-red-400/12 px-5 py-3 font-mono text-[11px] font-black tracking-[0.18em] text-red-200 uppercase transition-colors hover:bg-red-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-lime-400/35 bg-lime-400/12 px-5 py-3 font-mono text-[11px] font-black tracking-[0.18em] text-lime-100 uppercase transition-colors hover:bg-lime-400/20 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 size={14} />
-              {deleteForm.isPending ? "Deleting..." : "Delete forever"}
+              {deleteForm.isPending ? "Deleting..." : "Confirm delete"}
             </button>
           </AlertDialogFooter>
         </div>
