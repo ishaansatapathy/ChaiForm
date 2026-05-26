@@ -160,7 +160,7 @@ class AnalyticsService {
       .innerJoin(submissionsTable, eq(submissionsTable.id, submissionResponsesTable.submissionId))
       .where(and(eq(submissionsTable.formId, formId), eq(submissionResponsesTable.fieldId, fieldId)))
       .orderBy(desc(submissionsTable.submittedAt))
-      .limit(200);
+      .limit(1000);
 
     if (normalized.length > 0) {
       return normalized.map((row) => row.value).filter(Boolean);
@@ -171,7 +171,7 @@ class AnalyticsService {
       .from(submissionsTable)
       .where(eq(submissionsTable.formId, formId))
       .orderBy(desc(submissionsTable.submittedAt))
-      .limit(200);
+      .limit(1000);
 
     const values: string[] = [];
     for (const row of legacyRows) {

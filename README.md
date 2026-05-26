@@ -60,7 +60,7 @@ chaiform/
 | Drizzle | `forms`, `form_fields`, `submissions`, `submission_responses` + indexes |
 | Public submission | `/f/[formId]`, `/f/s/[slug]`, rate-limited submit, Typeform-style UX |
 | Analytics | Summary, trend chart, field breakdown, **full CSV export**, flow chart, pagination |
-| Scalar | https://chaiform.onrender.com/docs |
+| Scalar | https://chaiform-production.up.railway.app/docs |
 
 ## Demo credentials (for judges)
 
@@ -158,17 +158,19 @@ Private — hackathon project.
 
 ## Deploy (production)
 
-See **[DEPLOY.md](./DEPLOY.md)** for **Neon + Render (API) + Vercel (web)** setup.
+See **[DEPLOY.md](./DEPLOY.md)** for **Neon + Railway (API) + Vercel (web)** setup.
 
 ### Live demo (production)
 
 | Service | URL |
 |---------|-----|
 | **Web app** | https://chai-form-web.vercel.app |
-| **API health** | https://chaiform.onrender.com/health |
-| **Scalar API docs** | https://chaiform.onrender.com/docs |
-| **OpenAPI JSON** | https://chaiform.onrender.com/openapi.json |
+| **API health** | https://chaiform-production.up.railway.app/health |
+| **Scalar API docs** | https://chaiform-production.up.railway.app/docs |
+| **OpenAPI JSON** | https://chaiform-production.up.railway.app/openapi.json |
 
-**Demo login:** `demo@chaiform.dev` / `DemoPass123!` (after seed)
+**Demo login:** `demo@chaiform.dev` / `DemoPass123!` (run `pnpm db:seed` on production Neon once; user is email-verified in seed)
 
 **Sample public form:** https://chai-form-web.vercel.app/f/s/product-feedback
+
+**Vercel env:** `API_INTERNAL_URL=https://chaiform-production.up.railway.app` (not `.railway.internal`)

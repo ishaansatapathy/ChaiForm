@@ -1,9 +1,9 @@
-# Deploy ChaiForm (Vercel + Render + Neon)
+# Deploy ChaiForm (Vercel + Railway + Neon)
 
 | Service | Host | Role |
 |---------|------|------|
 | **Web** | [Vercel](https://vercel.com) | Next.js frontend |
-| **API** | [Render](https://render.com) | Express + tRPC |
+| **API** | [Railway](https://railway.app) | Express + tRPC (always-on — no Render-style cold start) |
 | **DB** | [Neon](https://neon.tech) | PostgreSQL |
 
 ---
@@ -21,7 +21,41 @@ DATABASE_URL="postgresql://..." pnpm db:seed
 
 ---
 
-## 2. Render (API / backend)
+## 2. Railway (API / backend)
+
+1. Connect GitHub repo on [Railway](https://railway.app)
+2. Set **Root Directory** to repo root (or configure build/start for `@repo/api`)
+3. **Build:** `pnpm install --frozen-lockfile && pnpm --filter @repo/api run build`
+4. **Start:** `node apps/api/dist/index.js`
+5. **Health check:** `/health`
+6. Migrations run automatically on API startup (`apps/api/src/migrate.ts`)
+
+Environment variables:
+
+| Variable | Example |
+|----------|---------|
+| `DATABASE_URL` | Neon pooled URL |
+| `NODE_ENV` | `production` |
+| `BASE_URL` | `https://chaiform-production.up.railway.app` |
+| `CLIENT_URL` | `https://chai-form-web.vercel.app` |
+| `JWT_SECRET` | long random string (32+ chars) |
+| `JWT_REFRESH_SECRET` | another long random string |
+| `RESEND_API_KEY` | from Resend *(optional)* |
+| `EMAIL_FROM` | `ChaiForm <onboarding@resend.dev>` |
+| `GOOGLE_OAUTH_CLIENT_ID` | Google Cloud Console |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Google Cloud Console |
+| `GOOGLE_OAUTH_REDIRECT_URI` | `https://chai-form-web.vercel.app/api-auth/google/callback` |
+| `CRON_SECRET` | optional — expired-form purge via Vercel keep-warm |
+
+Verify: `https://chaiform-production.up.railway.app/health` → `{ "healthy": true }`
+
+> **Note:** Railway stays warm — no free-tier spin-down like Render.
+
+### Legacy: Render (optional)
+
+See `render.yaml` if you still deploy API to Render. Production demo uses **Railway** URLs above.
+
+## 2b. Render (API / backend) — legacy
 
 ### Option A — Blueprint (recommended)
 
@@ -84,33 +118,33 @@ DATABASE_URL="postgresql://..." pnpm db:seed
 |----------|-------|
 | `NODE_ENV` | `production` |
 | `NEXT_PUBLIC_API_URL` | `/trpc` |
-| `API_INTERNAL_URL` | `https://YOUR-API.onrender.com` |
+| `API_INTERNAL_URL` | `https://chaiform-production.up.railway.app` |
 | `SKIP_ENV_VALIDATION` | `true` |
 
 5. Deploy → copy URL (e.g. `https://chaiform.vercel.app`)
 
-Vercel proxies `/trpc` and `/api-auth` to Render — auth cookies stay same-origin on your Vercel domain.
+Vercel proxies `/trpc` and `/api-auth` to Railway — auth cookies stay same-origin on your Vercel domain.
 
 ---
 
 ## 4. Wire URLs together
 
-Update **Render** env vars after Vercel deploy:
+Update **Railway** env vars after Vercel deploy:
 
 - `CLIENT_URL` = your Vercel URL (no trailing slash)
 - `GOOGLE_OAUTH_REDIRECT_URI` = `{VERCEL_URL}/api-auth/google/callback`
 
 Update **Google Cloud Console** → OAuth client → **Authorized redirect URIs**:
 
-- `https://YOUR-APP.vercel.app/api-auth/google/callback`
+- `https://chai-form-web.vercel.app/api-auth/google/callback`
 
-Redeploy Render (or use **Manual Deploy**) if you changed env vars.
+Redeploy Railway if you changed env vars.
 
 ---
 
 ## 5. Smoke test
 
-- [ ] `https://YOUR-API.onrender.com/health` → `{ "healthy": true }`
+- [ ] `https://chaiform-production.up.railway.app/health` → `{ "healthy": true }`
 - [ ] `https://YOUR-APP.vercel.app` loads landing page
 - [ ] Sign in: `demo@chaiform.dev` / `DemoPass123!` (after seed)
 - [ ] Create form → dashboard shows it

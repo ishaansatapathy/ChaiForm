@@ -1,9 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TRPCClientError } from "@repo/trpc/client";
+import {
+  assertSignUpPasswordsMatch,
+  signInInputSchema,
+  signUpInputSchema,
+} from "@repo/services/auth/dtos";
 import { toast } from "sonner";
 
 import { AuthField, AuthModeToggle, AuthSubmitButton } from "~/components/auth/auth-field";
@@ -89,10 +94,16 @@ export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
       }
 
       if (isLogin) {
-        const result = await signInMutation.mutateAsync({
+        const parsed = signInInputSchema.safeParse({
           email: formData.email,
           password: formData.password,
         });
+        if (!parsed.success) {
+          setError(parsed.error.issues[0]?.message ?? "Invalid sign-in details");
+          return;
+        }
+
+        const result = await signInMutation.mutateAsync(parsed.data);
 
         if (result.twoFactorRequired) {
           setTwoFactorStep({
@@ -108,12 +119,20 @@ export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
         return;
       }
 
-      await signUpMutation.mutateAsync({
-        fullName: formData.name,
-        email: formData.email,
-        password: formData.password,
-        confirmPassword: formData.confirmPassword,
-      });
+      const parsed = signUpInputSchema.safeParse(formData);
+      if (!parsed.success) {
+        setError(parsed.error.issues[0]?.message ?? "Invalid sign-up details");
+        return;
+      }
+
+      try {
+        assertSignUpPasswordsMatch(parsed.data);
+      } catch (matchError) {
+        setError(matchError instanceof Error ? matchError.message : "Passwords do not match");
+        return;
+      }
+
+      await signUpMutation.mutateAsync(parsed.data);
 
       toast.success("Account created — verify your email to continue");
       router.push(`/check-email?email=${encodeURIComponent(formData.email)}`);

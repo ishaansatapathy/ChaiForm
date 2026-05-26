@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { checkRateLimit, getClientIp, readJsonBody } from "~/lib/rate-limit";
+import { parseSubmitFormInput } from "~/lib/validate-submit-payload";
 
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
@@ -17,18 +18,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
 
-  const body = parsed.body as Record<string, unknown>;
-  const formId = body.formId;
-  const answers = body.answers;
-  const website = body.website ?? "";
-  const respondentKey = body.respondentKey;
-  const idempotencyKey = body.idempotencyKey;
-
-  if (typeof formId !== "string" || !Array.isArray(answers)) {
-    return NextResponse.json({ error: "Invalid submission payload." }, { status: 400 });
+  const validated = parseSubmitFormInput(parsed.body);
+  if (!validated.success) {
+    return NextResponse.json({ error: validated.message }, { status: 400 });
   }
 
-  if (typeof formId === "string" && !checkRateLimit(`submit-form:${formId}:${ip}`, 10, 15 * 60 * 1000)) {
+  const { formId, answers, website, respondentKey, idempotencyKey } = validated.data;
+
+  if (!checkRateLimit(`submit-form:${formId}:${ip}`, 10, 15 * 60 * 1000)) {
     return NextResponse.json({ error: "Too many submissions for this form." }, { status: 429 });
   }
 
@@ -45,8 +42,8 @@ export async function POST(request: NextRequest) {
         formId,
         answers,
         website,
-        ...(typeof respondentKey === "string" ? { respondentKey } : {}),
-        ...(typeof idempotencyKey === "string" ? { idempotencyKey } : {}),
+        ...(respondentKey ? { respondentKey } : {}),
+        ...(idempotencyKey ? { idempotencyKey } : {}),
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(12_000),
