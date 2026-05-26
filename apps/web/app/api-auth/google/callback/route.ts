@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { appendProxiedSetCookies } from "~/lib/proxied-set-cookie";
+
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
 /** Proxy Google OAuth callback so Set-Cookie headers reach the browser on :3000. */
@@ -18,19 +20,7 @@ export async function GET(request: NextRequest) {
     ? NextResponse.redirect(location)
     : new NextResponse(upstreamRes.body, { status: upstreamRes.status });
 
-  const setCookies =
-    typeof upstreamRes.headers.getSetCookie === "function"
-      ? upstreamRes.headers.getSetCookie()
-      : [];
-
-  if (setCookies.length > 0) {
-    for (const cookie of setCookies) {
-      response.headers.append("set-cookie", cookie);
-    }
-  } else {
-    const single = upstreamRes.headers.get("set-cookie");
-    if (single) response.headers.set("set-cookie", single);
-  }
+  appendProxiedSetCookies(response.headers, upstreamRes.headers);
 
   return response;
 }
