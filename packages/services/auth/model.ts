@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { userRoleSchema } from "./roles";
+
 export const authUserSchema = z.object({
   id: z.string().uuid(),
   fullName: z.string(),
@@ -8,6 +10,7 @@ export const authUserSchema = z.object({
   emailVerified: z.boolean(),
   profileImageUrl: z.string().nullable(),
   twoFactorEnabled: z.boolean(),
+  role: userRoleSchema,
 });
 
 export const signInOutputSchema = z.union([

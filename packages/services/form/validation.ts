@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { FormField } from "./model";
 import { sanitizeSubmissionValue } from "./sanitize";
+import { getVisibleFields } from "./visibility";
 
 function fieldValueSchema(field: FormField) {
   let schema: z.ZodString = z.string();
@@ -140,7 +141,8 @@ export function validateSubmissionAnswers(fields: FormField[], answers: { fieldI
     }
   }
 
-  const schema = buildSubmissionSchema(fields);
+  const visibleFields = getVisibleFields(fields, answerMap);
+  const schema = buildSubmissionSchema(visibleFields);
   const parsed = schema.safeParse(answerMap);
 
   if (!parsed.success) {

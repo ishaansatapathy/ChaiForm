@@ -426,7 +426,12 @@ const DEMO_FORMS: SeedForm[] = [
 
 async function ensureDemoUser(email: string) {
   const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
-  if (existingUser) return existingUser;
+  if (existingUser) {
+    if (existingUser.role !== "admin") {
+      await db.update(usersTable).set({ role: "admin" }).where(eq(usersTable.id, existingUser.id));
+    }
+    return existingUser;
+  }
 
   const demoPassword = process.env.SEED_DEMO_PASSWORD ?? "DemoPass123!";
   const passwordHash = await bcrypt.hash(demoPassword, 12);
@@ -440,6 +445,7 @@ async function ensureDemoUser(email: string) {
       passwordHash,
       authProvider: "local",
       emailVerified: true,
+      role: "admin",
     })
     .returning();
 

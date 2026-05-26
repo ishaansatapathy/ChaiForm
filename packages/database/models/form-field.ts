@@ -7,6 +7,11 @@ export type FieldConfigJson = {
   maxRating?: number;
   placeholder?: string;
   checkboxLabel?: string;
+  showWhen?: {
+    fieldId: string;
+    operator: "eq" | "neq";
+    value: string;
+  };
 };
 
 export const formFieldsTable = pgTable("form_fields", {

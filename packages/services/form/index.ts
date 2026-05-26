@@ -28,6 +28,8 @@ import { expiresAtFromRetention, expiresAtFromRetentionChange, isFormExpired } f
 import { sanitizeLabel } from "./sanitize";
 import { fieldsChanged, fieldsToVersionSnapshot } from "./versioning";
 import { validateSubmissionAnswers } from "./validation";
+import { isTurnstileRequired, verifyTurnstileToken } from "../turnstile";
+import type { UserRole } from "../auth/roles";
 
 export class FormError extends Error {
   constructor(
@@ -68,13 +70,17 @@ function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
         config: {
           options: config?.options?.length ? config.options : ["Option 1"],
           placeholder: config?.placeholder,
+          ...(config?.showWhen ? { showWhen: config.showWhen } : {}),
         },
       };
     case "rating":
       return {
         ...base,
         type: "rating",
-        config: { maxRating: config?.maxRating ?? 5 },
+        config: {
+          maxRating: config?.maxRating ?? 5,
+          ...(config?.showWhen ? { showWhen: config.showWhen } : {}),
+        },
       };
     case "checkbox": {
       const options = config?.options?.map((option) => option.trim()).filter(Boolean);
@@ -82,28 +88,46 @@ function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
         return {
           ...base,
           type: "checkbox",
-          config: { options },
+          config: {
+            options,
+            ...(config?.showWhen ? { showWhen: config.showWhen } : {}),
+          },
         };
       }
       if (config?.checkboxLabel) {
         return {
           ...base,
           type: "checkbox",
-          config: { checkboxLabel: config.checkboxLabel },
+          config: {
+            checkboxLabel: config.checkboxLabel,
+            ...(config?.showWhen ? { showWhen: config.showWhen } : {}),
+          },
         };
       }
-      return { ...base, type: "checkbox" };
+      return {
+        ...base,
+        type: "checkbox",
+        config: config?.showWhen ? { showWhen: config.showWhen } : undefined,
+      };
     }
     case "text":
     case "textarea":
     case "email":
     case "number":
-    case "date":
+    case "date": {
+      const fieldConfig =
+        config?.placeholder || config?.showWhen
+          ? {
+              ...(config.placeholder ? { placeholder: config.placeholder } : {}),
+              ...(config.showWhen ? { showWhen: config.showWhen } : {}),
+            }
+          : undefined;
       return {
         ...base,
         type: row.type,
-        config: config?.placeholder ? { placeholder: config.placeholder } : undefined,
+        config: fieldConfig,
       };
+    }
     default:
       return { ...base, type: "text" };
   }
@@ -303,9 +327,9 @@ class FormService {
     return this.mapForm(created, 0);
   }
 
-  async updateForm(userId: string, input: UpdateFormInput) {
+  async updateForm(userId: string, input: UpdateFormInput, actorRole: UserRole = "user") {
     refineUpdateFormInput(input);
-    const existing = await this.getOwnedForm(userId, input.formId);
+    const existing = await this.getOwnedForm(userId, input.formId, actorRole);
     const previousFields = await this.loadFields(input.formId);
     const fields = input.fields ? this.normalizeInputFields(input.fields, true) : undefined;
 
@@ -372,8 +396,8 @@ class FormService {
     return this.mapForm(updated, countRow?.count ?? 0);
   }
 
-  async deleteForm(userId: string, formId: string) {
-    const row = await this.getOwnedForm(userId, formId);
+  async deleteForm(userId: string, formId: string, actorRole: UserRole = "user") {
+    const row = await this.getOwnedForm(userId, formId, actorRole);
 
     const [countRow] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -395,8 +419,8 @@ class FormService {
     return { success: true as const };
   }
 
-  async getFormById(userId: string, formId: string) {
-    const row = await this.getOwnedForm(userId, formId);
+  async getFormById(userId: string, formId: string, actorRole: UserRole = "user") {
+    const row = await this.getOwnedForm(userId, formId, actorRole);
 
     const [countRow] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -635,14 +659,16 @@ class FormService {
     };
   }
 
-  private async getOwnedForm(userId: string, formId: string) {
+  private async getOwnedForm(userId: string, formId: string, actorRole: UserRole = "user") {
     const [row] = await db
       .select()
       .from(formsTable)
       .where(and(eq(formsTable.id, formId), isNull(formsTable.deletedAt)))
       .limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
-    if (row.userId !== userId) throw new FormError("FORBIDDEN", "Not allowed");
+    if (row.userId !== userId && actorRole !== "admin") {
+      throw new FormError("FORBIDDEN", "Not allowed");
+    }
     return row;
   }
 
@@ -650,6 +676,16 @@ class FormService {
     refineSubmitFormInput(input);
     if (input.website.length > 0) {
       throw new FormError("BAD_REQUEST", "Submission rejected");
+    }
+
+    if (isTurnstileRequired()) {
+      if (!input.turnstileToken) {
+        throw new FormError("BAD_REQUEST", "Please complete the CAPTCHA check.");
+      }
+      const captchaOk = await verifyTurnstileToken(input.turnstileToken);
+      if (!captchaOk) {
+        throw new FormError("BAD_REQUEST", "CAPTCHA verification failed. Please try again.");
+      }
     }
 
     const [formRow] = await db
@@ -784,8 +820,13 @@ class FormService {
     };
   }
 
-  async listSubmissions(userId: string, formId: string, pagination: PaginationInput = { limit: 20 }) {
-    await this.getOwnedForm(userId, formId);
+  async listSubmissions(
+    userId: string,
+    formId: string,
+    pagination: PaginationInput = { limit: 20 },
+    actorRole: UserRole = "user",
+  ) {
+    await this.getOwnedForm(userId, formId, actorRole);
     const limit = pagination.limit ?? 20;
 
     const conditions = [eq(submissionsTable.formId, formId)];
@@ -839,7 +880,7 @@ class FormService {
     };
   }
 
-  async getSubmission(userId: string, submissionId: string) {
+  async getSubmission(userId: string, submissionId: string, actorRole: UserRole = "user") {
     const [row] = await db
       .select({
         submission: submissionsTable,
@@ -852,7 +893,9 @@ class FormService {
       .limit(1);
 
     if (!row) throw new FormError("NOT_FOUND", "Submission not found");
-    if (row.ownerId !== userId) throw new FormError("FORBIDDEN", "Not allowed");
+    if (row.ownerId !== userId && actorRole !== "admin") {
+      throw new FormError("FORBIDDEN", "Not allowed");
+    }
 
     return {
       id: row.submission.id,

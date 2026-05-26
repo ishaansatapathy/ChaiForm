@@ -99,6 +99,13 @@
       "when": 1767592965704,
       "tag": "0013_versions_soft_delete_idempotency",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1767592965705,
+      "tag": "0014_user_role",
+      "breakpoints": true
     }
   ]
 }

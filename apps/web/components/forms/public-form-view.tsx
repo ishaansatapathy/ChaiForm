@@ -1,9 +1,12 @@
 "use client";
 
+import { getVisibleFields } from "@repo/services/form/visibility";
+
 import type { RouterOutputs } from "@repo/trpc/client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { TRPCClientError } from "@repo/trpc/client";
 import { toast } from "sonner";
 
 import { FormFieldInput } from "~/components/forms/form-field-input";
@@ -52,6 +55,8 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [checkingSubmission, setCheckingSubmission] = useState(!form.allowMultipleSubmissions);
 
+  const submitMutation = trpc.forms.submit.useMutation();
+
   const { data: user, isLoading: authLoading } = trpc.auth.me.useQuery(
     {},
     { retry: false, staleTime: 30_000, enabled: form.requireAuthentication },
@@ -67,9 +72,17 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const turnstileEnabled = Boolean(turnstileSiteKey);
 
   const fields = form.fields;
-  const currentField = fields[step];
-  const isLastStep = step >= fields.length - 1;
-  const progress = fields.length > 0 ? ((step + 1) / fields.length) * 100 : 0;
+  const visibleFields = useMemo(() => getVisibleFields(fields, values), [fields, values]);
+  const currentField = visibleFields[step];
+  const isLastStep = visibleFields.length > 0 && step >= visibleFields.length - 1;
+  const progress =
+    visibleFields.length > 0 ? ((step + 1) / visibleFields.length) * 100 : 0;
+
+  useEffect(() => {
+    if (step >= visibleFields.length && visibleFields.length > 0) {
+      setStep(Math.max(visibleFields.length - 1, 0));
+    }
+  }, [step, visibleFields.length]);
 
   useEffect(() => {
     if (honeypotRef.current) {
@@ -135,7 +148,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
       void handleSubmit();
       return;
     }
-    setStep((prev) => Math.min(prev + 1, fields.length - 1));
+    setStep((prev) => Math.min(prev + 1, visibleFields.length - 1));
   };
 
   const handleSubmit = async () => {
@@ -147,60 +160,49 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
     const honeypot = honeypotRef.current?.value ?? "";
     const respondentKey = form.requireAuthentication ? undefined : getRespondentKey(form.id);
     const idempotencyKey = getSubmissionIdempotencyKey(form.id);
-    const payload = {
-      formId: form.id,
-      website: honeypot,
-      idempotencyKey,
-      ...(turnstileEnabled && turnstileToken ? { turnstileToken } : {}),
-      ...(form.allowMultipleSubmissions || form.requireAuthentication
-        ? {}
-        : { respondentKey }),
-      answers: fields.map((field) => ({
-        fieldId: field.id,
-        value: values[field.id] ?? "",
-      })),
-    };
 
     setSubmitting(true);
     try {
       await runWithRetry(
-        async () => {
-          const response = await fetch("/api/submit-form", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify(payload),
-            cache: "no-store",
-            signal: AbortSignal.timeout(20_000),
-          });
-
-          // Server may save even when response body is odd — treat HTTP 2xx as success.
-          if (response.ok) return;
-
-          let result: { error?: string; retryable?: boolean } = {};
-          try {
-            result = (await response.json()) as typeof result;
-          } catch {
-            throw new Error("Could not submit this form.");
-          }
-
-          const message = result.error ?? "Could not submit this form.";
-          if (!result.retryable && response.status < 500) {
-            throw new Error(message);
-          }
-          throw new Error(message);
-        },
+        () =>
+          submitMutation.mutateAsync({
+            formId: form.id,
+            website: honeypot,
+            idempotencyKey,
+            ...(turnstileEnabled && turnstileToken ? { turnstileToken } : {}),
+            ...(form.allowMultipleSubmissions || form.requireAuthentication
+              ? {}
+              : { respondentKey }),
+            answers: fields.map((field) => ({
+              fieldId: field.id,
+              value: values[field.id] ?? "",
+            })),
+          }),
         {
-          attempts: 4,
-          delaysMs: [0, 4_000, 6_000, 8_000],
-          onRetry: (attempt) => toast.message(`Submitting… retry ${attempt}/4`),
+          attempts: 3,
+          delaysMs: [0, 2_000, 4_000],
+          isRetryable: (error) => {
+            if (error instanceof TRPCClientError) {
+              const code = error.data?.code;
+              return code !== "BAD_REQUEST" && code !== "FORBIDDEN";
+            }
+            return true;
+          },
         },
       );
-      markFormSubmitted(form.id);
+
+      if (!form.allowMultipleSubmissions) {
+        markFormSubmitted(form.id);
+      }
       clearSubmissionIdempotencyKey(form.id);
       router.push(thankYouPath);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not submit this form.";
+      const message =
+        error instanceof TRPCClientError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Could not submit form";
       toast.error(message);
     } finally {
       setSubmitting(false);
@@ -208,24 +210,19 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key !== "Enter" || event.shiftKey) return;
-    if (currentField?.type === "text" && (event.target as HTMLElement).tagName === "TEXTAREA")
-      return;
-    event.preventDefault();
-    handleContinue();
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      handleContinue();
+    }
   };
 
-  const signInHref = `/sign-in?next=${encodeURIComponent(pathname || "/")}`;
   const needsSignIn = form.requireAuthentication && !authLoading && !user;
+  const signInHref = `/sign-in?next=${encodeURIComponent(pathname || "/")}`;
 
   return (
-    <div
-      className={`relative flex min-h-[100dvh] flex-col overflow-hidden px-4 py-8 text-white sm:py-10 ${theme.pageBg}`}
-    >
-      <div className={`pointer-events-none absolute inset-0 overflow-hidden ${theme.glow}`} />
-
-      <div className="relative mx-auto flex w-full max-w-lg flex-col">
-        <div className="mb-6 shrink-0">
+    <div className={`relative flex min-h-dvh flex-col ${theme.pageBg}`}>
+      <div className={`relative mx-auto flex w-full max-w-xl flex-1 flex-col px-6 py-10 sm:px-8 ${theme.glow}`}>
+        <div className="mb-10">
           <p
             className={`font-mono mb-2 text-[10px] tracking-[0.3em] uppercase opacity-70 ${theme.accentSoft}`}
           >
@@ -275,7 +272,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
           </div>
         ) : (
           <>
-        {fields.length > 0 && (
+        {visibleFields.length > 0 && (
           <div className="mb-6 h-1.5 shrink-0 overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-lime-400 transition-all duration-300"
@@ -330,7 +327,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
                 {submitting ? "Submitting…" : isLastStep ? "Submit" : "Continue"}
               </button>
               <p className="w-full font-mono text-[10px] tracking-wider text-white/30 uppercase">
-                Question {step + 1} of {fields.length} · Press Enter ↵
+                Question {step + 1} of {visibleFields.length} · Press Enter ↵
               </p>
             </div>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { getVisibleFields } from "@repo/services/form/visibility";
+import { useEffect, useMemo, useState } from "react";
 
 import type { FormThemeId } from "~/lib/form-themes";
 import { getFormTheme } from "~/lib/form-themes";
@@ -17,21 +18,34 @@ type FormBuilderPreviewProps = {
 export function FormBuilderPreview({ title, description, themeId, fields }: FormBuilderPreviewProps) {
   const theme = getFormTheme(themeId);
   const [step, setStep] = useState(0);
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  const visibleFields = useMemo(
+    () => getVisibleFields(fields as Parameters<typeof getVisibleFields>[0], values),
+    [fields, values],
+  );
 
   useEffect(() => {
     setStep(0);
   }, [fields.length]);
 
-  const previewField = fields[step];
-  const progress = fields.length > 0 ? ((step + 1) / fields.length) * 100 : 0;
-  const isLastStep = fields.length > 0 && step >= fields.length - 1;
+  useEffect(() => {
+    if (step >= visibleFields.length && visibleFields.length > 0) {
+      setStep(Math.max(visibleFields.length - 1, 0));
+    }
+  }, [step, visibleFields.length]);
+
+  const previewField = visibleFields[step];
+  const progress = visibleFields.length > 0 ? ((step + 1) / visibleFields.length) * 100 : 0;
+  const isLastStep = visibleFields.length > 0 && step >= visibleFields.length - 1;
 
   return (
     <div className={`overflow-hidden rounded-[32px] border border-white/10 ${theme.pageBg}`}>
       <div className="border-b border-white/10 px-5 py-3">
         <p className="font-mono text-[9px] tracking-[0.28em] text-white/40 uppercase">Live preview</p>
         <p className="mt-1 text-xs text-white/50">
-          One-question flow · {fields.length || 0} question{fields.length === 1 ? "" : "s"}
+          One-question flow · {visibleFields.length || 0} visible question
+          {visibleFields.length === 1 ? "" : "s"}
         </p>
       </div>
       <div className={`relative px-5 py-8 ${theme.glow}`}>
@@ -52,7 +66,7 @@ export function FormBuilderPreview({ title, description, themeId, fields }: Form
               />
             </div>
             <p className="font-mono text-[9px] tracking-[0.22em] text-white/35 uppercase">
-              Question {step + 1} of {fields.length}
+              Question {step + 1} of {visibleFields.length}
             </p>
             <p className="text-sm font-medium text-white/80">
               {previewField.label}
@@ -61,8 +75,8 @@ export function FormBuilderPreview({ title, description, themeId, fields }: Form
             <FormFieldInput
               field={previewField as Parameters<typeof FormFieldInput>[0]["field"]}
               theme={theme}
-              value=""
-              onChange={() => undefined}
+              value={values[previewField.id] ?? ""}
+              onChange={(value) => setValues((prev) => ({ ...prev, [previewField.id]: value }))}
             />
             <div className="flex items-center gap-2 pt-2">
               <button
@@ -75,7 +89,7 @@ export function FormBuilderPreview({ title, description, themeId, fields }: Form
               </button>
               <button
                 type="button"
-                onClick={() => setStep((current) => Math.min(fields.length - 1, current + 1))}
+                onClick={() => setStep((current) => Math.min(visibleFields.length - 1, current + 1))}
                 disabled={isLastStep}
                 className="btn-omni font-display inline-flex rounded-xl px-5 py-2.5 text-xs font-black tracking-[0.15em] uppercase disabled:opacity-50"
               >

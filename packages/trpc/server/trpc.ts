@@ -48,6 +48,13 @@ export const verifiedProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+export const adminProcedure = verifiedProcedure.use(({ ctx, next }) => {
+  if (ctx.user.role !== "admin") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+  }
+  return next({ ctx });
+});
+
 export function mapAuthError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
 
