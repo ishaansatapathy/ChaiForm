@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 declare global {
   interface Window {
@@ -29,6 +29,7 @@ type TurnstileWidgetProps = {
 export function TurnstileWidget({ siteKey, onTokenChange }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const [scriptReady, setScriptReady] = useState(false);
 
   const cleanup = useCallback(() => {
     if (widgetIdRef.current && window.turnstile) {
@@ -51,6 +52,11 @@ export function TurnstileWidget({ siteKey, onTokenChange }: TurnstileWidgetProps
   }, [siteKey, onTokenChange]);
 
   useEffect(() => {
+    if (!scriptReady) return;
+    renderWidget();
+  }, [scriptReady, renderWidget]);
+
+  useEffect(() => {
     return () => cleanup();
   }, [cleanup]);
 
@@ -58,10 +64,14 @@ export function TurnstileWidget({ siteKey, onTokenChange }: TurnstileWidgetProps
     <>
       <Script
         src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-        strategy="lazyOnload"
-        onLoad={renderWidget}
+        strategy="afterInteractive"
+        onLoad={() => setScriptReady(true)}
       />
-      <div ref={containerRef} className="min-h-[65px]" aria-label="CAPTCHA verification" />
+      <div
+        ref={containerRef}
+        className="flex min-h-[65px] items-center justify-start rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+        aria-label="CAPTCHA verification"
+      />
     </>
   );
 }
