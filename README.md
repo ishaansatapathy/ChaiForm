@@ -52,6 +52,7 @@ chaiform/
 | Monorepo & structure | Turborepo, shared packages, clean root |
 | Auth | Google OAuth + email/password, JWT cookies |
 | Form builder | Create/edit/delete, 7 field types, **themes picker**, **live preview**, one-question public flow |
+| Pricing | Ben 10 themed fake pricing section on the landing page |
 | Public explore | `/explore` lists public forms only |
 | Email notifications | Creator notified on new submission (Resend) |
 | Spam protection | Rate limits + **required honeypot** on public submit |
@@ -116,7 +117,7 @@ Required env vars: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, Google OA
 
 ```bash
 pnpm db:migrate
-pnpm db:seed   # optional — after sign-up; seeds demo form + 6 submissions + views
+pnpm db:seed   # optional — creates demo user, themed sample forms, submissions + views
 ```
 
 Set `SEED_USER_EMAIL` in `.env` to the email you signed up with (defaults to `demo@chaiform.dev`).

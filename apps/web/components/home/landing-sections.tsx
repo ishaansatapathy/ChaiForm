@@ -41,6 +41,34 @@ const STICKY_SLIDES = [
   },
 ];
 
+const BEN10_PRICING = [
+  {
+    tier: "Ben 10 Classic",
+    price: "₹0",
+    cadence: "starter hero kit",
+    signal: "10 forms",
+    copy: "For solo creators testing forms, themes, and public links.",
+    features: ["Public + unlisted links", "Basic analytics", "Classic green themes"],
+  },
+  {
+    tier: "Ben 10 Alien Force",
+    price: "₹499",
+    cadence: "per month",
+    signal: "Unlimited forms",
+    copy: "For teams collecting serious responses with stronger workflows.",
+    features: ["Conditional logic", "CSV exports", "Creator email alerts"],
+    featured: true,
+  },
+  {
+    tier: "Ben 10 Omniverse",
+    price: "₹1,499",
+    cadence: "per month",
+    signal: "Scale mode",
+    copy: "For high-volume campaigns, launches, communities, and events.",
+    features: ["Advanced analytics", "Priority limits", "Audit-ready response ops"],
+  },
+];
+
 
 
 function PreviewPanel({ type }: { type: string }) {
@@ -242,6 +270,113 @@ export function LandingSections({ part = "all" }: { part?: "all" | "workflow" | 
             Modern forms for modern heroes.
 
           </h2>
+
+        </div>
+
+      </section>
+
+
+
+      {/* Pricing */}
+
+      <section id="pricing" className="landing-section border-t border-[#70b404]/15 px-[clamp(1.25rem,5vw,5rem)] py-28 md:px-[5%]">
+
+        <div className="landing-copy landing-reveal mx-auto max-w-[1440px]">
+
+          <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+
+            <div>
+
+              <p className="landing-label mb-4 text-[11px] tracking-[0.36em]">Fake pricing · demo mode</p>
+              <h2 className="font-display text-[clamp(2.35rem,5vw,4rem)] font-normal leading-tight tracking-[-0.04em] text-white">
+                Choose your <span className="landing-accent-text">Omnitrix</span> loadout.
+              </h2>
+
+            </div>
+
+            <p className="landing-body max-w-md font-mono text-sm leading-relaxed">
+              Judge-friendly plans styled like a real SaaS pricing section. No payment integration required.
+            </p>
+
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+
+            {BEN10_PRICING.map((plan) => (
+
+              <div
+                key={plan.tier}
+                className={`group relative overflow-hidden rounded-[34px] border p-6 backdrop-blur-md transition-colors ${
+                  plan.featured
+                    ? "border-[#70b404]/55 bg-[#70b404]/12"
+                    : "border-white/10 bg-white/3 hover:border-[#70b404]/35 hover:bg-[#70b404]/6"
+                }`}
+              >
+
+                <div
+                  className="pointer-events-none absolute -top-20 -right-16 size-44 rounded-full border border-[#70b404]/20 bg-[#70b404]/8 transition-transform duration-500 group-hover:scale-110"
+                  aria-hidden="true"
+                />
+
+                <div className="relative">
+
+                  <div className="mb-6 flex items-start justify-between gap-4">
+
+                    <div>
+
+                      <p className="font-mono mb-2 text-[10px] tracking-[0.28em] text-[#9eea1a]/80 uppercase">
+                        {plan.signal}
+                      </p>
+                      <h3 className="font-display text-2xl font-bold tracking-tight text-white">{plan.tier}</h3>
+
+                    </div>
+
+                    {plan.featured && (
+                      <span className="rounded-full border border-[#70b404]/40 bg-[#70b404]/15 px-3 py-1 font-mono text-[9px] font-black tracking-[0.22em] text-[#b8f038] uppercase">
+                        Hero pick
+                      </span>
+                    )}
+
+                  </div>
+
+                  <div className="mb-6">
+
+                    <span className="font-display text-5xl font-black tracking-[-0.06em] text-white">{plan.price}</span>
+                    <span className="ml-3 font-mono text-[10px] tracking-[0.2em] text-white/35 uppercase">{plan.cadence}</span>
+
+                  </div>
+
+                  <p className="mb-6 min-h-12 text-sm leading-relaxed text-white/55">{plan.copy}</p>
+
+                  <div className="space-y-3 border-t border-white/8 pt-6">
+
+                    {plan.features.map((feature) => (
+                      <div key={feature} className="flex items-center gap-3 text-sm text-white/70">
+                        <span className="size-1.5 rounded-full bg-[#70b404]" />
+                        {feature}
+                      </div>
+                    ))}
+
+                  </div>
+
+                  <Link
+                    href="/sign-up"
+                    className={`mt-8 inline-flex w-full items-center justify-center rounded-2xl px-5 py-3 font-mono text-[11px] font-black tracking-[0.22em] uppercase transition-colors ${
+                      plan.featured
+                        ? "bg-[#b8f038] text-black hover:bg-white"
+                        : "border border-[#70b404]/35 text-[#b8f038] hover:bg-[#70b404]/10"
+                    }`}
+                  >
+                    Activate plan
+                  </Link>
+
+                </div>
+
+              </div>
+
+            ))}
+
+          </div>
 
         </div>
 
