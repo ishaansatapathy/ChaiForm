@@ -186,7 +186,7 @@ html {
   transform: rotate(-1deg);
 }
 
-/* === Auth card — flat ChaiPoll style (no glass / scanline) ================== */
+/* === Auth card — flat style (no glass / scanline) ================== */
 .auth-card {
   border: 1px solid rgba(255, 255, 255, 0.04);
   background: #0c0c0c;
@@ -731,7 +731,7 @@ html {
   transform: rotate(-1deg);
 }
 
-/* === App dashboard surfaces (ChaiPoll-style) ================================ */
+/* === App dashboard surfaces ================================================ */
 .app-surface {
   border: 1px solid rgba(255, 255, 255, 0.05);
   background: rgba(255, 255, 255, 0.01);
