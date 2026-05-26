@@ -1,5 +1,7 @@
 import pg from "pg";
 
+import { runJournalMigrations } from "@repo/database/migrate";
+
 /** Idempotent schema patches — fixes forms.list when 0010–0012 were never applied on Neon. */
 const ENSURE_SCHEMA_SQL = `
 ALTER TABLE "forms" ADD COLUMN IF NOT EXISTS "expires_at" timestamp;
@@ -74,6 +76,8 @@ export async function runMigrations() {
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required to run migrations");
   }
+
+  await runJournalMigrations(databaseUrl);
 
   const client = new pg.Client({ connectionString: databaseUrl });
   await client.connect();

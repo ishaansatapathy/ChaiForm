@@ -27,6 +27,7 @@ import {
 } from "./jwt";
 import { hashPassword, verifyPassword } from "./password";
 import type { AuthUser, SignInOutput, SignUpOutput } from "./model";
+import { sanitizeRedirectPath } from "./safe-redirect";
 
 const GENERIC_RECOVERY_MESSAGE = "If an account exists for that email, we sent reset instructions.";
 const GENERIC_VERIFY_MESSAGE =
@@ -177,7 +178,10 @@ class AuthService {
     const sanitizedEmail = sanitizeEmail(input.email);
     const existing = await this.findUserByEmail(sanitizedEmail);
     if (existing) {
-      throw new AuthError("CONFLICT", "User already exists");
+      throw new AuthError(
+        "BAD_REQUEST",
+        "Unable to register with this email. Try signing in or reset your password.",
+      );
     }
 
     const verificationToken = crypto.randomBytes(32).toString("hex");
@@ -507,6 +511,8 @@ class AuthService {
       throw new AuthError("INTERNAL", "Google OAuth is not configured");
     }
 
+    const safeReturnTo = sanitizeRedirectPath(returnTo);
+
     try {
       const client = getGoogleOAuth2Client();
       const { tokens } = await client.getToken(code);
@@ -582,7 +588,7 @@ class AuthService {
       }
 
       issueAuthCookies(res, user.id);
-      const destination = returnTo.startsWith("/") ? returnTo : `/${returnTo}`;
+      const destination = safeReturnTo;
       const separator = destination.includes("?") ? "&" : "?";
       return `${env.CLIENT_URL}${destination}${separator}hero=1`;
     } catch (error) {

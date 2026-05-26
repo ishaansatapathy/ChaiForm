@@ -9,6 +9,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "prod", "production", "test"]).default("development"),
   BASE_URL: z.string().default("http://localhost:8000"),
   CLIENT_URL: z.string().default("http://localhost:3000"),
+  OPENAPI_DOCS_SECRET: z.string().min(8).optional(),
 });
 
 function createEnv(env: NodeJS.ProcessEnv) {

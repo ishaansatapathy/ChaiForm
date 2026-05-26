@@ -1,6 +1,12 @@
 {
   "name": "@repo/database",
   "version": "1.0.0",
+  "exports": {
+    ".": "./index.ts",
+    "./migrate": "./migrate.ts",
+    "./schema": "./schema.ts",
+    "./relations": "./relations.ts"
+  },
   "scripts": {
     "db:migrate": "dotenv -e ../../.env -- drizzle-kit migrate",
     "db:generate": "dotenv -e ../../.env -- drizzle-kit generate",

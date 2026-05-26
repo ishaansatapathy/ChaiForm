@@ -52,7 +52,11 @@ async function bootstrap() {
     await runMigrations();
     logger.info("Database schema patches applied");
   } catch (err) {
-    logger.error("Database migration failed — forms list/analytics may break until fixed", { err });
+    logger.error("Database migration failed", { err });
+    const nodeEnv = process.env.NODE_ENV ?? "development";
+    if (["production", "prod"].includes(nodeEnv)) {
+      process.exit(1);
+    }
   }
 
   const { isEmailConfigured } = await import("@repo/services/env");

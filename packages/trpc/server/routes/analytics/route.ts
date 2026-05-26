@@ -42,7 +42,7 @@ export const analyticsRouter = router({
     .output(analyticsSummaryOutputSchema)
     .query(async ({ ctx, input }) => {
       try {
-        return await analyticsService.getSummary(ctx.user.id, input.formId);
+        return await analyticsService.getSummary(ctx.user.id, input.formId, ctx.user.role);
       } catch (error) {
         mapError(error);
       }
@@ -54,7 +54,12 @@ export const analyticsRouter = router({
     .output(submissionsOverTimeOutputSchema)
     .query(async ({ ctx, input }) => {
       try {
-        return await analyticsService.getSubmissionsOverTime(ctx.user.id, input.formId, input.days);
+        return await analyticsService.getSubmissionsOverTime(
+          ctx.user.id,
+          input.formId,
+          input.days,
+          ctx.user.role,
+        );
       } catch (error) {
         mapError(error);
       }
@@ -66,7 +71,12 @@ export const analyticsRouter = router({
     .output(fieldBreakdownOutputSchema)
     .query(async ({ ctx, input }) => {
       try {
-        return await analyticsService.getFieldBreakdown(ctx.user.id, input.formId, input.fieldId);
+        return await analyticsService.getFieldBreakdown(
+          ctx.user.id,
+          input.formId,
+          input.fieldId,
+          ctx.user.role,
+        );
       } catch (error) {
         mapError(error);
       }
@@ -78,7 +88,7 @@ export const analyticsRouter = router({
     .output(allFieldStatsOutputSchema)
     .query(async ({ ctx, input }) => {
       try {
-        return await analyticsService.getAllFieldStats(ctx.user.id, input.formId);
+        return await analyticsService.getAllFieldStats(ctx.user.id, input.formId, ctx.user.role);
       } catch (error) {
         mapError(error);
       }

@@ -91,15 +91,15 @@ export default function CreateFormPage() {
     }
 
     try {
-      await saveFormWithColdStart("create", parsed.data, {
+      const created = await saveFormWithColdStart("create", parsed.data, {
         mutate: () => createMutation.mutateAsync(parsed.data),
         onProgress: (message) => toast.message(message),
       });
       setServerReady(true);
       await utils.forms.list.invalidate();
       await utils.analytics.summary.invalidate();
-      toast.success("Form saved");
-      router.push("/dashboard");
+      toast.success("Form published");
+      router.push(`/forms/${created.id}/edit?share=1`);
     } catch (error) {
       toast.error(getSaveErrorMessage(error));
     } finally {
