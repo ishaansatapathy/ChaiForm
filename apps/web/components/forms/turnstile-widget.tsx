@@ -24,9 +24,23 @@ declare global {
 type TurnstileWidgetProps = {
   siteKey: string;
   onTokenChange: (token: string) => void;
+  placement?: "inline" | "bottom-left" | "bottom-right";
 };
 
-export function TurnstileWidget({ siteKey, onTokenChange }: TurnstileWidgetProps) {
+const placementClasses: Record<NonNullable<TurnstileWidgetProps["placement"]>, string> = {
+  inline:
+    "flex min-h-[65px] items-center justify-start rounded-2xl border border-white/10 bg-white/5 px-3 py-2",
+  "bottom-left":
+    "fixed bottom-4 left-4 z-50 flex min-h-[65px] items-center justify-start rounded-xl border border-white/10 bg-black/80 px-3 py-2 shadow-lg backdrop-blur-sm sm:bottom-6 sm:left-6",
+  "bottom-right":
+    "fixed bottom-4 right-4 z-50 flex min-h-[65px] items-center justify-start rounded-xl border border-white/10 bg-black/80 px-3 py-2 shadow-lg backdrop-blur-sm sm:bottom-6 sm:right-6",
+};
+
+export function TurnstileWidget({
+  siteKey,
+  onTokenChange,
+  placement = "inline",
+}: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
@@ -69,7 +83,7 @@ export function TurnstileWidget({ siteKey, onTokenChange }: TurnstileWidgetProps
       />
       <div
         ref={containerRef}
-        className="flex min-h-[65px] items-center justify-start rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+        className={placementClasses[placement]}
         aria-label="CAPTCHA verification"
       />
     </>
