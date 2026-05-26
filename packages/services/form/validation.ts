@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { FormField } from "./model";
+import { sanitizeSubmissionValue } from "./sanitize";
 
 function fieldValueSchema(field: FormField) {
   let schema: z.ZodString = z.string();
@@ -108,7 +109,7 @@ export function buildSubmissionSchema(fields: FormField[]) {
     shape[field.id] = fieldValueSchema(field);
   }
 
-  return z.object(shape);
+  return z.object(shape).strict();
 }
 
 export function validateSubmissionAnswers(fields: FormField[], answers: { fieldId: string; value: string }[]) {
@@ -124,7 +125,7 @@ export function validateSubmissionAnswers(fields: FormField[], answers: { fieldI
       throw new Error("Duplicate field in submission");
     }
     seenFieldIds.add(answer.fieldId);
-    answerMap[answer.fieldId] = answer.value?.trim() ?? "";
+    answerMap[answer.fieldId] = sanitizeSubmissionValue(answer.value ?? "");
   }
 
   for (const field of fields) {

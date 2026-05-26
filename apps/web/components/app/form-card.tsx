@@ -74,46 +74,51 @@ export function FormCard({ form }: { form: FormListItem }) {
         </span>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/5 pt-4">
-        <Link
-          href={`/forms/${form.id}/edit`}
-          className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-white/70 uppercase transition-colors hover:text-white"
-        >
-          <Pencil size={14} />
-          Edit
-        </Link>
-        <span className="text-white/15">·</span>
-        <Link
-          href={`/analytics?form=${form.id}`}
-          className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-lime-400/90 uppercase transition-colors hover:text-lime-300"
-        >
-          <BarChart3 size={14} />
-          Analytics
-        </Link>
-        <span className="text-white/15">·</span>
-        <button
-          type="button"
-          onClick={() => setShareOpen(true)}
-          className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-lime-400/90 uppercase transition-colors hover:text-lime-300"
-        >
-          <Share2 size={13} />
-          Share
-        </button>
-        <span className="text-white/15">·</span>
-        <Link
-          href={sharePath}
-          target="_blank"
-          className="text-[11px] font-medium text-white/45 transition-colors hover:text-white"
-        >
-          Open form
-        </Link>
-        <span className="text-white/15">·</span>
-        <DeleteFormButton
-          formId={form.id}
-          formTitle={form.title}
-          label="Delete"
-          className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-red-300 uppercase transition-colors hover:text-red-200"
-        />
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={`/forms/${form.id}/edit`}
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-white/70 uppercase transition-colors hover:text-white"
+          >
+            <Pencil size={14} />
+            Edit
+          </Link>
+          <span className="text-white/15">·</span>
+          <Link
+            href={`/analytics?form=${form.id}`}
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-lime-400/90 uppercase transition-colors hover:text-lime-300"
+          >
+            <BarChart3 size={14} />
+            Analytics
+          </Link>
+          <span className="text-white/15">·</span>
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-lime-400/90 uppercase transition-colors hover:text-lime-300"
+          >
+            <Share2 size={13} />
+            Share
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href={sharePath}
+            target="_blank"
+            className="text-[11px] font-medium text-white/45 transition-colors hover:text-white"
+          >
+            Open form
+          </Link>
+          <span className="text-white/15">·</span>
+          <DeleteFormButton
+            formId={form.id}
+            formTitle={form.title}
+            stayOnPage
+            label="Delete"
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-red-300 uppercase transition-colors hover:text-red-200 disabled:opacity-50"
+          />
+        </div>
       </div>
 
       <ShareFormModal

@@ -15,6 +15,7 @@ import {
 } from "@repo/services/form/model";
 import { TRPCError } from "@trpc/server";
 
+import { sanitizeTrpcError } from "../../error-handler";
 import { publicProcedure, router, verifiedProcedure } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
 
@@ -31,7 +32,7 @@ function mapFormError(error: unknown): never {
     } as const;
     throw new TRPCError({ code: codeMap[error.code], message: error.message });
   }
-  throw error;
+  sanitizeTrpcError(error);
 }
 
 export const formsRouter = router({

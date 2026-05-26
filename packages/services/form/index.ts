@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, db, desc, eq, gt, isNotNull, isNull, lt, or, sql } from "@repo/database";
 import {
   formFieldsTable,
+  formVersionsTable,
   formsTable,
   submissionResponsesTable,
   submissionsTable,
@@ -21,6 +22,8 @@ import type {
 import { createUniqueSlug } from "./slug";
 import { notifyCreatorOfFormDeletion, notifyCreatorOfSubmission } from "./notifications";
 import { expiresAtFromRetention, expiresAtFromRetentionChange, isFormExpired } from "./retention";
+import { sanitizeLabel } from "./sanitize";
+import { fieldsChanged, fieldsToVersionSnapshot } from "./versioning";
 import { validateSubmissionAnswers } from "./validation";
 
 export class FormError extends Error {
@@ -111,11 +114,58 @@ function defaultConfig(type: FormFieldInput["type"]): FieldConfigJson | undefine
 
 class FormService {
   private normalizeInputFields(fields: FormFieldInput[], preserveIds = false): FormField[] {
+    if (preserveIds) {
+      const uuids = fields.map((field) => field.id).filter(isUuid);
+      if (new Set(uuids).size !== uuids.length) {
+        throw new FormError("BAD_REQUEST", "Duplicate field IDs are not allowed");
+      }
+    }
+
     return fields.map((field) => ({
       ...field,
       id: preserveIds && isUuid(field.id) ? field.id : randomUUID(),
+      label: sanitizeLabel(field.label),
       config: field.config ?? defaultConfig(field.type),
     })) as FormField[];
+  }
+
+  private async getSchemaVersion(currentVersionId: string | null | undefined) {
+    if (!currentVersionId) return null;
+    const [version] = await db
+      .select({ versionNumber: formVersionsTable.versionNumber })
+      .from(formVersionsTable)
+      .where(eq(formVersionsTable.id, currentVersionId))
+      .limit(1);
+    return version?.versionNumber ?? null;
+  }
+
+  private async bumpFormVersion(formId: string, fields: FormField[], tx?: typeof db) {
+    const client = tx ?? db;
+    const [latest] = await client
+      .select({ versionNumber: formVersionsTable.versionNumber })
+      .from(formVersionsTable)
+      .where(eq(formVersionsTable.formId, formId))
+      .orderBy(desc(formVersionsTable.versionNumber))
+      .limit(1);
+
+    const versionNumber = (latest?.versionNumber ?? 0) + 1;
+    const [version] = await client
+      .insert(formVersionsTable)
+      .values({
+        formId,
+        versionNumber,
+        schemaSnapshot: fieldsToVersionSnapshot(fields),
+      })
+      .returning();
+
+    if (!version) throw new FormError("BAD_REQUEST", "Unable to save form version");
+
+    await client
+      .update(formsTable)
+      .set({ currentVersionId: version.id })
+      .where(eq(formsTable.id, formId));
+
+    return version;
   }
 
   private async loadFields(formId: string) {
@@ -149,6 +199,7 @@ class FormService {
     submissionCount = 0,
   ) {
     const fields = await this.loadFields(row.id);
+    const schemaVersion = await this.getSchemaVersion(row.currentVersionId);
 
     return {
       id: row.id,
@@ -164,12 +215,16 @@ class FormService {
       allowMultipleSubmissions: row.allowMultipleSubmissions ?? true,
       requireAuthentication: row.requireAuthentication ?? false,
       expiresAt: toIso(row.expiresAt),
+      schemaVersion,
       createdAt: toIso(row.createdAt),
       updatedAt: toIso(row.updatedAt),
     };
   }
 
   private assertFormAvailable(row: typeof formsTable.$inferSelect) {
+    if (row.deletedAt) {
+      throw new FormError("NOT_FOUND", "Form not found");
+    }
     if (row.visibility === "draft") {
       throw new FormError("NOT_FOUND", "Form not available");
     }
@@ -187,7 +242,7 @@ class FormService {
       })
       .from(formsTable)
       .leftJoin(submissionsTable, eq(submissionsTable.formId, formsTable.id))
-      .where(and(isNotNull(formsTable.expiresAt), lt(formsTable.expiresAt, now)))
+      .where(and(isNotNull(formsTable.expiresAt), lt(formsTable.expiresAt, now), isNull(formsTable.deletedAt)))
       .groupBy(formsTable.id);
 
     if (expiredRows.length === 0) return 0;
@@ -205,7 +260,7 @@ class FormService {
 
     await db
       .delete(formsTable)
-      .where(and(isNotNull(formsTable.expiresAt), lt(formsTable.expiresAt, now)));
+      .where(and(isNotNull(formsTable.expiresAt), lt(formsTable.expiresAt, now), isNull(formsTable.deletedAt)));
 
     return expiredRows.length;
   }
@@ -238,12 +293,14 @@ class FormService {
     if (!created) throw new FormError("BAD_REQUEST", "Unable to create form");
 
     await this.insertFields(created.id, fields);
+    await this.bumpFormVersion(created.id, fields);
 
     return this.mapForm(created, 0);
   }
 
   async updateForm(userId: string, input: UpdateFormInput) {
     const existing = await this.getOwnedForm(userId, input.formId);
+    const previousFields = await this.loadFields(input.formId);
     const fields = input.fields ? this.normalizeInputFields(input.fields, true) : undefined;
 
     let slug = existing.slug;
@@ -297,6 +354,10 @@ class FormService {
       return [row];
     });
 
+    if (fields && fieldsChanged(previousFields, fields)) {
+      await this.bumpFormVersion(input.formId, fields);
+    }
+
     const [countRow] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(submissionsTable)
@@ -321,7 +382,10 @@ class FormService {
       reason: "manual",
     }).catch(() => undefined);
 
-    await db.delete(formsTable).where(eq(formsTable.id, formId));
+    await db
+      .update(formsTable)
+      .set({ deletedAt: new Date() })
+      .where(eq(formsTable.id, formId));
     return { success: true as const };
   }
 
@@ -339,7 +403,7 @@ class FormService {
   async listForms(userId: string, pagination: PaginationInput = { limit: 20 }) {
     const limit = pagination.limit ?? 20;
 
-    const conditions = [eq(formsTable.userId, userId)];
+    const conditions = [eq(formsTable.userId, userId), isNull(formsTable.deletedAt)];
     if (pagination.cursor) {
       const [cursorRow] = await db
         .select({ createdAt: formsTable.createdAt })
@@ -376,7 +440,11 @@ class FormService {
   }
 
   async recordView(formId: string) {
-    const [row] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    const [row] = await db
+      .select()
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), isNull(formsTable.deletedAt)))
+      .limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
     this.assertFormAvailable(row);
 
@@ -441,7 +509,11 @@ class FormService {
   }
 
   async hasSubmitted(formId: string, respondentKey: string | undefined, submitterUserId?: string | null) {
-    const [formRow] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    const [formRow] = await db
+      .select()
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), isNull(formsTable.deletedAt)))
+      .limit(1);
     if (!formRow) throw new FormError("NOT_FOUND", "Form not found");
     if (formRow.allowMultipleSubmissions) {
       return { submitted: false as const };
@@ -458,7 +530,11 @@ class FormService {
   }
 
   async getPublicForm(formId: string) {
-    const [row] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    const [row] = await db
+      .select()
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), isNull(formsTable.deletedAt)))
+      .limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
     this.assertFormAvailable(row);
 
@@ -483,7 +559,7 @@ class FormService {
     const [row] = await db
       .select()
       .from(formsTable)
-      .where(sql`lower(${formsTable.slug}) = ${normalizedSlug}`)
+      .where(and(sql`lower(${formsTable.slug}) = ${normalizedSlug}`, isNull(formsTable.deletedAt)))
       .limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
     this.assertFormAvailable(row);
@@ -507,6 +583,7 @@ class FormService {
 
     const conditions = [
       eq(formsTable.visibility, "public"),
+      isNull(formsTable.deletedAt),
       or(isNull(formsTable.expiresAt), gt(formsTable.expiresAt, new Date())),
     ];
     if (pagination.cursor) {
@@ -553,7 +630,11 @@ class FormService {
   }
 
   private async getOwnedForm(userId: string, formId: string) {
-    const [row] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    const [row] = await db
+      .select()
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), isNull(formsTable.deletedAt)))
+      .limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
     if (row.userId !== userId) throw new FormError("FORBIDDEN", "Not allowed");
     return row;
@@ -564,7 +645,11 @@ class FormService {
       throw new FormError("BAD_REQUEST", "Submission rejected");
     }
 
-    const [formRow] = await db.select().from(formsTable).where(eq(formsTable.id, input.formId)).limit(1);
+    const [formRow] = await db
+      .select()
+      .from(formsTable)
+      .where(and(eq(formsTable.id, input.formId), isNull(formsTable.deletedAt)))
+      .limit(1);
     if (!formRow) throw new FormError("NOT_FOUND", "Form not found");
     this.assertFormAvailable(formRow);
 
@@ -573,6 +658,30 @@ class FormService {
     }
 
     const form = await this.getPublicForm(input.formId);
+
+    if (input.idempotencyKey) {
+      const [existingByKey] = await db
+        .select()
+        .from(submissionsTable)
+        .where(
+          and(
+            eq(submissionsTable.formId, input.formId),
+            eq(submissionsTable.idempotencyKey, input.idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (existingByKey) {
+        return {
+          id: existingByKey.id,
+          formId: existingByKey.formId,
+          formVersionId: existingByKey.formVersionId ?? null,
+          formTitle: form.title,
+          answers: existingByKey.answers as SubmissionAnswerJson[],
+          submittedAt: toIso(existingByKey.submittedAt),
+        };
+      }
+    }
+
     let validated: Record<string, string>;
 
     try {
@@ -622,8 +731,10 @@ class FormService {
         .insert(submissionsTable)
         .values({
           formId: form.id,
+          formVersionId: formRow.currentVersionId ?? null,
           submitterUserId: submitterUserId ?? null,
           respondentKey: input.respondentKey ?? null,
+          idempotencyKey: input.idempotencyKey ?? null,
           answers,
         })
         .returning();
@@ -656,6 +767,7 @@ class FormService {
     return {
       id: created.id,
       formId: created.formId,
+      formVersionId: created.formVersionId ?? null,
       formTitle: form.title,
       answers: created.answers as SubmissionAnswerJson[],
       submittedAt: toIso(created.submittedAt),
@@ -705,6 +817,7 @@ class FormService {
     const items = pageRows.map((row) => ({
       id: row.submission.id,
       formId: row.submission.formId,
+      formVersionId: row.submission.formVersionId ?? null,
       formTitle: row.formTitle,
       answers: row.submission.answers as SubmissionAnswerJson[],
       submittedAt: toIso(row.submission.submittedAt),
@@ -734,6 +847,7 @@ class FormService {
     return {
       id: row.submission.id,
       formId: row.submission.formId,
+      formVersionId: row.submission.formVersionId ?? null,
       formTitle: row.formTitle,
       answers: row.submission.answers as SubmissionAnswerJson[],
       submittedAt: toIso(row.submission.submittedAt),

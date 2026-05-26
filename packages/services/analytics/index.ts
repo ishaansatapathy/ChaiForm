@@ -1,9 +1,10 @@
-import { and, db, desc, eq, gte, sql } from "@repo/database";
+import { and, db, desc, eq, gte, isNull, sql } from "@repo/database";
 import {
   formFieldsTable,
   formsTable,
   submissionResponsesTable,
   submissionsTable,
+  type FormVisibility,
   type SubmissionAnswerJson,
 } from "@repo/database/schema";
 
@@ -14,25 +15,55 @@ function completionRate(submissions: number, views: number) {
   return Number(((submissions / views) * 100).toFixed(1));
 }
 
+const SUMMARY_CACHE_TTL_MS = 30_000;
+type SummaryResult = {
+  totalForms: number;
+  totalSubmissions: number;
+  submissionsLast7Days: number;
+  averageCompletionRate: number;
+  selectedForm: {
+    id: string;
+    title: string;
+    submissionCount: number;
+    viewCount: number;
+    completionRate: number;
+    fieldCount: number;
+    visibility: FormVisibility;
+  } | null;
+};
+const summaryCache = new Map<string, { expiresAt: number; value: SummaryResult }>();
+
 class AnalyticsService {
   private async assertFormOwnership(userId: string, formId: string) {
-    const [form] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    const [form] = await db
+      .select()
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), isNull(formsTable.deletedAt)))
+      .limit(1);
     if (!form) throw new FormError("NOT_FOUND", "Form not found");
     if (form.userId !== userId) throw new FormError("FORBIDDEN", "Not allowed");
     return form;
   }
 
   async getSummary(userId: string, formId?: string) {
+    const cacheKey = `${userId}:${formId ?? "all"}`;
+    const cached = summaryCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value;
+    }
+
+    const notDeleted = isNull(formsTable.deletedAt);
+
     const [formsCount] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(formsTable)
-      .where(eq(formsTable.userId, userId));
+      .where(and(eq(formsTable.userId, userId), notDeleted));
 
     const [submissionsCount] = await db
       .select({ count: sql<number>`count(${submissionsTable.id})::int` })
       .from(submissionsTable)
       .innerJoin(formsTable, eq(formsTable.id, submissionsTable.formId))
-      .where(eq(formsTable.userId, userId));
+      .where(and(eq(formsTable.userId, userId), notDeleted));
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -41,12 +72,12 @@ class AnalyticsService {
       .select({ count: sql<number>`count(${submissionsTable.id})::int` })
       .from(submissionsTable)
       .innerJoin(formsTable, eq(formsTable.id, submissionsTable.formId))
-      .where(and(eq(formsTable.userId, userId), gte(submissionsTable.submittedAt, sevenDaysAgo)));
+      .where(and(eq(formsTable.userId, userId), notDeleted, gte(submissionsTable.submittedAt, sevenDaysAgo)));
 
     const userForms = await db
       .select({ viewCount: formsTable.viewCount })
       .from(formsTable)
-      .where(eq(formsTable.userId, userId));
+      .where(and(eq(formsTable.userId, userId), notDeleted));
 
     const totalViews = userForms.reduce((sum, form) => sum + (form.viewCount ?? 0), 0);
     const totalSubs = submissionsCount?.count ?? 0;
@@ -80,13 +111,16 @@ class AnalyticsService {
       };
     }
 
-    return {
+    const result = {
       totalForms: formsCount?.count ?? 0,
       totalSubmissions: submissionsCount?.count ?? 0,
       submissionsLast7Days: recentCount?.count ?? 0,
       averageCompletionRate: completionRate(totalSubs, totalViews),
       selectedForm,
     };
+
+    summaryCache.set(cacheKey, { expiresAt: Date.now() + SUMMARY_CACHE_TTL_MS, value: result });
+    return result;
   }
 
   async getSubmissionsOverTime(userId: string, formId: string, days: number) {

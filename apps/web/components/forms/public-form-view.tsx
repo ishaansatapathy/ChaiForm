@@ -15,6 +15,7 @@ import {
   hasLocalSubmission,
   markFormSubmitted,
 } from "~/lib/respondent-key";
+import { clearSubmissionIdempotencyKey, getSubmissionIdempotencyKey } from "~/lib/idempotency-key";
 import { runWithRetry, useWarmApi } from "~/lib/warm-api";
 import { trpc } from "~/trpc/client";
 
@@ -137,9 +138,11 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
     if (!validateCurrentStep()) return;
     const honeypot = honeypotRef.current?.value ?? "";
     const respondentKey = form.requireAuthentication ? undefined : getRespondentKey(form.id);
+    const idempotencyKey = getSubmissionIdempotencyKey(form.id);
     const payload = {
       formId: form.id,
       website: honeypot,
+      idempotencyKey,
       ...(form.allowMultipleSubmissions || form.requireAuthentication
         ? {}
         : { respondentKey }),
@@ -185,6 +188,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
         },
       );
       markFormSubmitted(form.id);
+      clearSubmissionIdempotencyKey(form.id);
       router.push(thankYouPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not submit this form.";

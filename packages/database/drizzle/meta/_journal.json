@@ -92,6 +92,13 @@
       "when": 1767592965703,
       "tag": "0012_require_authentication",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1767592965704,
+      "tag": "0013_versions_soft_delete_idempotency",
+      "breakpoints": true
     }
   ]
 }
