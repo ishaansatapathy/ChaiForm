@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { appendProxiedSetCookies } from "~/lib/proxied-set-cookie";
+
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
 export const maxDuration = 60;
@@ -19,23 +21,6 @@ function buildUpstreamHeaders(request: NextRequest): Headers {
   // break browsers with ERR_CONTENT_DECODING_FAILED when re-proxied through Vercel.
   headers.set("accept-encoding", "identity");
   return headers;
-}
-
-function appendSetCookies(response: NextResponse, upstreamRes: Response) {
-  const setCookies =
-    typeof upstreamRes.headers.getSetCookie === "function"
-      ? upstreamRes.headers.getSetCookie()
-      : [];
-
-  if (setCookies.length > 0) {
-    for (const setCookie of setCookies) {
-      response.headers.append("set-cookie", setCookie);
-    }
-    return;
-  }
-
-  const single = upstreamRes.headers.get("set-cookie");
-  if (single) response.headers.set("set-cookie", single);
 }
 
 /** Proxy tRPC so auth Set-Cookie headers reach the browser (rewrites drop them). */
@@ -126,7 +111,7 @@ async function proxyTrpc(request: NextRequest, context: { params: Promise<{ path
   response.headers.set("Cache-Control", "no-store, no-transform");
   response.headers.delete("content-encoding");
 
-  appendSetCookies(response, upstreamRes);
+  appendProxiedSetCookies(response.headers, upstreamRes.headers);
   return response;
 }
 

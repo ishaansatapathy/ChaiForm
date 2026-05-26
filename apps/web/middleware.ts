@@ -5,6 +5,7 @@ import type { NextRequest } from "next/server";
 import { sanitizeRedirectPath } from "~/lib/safe-redirect";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/analytics", "/forms", "/settings"];
+const AUTH_ENTRY_PATHS = new Set(["/", "/sign-in", "/sign-up"]);
 
 function getJwtSecret() {
   return process.env.JWT_SECRET?.trim() ?? "";
@@ -54,8 +55,33 @@ async function resolveSession(request: NextRequest): Promise<SessionPayload | nu
   }
 }
 
+function isSignedIn(session: SessionPayload | null) {
+  return Boolean(session?.userId);
+}
+
+/** Only block when token explicitly says unverified (legacy tokens may omit the claim). */
+function isVerifiedSession(session: SessionPayload | null) {
+  return isSignedIn(session) && session?.emailVerified !== false;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const session = await resolveSession(request);
+
+  if (AUTH_ENTRY_PATHS.has(pathname)) {
+    if (isVerifiedSession(session)) {
+      const destination =
+        pathname === "/sign-in"
+          ? sanitizeRedirectPath(request.nextUrl.searchParams.get("next"))
+          : "/dashboard";
+      const dashboardUrl = request.nextUrl.clone();
+      dashboardUrl.pathname = destination;
+      dashboardUrl.search = "";
+      return NextResponse.redirect(dashboardUrl);
+    }
+    return NextResponse.next();
+  }
+
   const isProtected = PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
@@ -64,15 +90,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = await resolveSession(request);
-  if (!session?.userId) {
+  if (!isSignedIn(session)) {
     const signInUrl = request.nextUrl.clone();
     signInUrl.pathname = "/sign-in";
     signInUrl.searchParams.set("next", sanitizeRedirectPath(pathname));
     return NextResponse.redirect(signInUrl);
   }
 
-  if (session.emailVerified !== true) {
+  if (session?.emailVerified === false) {
     const verifyUrl = request.nextUrl.clone();
     verifyUrl.pathname = "/check-email";
     verifyUrl.search = "";
@@ -83,5 +108,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/analytics/:path*", "/forms/:path*", "/settings/:path*"],
+  matcher: [
+    "/",
+    "/sign-in",
+    "/sign-up",
+    "/dashboard/:path*",
+    "/analytics/:path*",
+    "/forms/:path*",
+    "/settings/:path*",
+  ],
 };
