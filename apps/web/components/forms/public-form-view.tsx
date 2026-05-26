@@ -174,7 +174,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
       website: honeypot,
       idempotencyKey,
       ...(turnstileEnabled && turnstileToken ? { turnstileToken } : {}),
-      answers: fields.map((field) => ({
+      answers: visibleFields.map((field) => ({
         fieldId: field.id,
         value: values[field.id] ?? "",
       })),

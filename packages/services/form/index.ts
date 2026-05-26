@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { ZodError } from "zod";
 
-import { and, asc, db, desc, eq, gt, isNotNull, isNull, lt, or, sql } from "@repo/database";
+import { and, asc, db, desc, eq, gt, gte, isNotNull, isNull, lt, or, sql } from "@repo/database";
 import {
   formFieldsTable,
   formVersionsTable,
@@ -18,6 +18,7 @@ import type {
   FormField,
   FormFieldInput,
   PaginationInput,
+  SubmissionPaginationInput,
   SubmitFormInput,
   UpdateFormInput,
 } from "./model";
@@ -54,6 +55,23 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function parseSubmissionDateFilter(value: string | undefined, endExclusive = false) {
+  if (!value?.trim()) return undefined;
+
+  const trimmed = value.trim();
+  const hasTime = trimmed.includes("T");
+  const date = new Date(hasTime ? trimmed : `${trimmed}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    throw new FormError("BAD_REQUEST", "Invalid submission date filter");
+  }
+
+  if (endExclusive && !hasTime) {
+    date.setUTCDate(date.getUTCDate() + 1);
+  }
+
+  return date;
+}
+
 function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
   const base = {
     id: row.id,
@@ -79,6 +97,8 @@ function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
         type: "rating",
         config: {
           maxRating: config?.maxRating ?? 5,
+          ...(config?.lowLabel ? { lowLabel: config.lowLabel } : {}),
+          ...(config?.highLabel ? { highLabel: config.highLabel } : {}),
           ...(config?.showWhen ? { showWhen: config.showWhen } : {}),
         },
       };
@@ -116,9 +136,10 @@ function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
     case "number":
     case "date": {
       const fieldConfig =
-        config?.placeholder || config?.showWhen
+        config?.placeholder || config?.validation || config?.showWhen
           ? {
               ...(config.placeholder ? { placeholder: config.placeholder } : {}),
+              ...(config.validation ? { validation: config.validation } : {}),
               ...(config.showWhen ? { showWhen: config.showWhen } : {}),
             }
           : undefined;
@@ -141,6 +162,87 @@ function defaultConfig(type: FormFieldInput["type"]): FieldConfigJson | undefine
 }
 
 class FormService {
+  private assertValidationConfigs(fields: FormField[]) {
+    fields.forEach((field) => {
+      const validation =
+        field.config && "validation" in field.config ? field.config.validation : undefined;
+      if (!validation) return;
+
+      if (
+        validation.minLength !== undefined &&
+        validation.maxLength !== undefined &&
+        validation.minLength > validation.maxLength
+      ) {
+        throw new FormError("BAD_REQUEST", `"${field.label}" minimum length cannot exceed maximum length`);
+      }
+
+      if (
+        validation.minValue !== undefined &&
+        validation.maxValue !== undefined &&
+        validation.minValue > validation.maxValue
+      ) {
+        throw new FormError("BAD_REQUEST", `"${field.label}" minimum value cannot exceed maximum value`);
+      }
+
+      if (validation.pattern) {
+        try {
+          new RegExp(validation.pattern);
+        } catch {
+          throw new FormError("BAD_REQUEST", `"${field.label}" validation pattern is invalid`);
+        }
+      }
+    });
+  }
+
+  private assertVisibilityRules(fields: FormField[]) {
+    const fieldIndex = new Map(fields.map((field, index) => [field.id, index]));
+
+    fields.forEach((field, index) => {
+      const rule = field.config?.showWhen;
+      if (!rule) return;
+
+      const dependencyIndex = fieldIndex.get(rule.fieldId);
+      if (dependencyIndex === undefined) {
+        throw new FormError("BAD_REQUEST", `"${field.label}" has an invalid conditional field`);
+      }
+      if (dependencyIndex >= index) {
+        throw new FormError(
+          "BAD_REQUEST",
+          `"${field.label}" can only depend on a question that appears before it`,
+        );
+      }
+
+      const dependency = fields[dependencyIndex];
+      const expected = rule.value.trim();
+      if (!expected) {
+        throw new FormError("BAD_REQUEST", `"${field.label}" conditional value is required`);
+      }
+
+      if (dependency?.type === "select") {
+        const options = dependency.config?.options ?? [];
+        if (!options.includes(expected)) {
+          throw new FormError("BAD_REQUEST", `"${field.label}" conditional value must match an option`);
+        }
+      }
+
+      if (dependency?.type === "rating") {
+        const maxRating = dependency.config?.maxRating ?? 5;
+        const rating = Number(expected);
+        if (!Number.isInteger(rating) || rating < 1 || rating > maxRating) {
+          throw new FormError("BAD_REQUEST", `"${field.label}" conditional rating is out of range`);
+        }
+      }
+
+      if (dependency?.type === "checkbox") {
+        const options = dependency.config?.options?.map((option) => option.trim()).filter(Boolean) ?? [];
+        const allowed = options.length > 0 ? options : ["true", "false"];
+        if (!allowed.includes(expected)) {
+          throw new FormError("BAD_REQUEST", `"${field.label}" conditional checkbox value is invalid`);
+        }
+      }
+    });
+  }
+
   private normalizeInputFields(fields: FormFieldInput[], preserveIds = false): FormField[] {
     if (preserveIds) {
       const uuids = fields.map((field) => field.id).filter(isUuid);
@@ -149,12 +251,39 @@ class FormService {
       }
     }
 
-    return fields.map((field) => ({
-      ...field,
-      id: preserveIds && isUuid(field.id) ? field.id : randomUUID(),
-      label: sanitizeLabel(field.label),
-      config: field.config ?? defaultConfig(field.type),
-    })) as FormField[];
+    const normalizedIds = new Map(
+      fields.map((field) => [field.id, preserveIds && isUuid(field.id) ? field.id : randomUUID()]),
+    );
+
+    const normalized = fields.map((field) => {
+      const config = field.config ?? defaultConfig(field.type);
+      const showWhen = config?.showWhen;
+      const normalizedConfig = config
+        ? {
+            ...config,
+            ...(showWhen
+              ? {
+                  showWhen: {
+                    ...showWhen,
+                    fieldId: normalizedIds.get(showWhen.fieldId) ?? showWhen.fieldId,
+                    value: showWhen.value.trim(),
+                  },
+                }
+              : {}),
+          }
+        : undefined;
+
+      return {
+        ...field,
+        id: normalizedIds.get(field.id) ?? randomUUID(),
+        label: sanitizeLabel(field.label),
+        config: normalizedConfig,
+      };
+    }) as FormField[];
+
+    this.assertVisibilityRules(normalized);
+    this.assertValidationConfigs(normalized);
+    return normalized;
   }
 
   private async getSchemaVersion(currentVersionId: string | null | undefined) {
@@ -672,6 +801,33 @@ class FormService {
     return row;
   }
 
+  private buildSubmissionConditions(formId: string, pagination: SubmissionPaginationInput) {
+    const conditions = [eq(submissionsTable.formId, formId)];
+
+    if (pagination.search?.trim()) {
+      const pattern = `%${pagination.search.trim()}%`;
+      conditions.push(
+        sql`exists (
+          select 1 from ${submissionResponsesTable} sr
+          where sr.submission_id = ${submissionsTable.id}
+          and sr.value ilike ${pattern}
+        )`,
+      );
+    }
+
+    const submittedFrom = parseSubmissionDateFilter(pagination.submittedFrom);
+    if (submittedFrom) {
+      conditions.push(gte(submissionsTable.submittedAt, submittedFrom));
+    }
+
+    const submittedTo = parseSubmissionDateFilter(pagination.submittedTo, true);
+    if (submittedTo) {
+      conditions.push(lt(submissionsTable.submittedAt, submittedTo));
+    }
+
+    return conditions;
+  }
+
   async submitForm(input: SubmitFormInput, submitterUserId?: string | null) {
     refineSubmitFormInput(input);
     if (input.website.length > 0) {
@@ -823,23 +979,13 @@ class FormService {
   async listSubmissions(
     userId: string,
     formId: string,
-    pagination: PaginationInput = { limit: 20 },
+    pagination: SubmissionPaginationInput = { limit: 20 },
     actorRole: UserRole = "user",
   ) {
     await this.getOwnedForm(userId, formId, actorRole);
     const limit = pagination.limit ?? 20;
 
-    const conditions = [eq(submissionsTable.formId, formId)];
-    if (pagination.search?.trim()) {
-      const pattern = `%${pagination.search.trim()}%`;
-      conditions.push(
-        sql`exists (
-          select 1 from ${submissionResponsesTable} sr
-          where sr.submission_id = ${submissionsTable.id}
-          and sr.value ilike ${pattern}
-        )`,
-      );
-    }
+    const conditions = this.buildSubmissionConditions(formId, pagination);
     if (pagination.cursor) {
       const [cursorRow] = await db
         .select({ submittedAt: submissionsTable.submittedAt })
@@ -877,6 +1023,46 @@ class FormService {
     return {
       items,
       nextCursor: hasMore ? (pageRows[pageRows.length - 1]?.submission.id ?? null) : null,
+    };
+  }
+
+  async exportSubmissions(
+    userId: string,
+    formId: string,
+    filters: Omit<SubmissionPaginationInput, "limit" | "cursor"> = {},
+    actorRole: UserRole = "user",
+  ) {
+    const form = await this.getOwnedForm(userId, formId, actorRole);
+    const fields = await this.loadFields(formId);
+    const conditions = this.buildSubmissionConditions(formId, {
+      limit: 100,
+      search: filters.search,
+      submittedFrom: filters.submittedFrom,
+      submittedTo: filters.submittedTo,
+    });
+
+    const rows = await db
+      .select({ submission: submissionsTable })
+      .from(submissionsTable)
+      .where(and(...conditions))
+      .orderBy(desc(submissionsTable.submittedAt))
+      .limit(5000);
+
+    return {
+      formTitle: form.title,
+      fields: fields.map((field) => ({
+        id: field.id,
+        label: field.label,
+        type: field.type,
+      })),
+      items: rows.map((row) => ({
+        id: row.submission.id,
+        formId: row.submission.formId,
+        formVersionId: row.submission.formVersionId ?? null,
+        formTitle: form.title,
+        answers: row.submission.answers as SubmissionAnswerJson[],
+        submittedAt: toIso(row.submission.submittedAt),
+      })),
     };
   }
 

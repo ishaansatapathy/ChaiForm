@@ -13,8 +13,19 @@ export const fieldVisibilityRuleSchema = z
   })
   .strict();
 
+const fieldValidationConfigSchema = z
+  .object({
+    minLength: z.number().int().min(0).max(5000).optional(),
+    maxLength: z.number().int().min(1).max(10000).optional(),
+    pattern: z.string().max(500).optional(),
+    minValue: z.number().optional(),
+    maxValue: z.number().optional(),
+  })
+  .strict();
+
 const textLikeConfigSchema = z.object({
   placeholder: z.string().max(200).optional(),
+  validation: fieldValidationConfigSchema.optional(),
   showWhen: fieldVisibilityRuleSchema.optional(),
 });
 
@@ -44,6 +55,8 @@ export const formFieldInputSchema = z.discriminatedUnion("type", [
     type: z.literal("rating"),
     config: z.object({
       maxRating: z.number().int().min(1).max(10).default(5),
+      lowLabel: z.string().max(80).optional(),
+      highLabel: z.string().max(80).optional(),
       showWhen: fieldVisibilityRuleSchema.optional(),
     }),
   }),
@@ -84,6 +97,8 @@ export const formFieldSchema = z.discriminatedUnion("type", [
     type: z.literal("rating"),
     config: z.object({
       maxRating: z.number().int().min(1).max(10).default(5),
+      lowLabel: z.string().max(80).optional(),
+      highLabel: z.string().max(80).optional(),
       showWhen: fieldVisibilityRuleSchema.optional(),
     }),
   }),
@@ -107,6 +122,16 @@ export const paginationInputSchema = z
     limit: z.number().int().min(1).max(100).default(20),
     cursor: z.string().uuid().optional(),
     search: z.string().max(200).optional(),
+  })
+  .strict();
+
+export const submissionPaginationInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(100).default(20),
+    cursor: z.string().uuid().optional(),
+    search: z.string().max(200).optional(),
+    submittedFrom: z.string().max(40).optional(),
+    submittedTo: z.string().max(40).optional(),
   })
   .strict();
 
@@ -265,9 +290,22 @@ export const paginatedSubmissionsOutputSchema = z.object({
   nextCursor: z.string().uuid().nullable(),
 });
 
+export const exportSubmissionsOutputSchema = z.object({
+  formTitle: z.string(),
+  fields: z.array(
+    z.object({
+      id: z.string().uuid(),
+      label: z.string(),
+      type: z.string(),
+    }),
+  ),
+  items: z.array(submissionOutputSchema),
+});
+
 export type FormFieldInput = z.infer<typeof formFieldInputSchema>;
 export type FormField = z.infer<typeof formFieldSchema>;
 export type CreateFormInput = z.infer<typeof createFormInputSchema>;
 export type UpdateFormInput = z.infer<typeof updateFormInputSchema>;
 export type SubmitFormInput = z.infer<typeof submitFormInputSchema>;
 export type PaginationInput = z.infer<typeof paginationInputSchema>;
+export type SubmissionPaginationInput = z.infer<typeof submissionPaginationInputSchema>;

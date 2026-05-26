@@ -22,8 +22,17 @@ export interface DraftField {
   config?: {
     options?: string[];
     maxRating?: number;
+    lowLabel?: string;
+    highLabel?: string;
     placeholder?: string;
     checkboxLabel?: string;
+    validation?: {
+      minLength?: number;
+      maxLength?: number;
+      pattern?: string;
+      minValue?: number;
+      maxValue?: number;
+    };
     showWhen?: {
       fieldId: string;
       operator: "eq" | "neq";
@@ -45,9 +54,19 @@ const FIELD_TYPES: FieldType[] = [
 
 function defaultConfig(type: FieldType): DraftField["config"] {
   if (type === "select") return { options: ["Option 1", "Option 2"] };
-  if (type === "rating") return { maxRating: 5 };
+  if (type === "rating") return { maxRating: 5, lowLabel: "Low", highLabel: "High" };
   if (type === "checkbox") return { options: ["Option 1"] };
   return undefined;
+}
+
+function emptyToUndefined(value: string) {
+  return value.trim() || undefined;
+}
+
+function numberOrUndefined(value: string) {
+  if (value.trim() === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function getCheckboxOptions(field: DraftField): string[] {
@@ -55,6 +74,23 @@ function getCheckboxOptions(field: DraftField): string[] {
   if (options?.length) return options;
   if (field.config?.checkboxLabel?.trim()) return [field.config.checkboxLabel];
   return ["Option 1"];
+}
+
+function getConditionValueOptions(field: DraftField): string[] | null {
+  if (field.type === "select") return field.config?.options?.filter(Boolean) ?? [];
+  if (field.type === "rating") {
+    const maxRating = Math.min(Math.max(field.config?.maxRating ?? 5, 1), 10);
+    return Array.from({ length: maxRating }, (_, index) => String(index + 1));
+  }
+  if (field.type === "checkbox") {
+    const options = field.config?.options?.map((option) => option.trim()).filter(Boolean) ?? [];
+    return options.length > 0 ? options : ["true", "false"];
+  }
+  return null;
+}
+
+function defaultConditionValue(field: DraftField) {
+  return getConditionValueOptions(field)?.[0] ?? "";
 }
 
 function newFieldId() {
@@ -244,21 +280,49 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
           )}
 
           {field.type === "rating" && (
-            <label className="mt-4 block text-xs text-white/50">
-              Max rating
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={field.config?.maxRating ?? 5}
-                onChange={(e) =>
-                  updateField(field.id, {
-                    config: { ...field.config, maxRating: Number(e.target.value) || 5 },
-                  })
-                }
-                className="mt-2 w-full rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
-              />
-            </label>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <label className="block text-xs text-white/50">
+                Max rating
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={field.config?.maxRating ?? 5}
+                  onChange={(e) =>
+                    updateField(field.id, {
+                      config: { ...field.config, maxRating: Number(e.target.value) || 5 },
+                    })
+                  }
+                  className="mt-2 w-full rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
+                />
+              </label>
+              <label className="block text-xs text-white/50">
+                Low label
+                <input
+                  value={field.config?.lowLabel ?? ""}
+                  onChange={(e) =>
+                    updateField(field.id, {
+                      config: { ...field.config, lowLabel: emptyToUndefined(e.target.value) },
+                    })
+                  }
+                  placeholder="Very unlikely"
+                  className="mt-2 w-full rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
+                />
+              </label>
+              <label className="block text-xs text-white/50">
+                High label
+                <input
+                  value={field.config?.highLabel ?? ""}
+                  onChange={(e) =>
+                    updateField(field.id, {
+                      config: { ...field.config, highLabel: emptyToUndefined(e.target.value) },
+                    })
+                  }
+                  placeholder="Very likely"
+                  className="mt-2 w-full rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
+                />
+              </label>
+            </div>
           )}
 
           {field.type === "checkbox" && (
@@ -273,7 +337,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                         index === optionIndex ? e.target.value : item,
                       );
                       updateField(field.id, {
-                        config: { options: nextOptions },
+                        config: { ...field.config, options: nextOptions },
                       });
                     }}
                     placeholder={`Option ${optionIndex + 1}`}
@@ -286,6 +350,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                       if (currentOptions.length <= 1) return;
                       updateField(field.id, {
                         config: {
+                          ...field.config,
                           options: currentOptions.filter((_, index) => index !== optionIndex),
                         },
                       });
@@ -304,6 +369,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                   const currentOptions = getCheckboxOptions(field);
                   updateField(field.id, {
                     config: {
+                      ...field.config,
                       options: [...currentOptions, `Option ${currentOptions.length + 1}`],
                     },
                   });
@@ -313,6 +379,121 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                 <Plus size={14} />
                 Add option
               </button>
+            </div>
+          )}
+
+          {(field.type === "text" ||
+            field.type === "textarea" ||
+            field.type === "email" ||
+            field.type === "number") && (
+            <div className="mt-4 space-y-3 rounded-2xl border border-white/8 bg-white/2 p-4">
+              <p className="text-xs font-semibold tracking-wide text-white/55 uppercase">
+                Validation rules
+              </p>
+              {field.type === "number" ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="block text-[10px] text-white/40">
+                    Min value
+                    <input
+                      type="number"
+                      value={field.config?.validation?.minValue ?? ""}
+                      onChange={(event) =>
+                        updateField(field.id, {
+                          config: {
+                            ...field.config,
+                            validation: {
+                              ...field.config?.validation,
+                              minValue: numberOrUndefined(event.target.value),
+                            },
+                          },
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                    />
+                  </label>
+                  <label className="block text-[10px] text-white/40">
+                    Max value
+                    <input
+                      type="number"
+                      value={field.config?.validation?.maxValue ?? ""}
+                      onChange={(event) =>
+                        updateField(field.id, {
+                          config: {
+                            ...field.config,
+                            validation: {
+                              ...field.config?.validation,
+                              maxValue: numberOrUndefined(event.target.value),
+                            },
+                          },
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <label className="block text-[10px] text-white/40">
+                    Min length
+                    <input
+                      type="number"
+                      min={0}
+                      value={field.config?.validation?.minLength ?? ""}
+                      onChange={(event) =>
+                        updateField(field.id, {
+                          config: {
+                            ...field.config,
+                            validation: {
+                              ...field.config?.validation,
+                              minLength: numberOrUndefined(event.target.value),
+                            },
+                          },
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                    />
+                  </label>
+                  <label className="block text-[10px] text-white/40">
+                    Max length
+                    <input
+                      type="number"
+                      min={1}
+                      value={field.config?.validation?.maxLength ?? ""}
+                      onChange={(event) =>
+                        updateField(field.id, {
+                          config: {
+                            ...field.config,
+                            validation: {
+                              ...field.config?.validation,
+                              maxLength: numberOrUndefined(event.target.value),
+                            },
+                          },
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                    />
+                  </label>
+                  <label className="block text-[10px] text-white/40">
+                    Regex pattern
+                    <input
+                      value={field.config?.validation?.pattern ?? ""}
+                      onChange={(event) =>
+                        updateField(field.id, {
+                          config: {
+                            ...field.config,
+                            validation: {
+                              ...field.config?.validation,
+                              pattern: emptyToUndefined(event.target.value),
+                            },
+                          },
+                        })
+                      }
+                      placeholder="^[A-Z0-9-]+$"
+                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                    />
+                  </label>
+                </div>
+              )}
             </div>
           )}
 
@@ -349,7 +530,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                         showWhen: {
                           fieldId: priorField.id,
                           operator: "eq",
-                          value: "",
+                          value: defaultConditionValue(priorField),
                         },
                       },
                     });
@@ -366,15 +547,21 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                     <select
                       value={field.config.showWhen.fieldId}
                       onChange={(event) =>
-                        updateField(field.id, {
-                          config: {
-                            ...field.config,
-                            showWhen: {
-                              ...field.config!.showWhen!,
-                              fieldId: event.target.value,
+                        {
+                          const nextDependency = fields.find((candidate) => candidate.id === event.target.value);
+                          updateField(field.id, {
+                            config: {
+                              ...field.config,
+                              showWhen: {
+                                ...field.config!.showWhen!,
+                                fieldId: event.target.value,
+                                value: nextDependency
+                                  ? defaultConditionValue(nextDependency)
+                                  : field.config!.showWhen!.value,
+                              },
                             },
-                          },
-                        })
+                          });
+                        }
                       }
                       className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
                     >
@@ -408,22 +595,54 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                   </label>
                   <label className="block text-[10px] text-white/40">
                     Value
-                    <input
-                      value={field.config.showWhen.value}
-                      onChange={(event) =>
-                        updateField(field.id, {
-                          config: {
-                            ...field.config,
-                            showWhen: {
-                              ...field.config!.showWhen!,
-                              value: event.target.value,
-                            },
-                          },
-                        })
+                    {(() => {
+                      const dependency = fields.find((candidate) => candidate.id === field.config!.showWhen!.fieldId);
+                      const options = dependency ? getConditionValueOptions(dependency) : null;
+                      if (options?.length) {
+                        return (
+                          <select
+                            value={field.config.showWhen.value}
+                            onChange={(event) =>
+                              updateField(field.id, {
+                                config: {
+                                  ...field.config,
+                                  showWhen: {
+                                    ...field.config!.showWhen!,
+                                    value: event.target.value,
+                                  },
+                                },
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                          >
+                            {options.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        );
                       }
-                      placeholder="Match value"
-                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
-                    />
+
+                      return (
+                        <input
+                          value={field.config.showWhen.value}
+                          onChange={(event) =>
+                            updateField(field.id, {
+                              config: {
+                                ...field.config,
+                                showWhen: {
+                                  ...field.config!.showWhen!,
+                                  value: event.target.value,
+                                },
+                              },
+                            })
+                          }
+                          placeholder="Match value"
+                          className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                        />
+                      );
+                    })()}
                   </label>
                 </div>
               )}

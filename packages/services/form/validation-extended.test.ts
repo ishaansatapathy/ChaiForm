@@ -209,4 +209,127 @@ describe("validateSubmissionAnswers", () => {
       ]),
     ).toThrow();
   });
+
+  it("does not require hidden conditional fields and clears stale hidden answers", () => {
+    const conditionalFields: FormField[] = [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        label: "Need follow up?",
+        type: "select",
+        required: true,
+        config: { options: ["Yes", "No"] },
+      },
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        label: "Follow-up details",
+        type: "text",
+        required: true,
+        config: {
+          showWhen: {
+            fieldId: "11111111-1111-4111-8111-111111111111",
+            operator: "eq",
+            value: "Yes",
+          },
+        },
+      },
+    ];
+
+    const result = validateSubmissionAnswers(conditionalFields, [
+      { fieldId: conditionalFields[0]!.id, value: "No" },
+      { fieldId: conditionalFields[1]!.id, value: "old stale text" },
+    ]);
+
+    expect(result[conditionalFields[0]!.id]).toBe("No");
+    expect(result[conditionalFields[1]!.id]).toBe("");
+  });
+
+  it("requires conditional fields when their visibility rule matches", () => {
+    const conditionalFields: FormField[] = [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        label: "Need follow up?",
+        type: "select",
+        required: true,
+        config: { options: ["Yes", "No"] },
+      },
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        label: "Follow-up details",
+        type: "text",
+        required: true,
+        config: {
+          showWhen: {
+            fieldId: "11111111-1111-4111-8111-111111111111",
+            operator: "eq",
+            value: "Yes",
+          },
+        },
+      },
+    ];
+
+    expect(() =>
+      validateSubmissionAnswers(conditionalFields, [
+        { fieldId: conditionalFields[0]!.id, value: "Yes" },
+      ]),
+    ).toThrow();
+  });
+
+  it("enforces text validation rules", () => {
+    const validationFields: FormField[] = [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        label: "Ticket ID",
+        type: "text",
+        required: true,
+        config: {
+          validation: {
+            minLength: 4,
+            maxLength: 8,
+            pattern: "^[A-Z0-9-]+$",
+          },
+        },
+      },
+    ];
+
+    expect(
+      validateSubmissionAnswers(validationFields, [
+        { fieldId: validationFields[0]!.id, value: "AB-12" },
+      ])[validationFields[0]!.id],
+    ).toBe("AB-12");
+
+    expect(() =>
+      validateSubmissionAnswers(validationFields, [
+        { fieldId: validationFields[0]!.id, value: "bad value" },
+      ]),
+    ).toThrow();
+  });
+
+  it("enforces number min and max validation rules", () => {
+    const validationFields: FormField[] = [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        label: "Budget",
+        type: "number",
+        required: true,
+        config: {
+          validation: {
+            minValue: 100,
+            maxValue: 500,
+          },
+        },
+      },
+    ];
+
+    expect(
+      validateSubmissionAnswers(validationFields, [
+        { fieldId: validationFields[0]!.id, value: "250" },
+      ])[validationFields[0]!.id],
+    ).toBe("250");
+
+    expect(() =>
+      validateSubmissionAnswers(validationFields, [
+        { fieldId: validationFields[0]!.id, value: "50" },
+      ]),
+    ).toThrow();
+  });
 });

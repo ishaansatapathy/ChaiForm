@@ -46,6 +46,10 @@ export const fieldBreakdownOutputSchema = z.object({
   label: z.string(),
   type: z.string(),
   totalResponses: z.number().int(),
+  eligibleResponses: z.number().int(),
+  skippedResponses: z.number().int(),
+  answerRate: z.number(),
+  dropOffRate: z.number(),
   averageRating: z.number().nullable(),
   optionCounts: z.array(
     z.object({

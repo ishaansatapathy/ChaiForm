@@ -11,6 +11,11 @@ type SubmissionRow = {
   answers: SubmissionAnswer[];
 };
 
+type ExportField = {
+  id: string;
+  label: string;
+};
+
 function escapeCsv(value: string) {
   if (/[",\n]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;
@@ -18,19 +23,27 @@ function escapeCsv(value: string) {
   return value;
 }
 
-export function downloadSubmissionsCsv(formTitle: string, submissions: SubmissionRow[]) {
+export function downloadSubmissionsCsv(
+  formTitle: string,
+  submissions: SubmissionRow[],
+  fields?: ExportField[],
+) {
   if (submissions.length === 0) return;
 
-  const fieldLabels = submissions[0]?.answers.map((a) => a.label) ?? [];
-  const headers = ["Submission ID", "Submitted At", ...fieldLabels];
+  const columns = fields?.length
+    ? fields
+    : (submissions[0]?.answers.map((answer) => ({
+        id: answer.fieldId,
+        label: answer.label,
+      })) ?? []);
+  const headers = ["Submission ID", "Submitted At", ...columns.map((field) => field.label)];
 
   const rows = submissions.map((submission) => {
     const answerByField = new Map(submission.answers.map((a) => [a.fieldId, a.value]));
-    const fieldIds = submission.answers.map((a) => a.fieldId);
     return [
       submission.id,
       submission.submittedAt ?? "",
-      ...fieldIds.map((fieldId) => answerByField.get(fieldId) ?? ""),
+      ...columns.map((field) => answerByField.get(field.id) ?? ""),
     ];
   });
 

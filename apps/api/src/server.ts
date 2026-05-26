@@ -33,6 +33,123 @@ app.use(
   }),
 );
 
+type OpenApiMedia = {
+  examples?: Record<string, { summary: string; value: unknown }>;
+};
+
+type OpenApiOperation = {
+  description?: string;
+  requestBody?: {
+    content?: Record<string, OpenApiMedia>;
+  };
+  parameters?: Array<{
+    name?: string;
+    description?: string;
+    example?: unknown;
+  }>;
+};
+
+type OpenApiDocumentWithPaths = {
+  paths?: Record<string, Record<string, OpenApiOperation>>;
+};
+
+function addJsonRequestExample(
+  document: OpenApiDocumentWithPaths,
+  path: string,
+  method: "post" | "patch",
+  key: string,
+  summary: string,
+  value: unknown,
+) {
+  const operation = document.paths?.[path]?.[method];
+  const json = operation?.requestBody?.content?.["application/json"];
+  if (!json) return;
+  json.examples = {
+    ...json.examples,
+    [key]: { summary, value },
+  };
+}
+
+function enrichOpenApiExamples(document: OpenApiDocumentWithPaths) {
+  addJsonRequestExample(
+    document,
+    "/authentication/sign-in",
+    "post",
+    "demoSignIn",
+    "Demo creator sign-in",
+    { email: "demo@chaiform.dev", password: "DemoPass123!" },
+  );
+
+  addJsonRequestExample(
+    document,
+    "/forms/",
+    "post",
+    "conditionalForm",
+    "Create a form with conditional follow-up question",
+    {
+      title: "Customer feedback",
+      description: "Feedback form with an optional support follow-up",
+      visibility: "public",
+      theme: "default",
+      allowMultipleSubmissions: true,
+      requireAuthentication: false,
+      fields: [
+        {
+          id: "11111111-1111-4111-8111-111111111111",
+          label: "Need follow up?",
+          type: "select",
+          required: true,
+          config: { options: ["Yes", "No"] },
+        },
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          label: "What should we help with?",
+          type: "textarea",
+          required: true,
+          config: {
+            showWhen: {
+              fieldId: "11111111-1111-4111-8111-111111111111",
+              operator: "eq",
+              value: "Yes",
+            },
+          },
+        },
+      ],
+    },
+  );
+
+  addJsonRequestExample(
+    document,
+    "/forms/submit",
+    "post",
+    "conditionalSubmit",
+    "Submit the visible path of a conditional form",
+    {
+      formId: "00000000-0000-4000-8000-000000000000",
+      answers: [{ fieldId: "11111111-1111-4111-8111-111111111111", value: "No" }],
+      website: "",
+    },
+  );
+
+  const listSubmissions = document.paths?.["/forms/{formId}/submissions"]?.get;
+  if (listSubmissions) {
+    listSubmissions.description =
+      "List form submissions with search and submitted date filters. Use the same filters with the tRPC exportSubmissions procedure to export matching rows.";
+    listSubmissions.parameters = listSubmissions.parameters?.map((parameter) => {
+      if (parameter.name === "search") {
+        return { ...parameter, description: "Filter by answer text", example: "pricing" };
+      }
+      if (parameter.name === "submittedFrom") {
+        return { ...parameter, description: "Inclusive submitted date, YYYY-MM-DD", example: "2026-05-01" };
+      }
+      if (parameter.name === "submittedTo") {
+        return { ...parameter, description: "Exclusive submitted date, YYYY-MM-DD", example: "2026-05-27" };
+      }
+      return parameter;
+    });
+  }
+}
+
 function buildOpenApiDocument() {
   try {
     const document = generateOpenApiDocument(openApiRouter, {
@@ -60,6 +177,8 @@ function buildOpenApiDocument() {
         },
       },
     };
+
+    enrichOpenApiExamples(document as OpenApiDocumentWithPaths);
 
     return document;
   } catch (error) {

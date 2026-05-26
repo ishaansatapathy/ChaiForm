@@ -3,12 +3,14 @@ import { z } from "zod";
 import FormService, { FormError } from "@repo/services/form";
 import {
   createFormInputSchema,
+  exportSubmissionsOutputSchema,
   formOutputSchema,
   paginatedFormsOutputSchema,
   paginatedPublicFormsOutputSchema,
   paginatedSubmissionsOutputSchema,
   paginationInputSchema,
   publicFormOutputSchema,
+  submissionPaginationInputSchema,
   submissionOutputSchema,
   submitFormInputSchema,
   updateFormInputSchema,
@@ -179,14 +181,7 @@ export const formsRouter = router({
 
   listSubmissions: verifiedProcedure
     .meta({ openapi: { method: "GET", path: getPath("/{formId}/submissions"), tags: TAGS, protect: true } })
-    .input(
-      z.object({
-        formId: z.string().uuid(),
-        limit: z.number().int().min(1).max(100).default(20).optional(),
-        cursor: z.string().uuid().optional(),
-        search: z.string().max(200).optional(),
-      }),
-    )
+    .input(submissionPaginationInputSchema.extend({ formId: z.string().uuid() }))
     .output(paginatedSubmissionsOutputSchema)
     .query(async ({ ctx, input }) => {
       try {
@@ -197,6 +192,33 @@ export const formsRouter = router({
             limit: input.limit ?? 20,
             cursor: input.cursor,
             search: input.search,
+          },
+          ctx.user.role,
+        );
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  exportSubmissions: verifiedProcedure
+    .input(
+      z.object({
+        formId: z.string().uuid(),
+        search: z.string().max(200).optional(),
+        submittedFrom: z.string().max(40).optional(),
+        submittedTo: z.string().max(40).optional(),
+      }),
+    )
+    .output(exportSubmissionsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await formService.exportSubmissions(
+          ctx.user.id,
+          input.formId,
+          {
+            search: input.search,
+            submittedFrom: input.submittedFrom,
+            submittedTo: input.submittedTo,
           },
           ctx.user.role,
         );
