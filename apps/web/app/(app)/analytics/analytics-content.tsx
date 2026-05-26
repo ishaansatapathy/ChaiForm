@@ -186,6 +186,14 @@ export default function AnalyticsContent({
     },
   );
 
+  const { data: funnel } = trpc.analytics.funnel.useQuery(
+    { formId: activeFormId! },
+    {
+      enabled: Boolean(activeFormId),
+      ...QUERY_OPTS,
+    },
+  );
+
   const activeFieldId = selectedFieldId ?? formFields?.fields[0]?.id;
   const isInitialField =
     isInitialForm && activeFieldId === initialBundle?.formFields?.fields[0]?.id;
@@ -491,6 +499,29 @@ export default function AnalyticsContent({
               )}
             </div>
           </div>
+
+          {funnel && (
+            <div className="app-surface rounded-3xl p-6">
+              <h3 className="font-display mb-4 text-lg font-bold text-white">Response funnel</h3>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
+                  <p className="text-xs text-white/45">Views</p>
+                  <p className="font-display mt-1 text-2xl text-white">{funnel.views}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
+                  <p className="text-xs text-white/45">Submissions</p>
+                  <p className="font-display mt-1 text-2xl text-white">{funnel.submissions}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
+                  <p className="text-xs text-white/45">Completion</p>
+                  <p className="font-display mt-1 text-2xl text-lime-400">{funnel.completionRate}%</p>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-white/40">
+                Drop-off: {funnel.dropOffRate}% of viewers did not submit.
+              </p>
+            </div>
+          )}
 
           {allFieldStats && allFieldStats.fields.length > 0 && (
             <div className="app-surface rounded-3xl p-6">

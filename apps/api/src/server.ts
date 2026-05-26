@@ -41,6 +41,14 @@ function buildOpenApiDocument() {
       baseUrl: env.BASE_URL.concat("/api"),
     });
 
+    document.info = {
+      ...document.info,
+      description:
+        "ChaiForm REST API generated from tRPC. Authenticated routes use the `jwt` httpOnly cookie after POST /api/auth/sign-in.",
+    };
+
+    document.servers = [{ url: env.BASE_URL.concat("/api"), description: "ChaiForm API" }];
+
     document.components = {
       ...document.components,
       securitySchemes: {
@@ -70,6 +78,8 @@ function isProduction() {
 
 function requireOpenApiDocsAuth(req: Request, res: Response, next: NextFunction) {
   if (!isProduction()) return next();
+
+  if (env.PUBLIC_OPENAPI_DOCS === "true") return next();
 
   const secret = env.OPENAPI_DOCS_SECRET;
   if (!secret) {

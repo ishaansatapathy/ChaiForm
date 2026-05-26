@@ -9,14 +9,16 @@ export const tRPCContext = initTRPC
   .meta<OpenApiMeta>()
   .context<typeof createContext>()
   .create({
-    errorFormatter({ shape, error }) {
+    errorFormatter({ shape, error, ctx }) {
       const zodError =
         error.cause instanceof ZodError ? error.cause.flatten().fieldErrors : null;
       return {
         ...shape,
+        message: ctx?.requestId ? `[${ctx.requestId}] ${shape.message}` : shape.message,
         data: {
           ...shape.data,
           zodError,
+          requestId: ctx?.requestId,
         },
       };
     },

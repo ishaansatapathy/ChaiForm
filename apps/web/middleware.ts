@@ -14,35 +14,43 @@ function getRefreshSecret() {
   return process.env.JWT_REFRESH_SECRET?.trim() || getJwtSecret();
 }
 
-async function hasValidSession(request: NextRequest): Promise<boolean> {
+type SessionPayload = {
+  userId?: string;
+  emailVerified?: boolean;
+  type?: string;
+};
+
+async function resolveSession(request: NextRequest): Promise<SessionPayload | null> {
   const accessToken = request.cookies.get("jwt")?.value;
   const refreshToken = request.cookies.get("jwt_refresh")?.value;
   const jwtSecret = getJwtSecret();
 
   if (!jwtSecret || (!accessToken && !refreshToken)) {
-    return false;
+    return null;
   }
 
   if (accessToken) {
     try {
-      await jwtVerify(accessToken, new TextEncoder().encode(jwtSecret), {
+      const { payload } = await jwtVerify(accessToken, new TextEncoder().encode(jwtSecret), {
         algorithms: ["HS256"],
       });
-      return true;
+      return payload as SessionPayload;
     } catch {
       // Fall through to refresh token.
     }
   }
 
-  if (!refreshToken) return false;
+  if (!refreshToken) return null;
 
   try {
     const { payload } = await jwtVerify(refreshToken, new TextEncoder().encode(getRefreshSecret()), {
       algorithms: ["HS256"],
     });
-    return payload.type === "refresh";
+    const session = payload as SessionPayload;
+    if (session.type !== "refresh") return null;
+    return session;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -56,11 +64,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!(await hasValidSession(request))) {
+  const session = await resolveSession(request);
+  if (!session?.userId) {
     const signInUrl = request.nextUrl.clone();
     signInUrl.pathname = "/sign-in";
     signInUrl.searchParams.set("next", sanitizeRedirectPath(pathname));
     return NextResponse.redirect(signInUrl);
+  }
+
+  if (session.emailVerified !== true) {
+    const verifyUrl = request.nextUrl.clone();
+    verifyUrl.pathname = "/check-email";
+    verifyUrl.search = "";
+    return NextResponse.redirect(verifyUrl);
   }
 
   return NextResponse.next();

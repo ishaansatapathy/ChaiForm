@@ -4,20 +4,50 @@ import type { Response } from "express";
 import { env } from "../env";
 import { getClearJwtCookieOptions, getJwtCookieOptions } from "./jwt-cookie-options";
 
+import type { UserRole } from "./roles";
+
 const refreshSecret = () => env.JWT_REFRESH_SECRET ?? env.JWT_SECRET;
 const JWT_ALGORITHMS = ["HS256"] as const;
 
-export type AccessTokenPayload = { userId: string };
-export type RefreshTokenPayload = { userId: string; type: "refresh" };
+export type AccessTokenPayload = {
+  userId: string;
+  emailVerified: boolean;
+  role: UserRole;
+};
+export type RefreshTokenPayload = {
+  userId: string;
+  type: "refresh";
+  emailVerified: boolean;
+  role: UserRole;
+};
 
-export function issueAuthCookies(res: Response, userId: string) {
-  const accessToken = jwt.sign({ userId } satisfies AccessTokenPayload, env.JWT_SECRET, {
-    expiresIn: "15m",
-    algorithm: "HS256",
-  });
+export type AuthTokenUser = {
+  id: string;
+  emailVerified: boolean;
+  role: UserRole;
+};
+
+export function issueAuthCookies(res: Response, user: AuthTokenUser) {
+  const accessToken = jwt.sign(
+    {
+      userId: user.id,
+      emailVerified: user.emailVerified,
+      role: user.role,
+    } satisfies AccessTokenPayload,
+    env.JWT_SECRET,
+    {
+      expiresIn: "15m",
+      algorithm: "HS256",
+    },
+  );
 
   const refreshToken = jwt.sign(
-    { userId, type: "refresh" } satisfies RefreshTokenPayload,
+    {
+      userId: user.id,
+      type: "refresh",
+      emailVerified: user.emailVerified,
+      role: user.role,
+    } satisfies RefreshTokenPayload,
     refreshSecret(),
     { expiresIn: "30d", algorithm: "HS256" },
   );

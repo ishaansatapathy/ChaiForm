@@ -10,6 +10,7 @@ import {
 
 import { FormError } from "../form";
 import type { UserRole } from "../auth/roles";
+import { cacheGet, cacheSet } from "../cache/kv-store";
 
 function completionRate(submissions: number, views: number) {
   if (views <= 0) return submissions > 0 ? 100 : 0;
@@ -32,7 +33,6 @@ type SummaryResult = {
     visibility: FormVisibility;
   } | null;
 };
-const summaryCache = new Map<string, { expiresAt: number; value: SummaryResult }>();
 
 class AnalyticsService {
   private async assertFormOwnership(userId: string, formId: string, actorRole: UserRole = "user") {
@@ -49,10 +49,14 @@ class AnalyticsService {
   }
 
   async getSummary(userId: string, formId?: string, actorRole: UserRole = "user") {
-    const cacheKey = `${userId}:${formId ?? "all"}`;
-    const cached = summaryCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.value;
+    const cacheKey = `analytics:summary:${userId}:${formId ?? "all"}`;
+    const cachedRaw = await cacheGet(cacheKey);
+    if (cachedRaw) {
+      try {
+        return JSON.parse(cachedRaw) as SummaryResult;
+      } catch {
+        // Ignore corrupt cache entries.
+      }
     }
 
     const notDeleted = isNull(formsTable.deletedAt);
@@ -122,8 +126,35 @@ class AnalyticsService {
       selectedForm,
     };
 
-    summaryCache.set(cacheKey, { expiresAt: Date.now() + SUMMARY_CACHE_TTL_MS, value: result });
+    await cacheSet(cacheKey, JSON.stringify(result), SUMMARY_CACHE_TTL_MS);
     return result;
+  }
+
+  async getFormFunnel(userId: string, formId: string, actorRole: UserRole = "user") {
+    const form = await this.assertFormOwnership(userId, formId, actorRole);
+
+    const [submissionCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(submissionsTable)
+      .where(eq(submissionsTable.formId, formId));
+
+    const views = form.viewCount ?? 0;
+    const submissions = submissionCount?.count ?? 0;
+    const rate = completionRate(submissions, views);
+    const dropOffRate = views > 0 ? Number((100 - rate).toFixed(1)) : 0;
+
+    return {
+      formId: form.id,
+      title: form.title,
+      views,
+      submissions,
+      completionRate: rate,
+      dropOffRate,
+      stages: [
+        { label: "Form views", count: views },
+        { label: "Completed submissions", count: submissions },
+      ],
+    };
   }
 
   async getSubmissionsOverTime(
