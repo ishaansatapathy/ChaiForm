@@ -6,15 +6,14 @@ export const env = createEnv({
    * Specify your server-side environment variables schema here. This way you can ensure the app
    * isn't built with invalid env vars.
    */
-  server: {
-    JWT_SECRET: z.string().min(16),
-    JWT_REFRESH_SECRET: z.string().min(16).optional(),
-  },
+  server: {},
 
   /**
    * Specify your client-side environment variables schema here. This way you can ensure the app
    * isn't built with invalid env vars. To expose them to the client, prefix them with
    * `NEXT_PUBLIC_`.
+   *
+   * JWT_SECRET is read in middleware via process.env (same value as Railway). See DEPLOY.md.
    */
   client: {
     NEXT_PUBLIC_API_URL: z.string().optional(),
@@ -25,8 +24,6 @@ export const env = createEnv({
    * middlewares) or client-side so we need to destruct manually.
    */
   runtimeEnv: {
-    JWT_SECRET: process.env.JWT_SECRET,
-    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   },
   /**
