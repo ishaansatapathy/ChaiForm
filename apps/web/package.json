@@ -12,7 +12,10 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@fontsource/caveat": "^5.2.8",
+    "@fontsource/exo-2": "^5.2.8",
     "@fontsource/orbitron": "^5.2.8",
+    "@fontsource/rubik-dirt": "^5.2.7",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -78,8 +81,8 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
-    "@playwright/test": "^1.52.0",
     "@imgly/background-removal": "^1.7.0",
+    "@playwright/test": "^1.52.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",

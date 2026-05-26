@@ -667,7 +667,10 @@ class AuthService {
         const verificationToken = crypto.randomBytes(32).toString("hex");
         await db
           .update(usersTable)
-          .set({ verificationToken, verificationTokenExpire: verificationExpiry() })
+          .set({
+            verificationToken: hashAuthSecret(verificationToken),
+            verificationTokenExpire: verificationExpiry(),
+          })
           .where(eq(usersTable.id, user.id));
         await sendVerificationEmail(user.email, verificationToken);
         return `${env.CLIENT_URL}/check-email?email=${encodeURIComponent(user.email)}`;
