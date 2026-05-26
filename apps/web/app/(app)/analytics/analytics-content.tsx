@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Bar,
@@ -128,68 +128,8 @@ export default function AnalyticsContent({
   const [loadedSubmissions, setLoadedSubmissions] = useState<SubmissionItem[]>(
     initialBundle?.submissions?.items ?? [],
   );
-  const [apiForms, setApiForms] = useState<FormsListPage | null>(initialForms ?? null);
-  const [apiBundle, setApiBundle] = useState<AnalyticsBundle | null>(initialBundle ?? null);
-  const [bundleFormId, setBundleFormId] = useState<string | undefined>(initialFormId);
-  const [apiSummary, setApiSummary] = useState<SummaryData | null>(
-    initialSummary ?? initialBundle?.summary ?? null,
-  );
-  const [formBundleLoading, setFormBundleLoading] = useState(false);
 
-  const forms = apiForms?.items ?? formsPage?.items ?? initialForms?.items ?? [];
-
-  const loadFormBundle = useCallback(
-    async (formId: string) => {
-      setFormBundleLoading(true);
-      try {
-        const response = await fetch(`/api/analytics?formId=${formId}`, { cache: "no-store" });
-        if (response.ok) {
-          const data = (await response.json()) as { bundle?: AnalyticsBundle };
-          if (data.bundle) {
-            setApiBundle(data.bundle);
-            setBundleFormId(formId);
-            if (data.bundle.summary) setApiSummary(data.bundle.summary);
-            if (data.bundle.submissions?.items) {
-              setLoadedSubmissions(data.bundle.submissions.items);
-            }
-            return;
-          }
-        }
-
-        const [summaryRes, overTimeRes, fieldsRes, subsRes, allSubsRes] = await Promise.all([
-          utils.analytics.summary.fetch({ formId }).catch(() => null),
-          utils.analytics.submissionsOverTime.fetch({ formId, days: chartDays }).catch(() => null),
-          utils.analytics.listFormFields.fetch({ formId }).catch(() => null),
-          utils.forms.listSubmissions.fetch({ formId, limit: 15 }).catch(() => null),
-          utils.forms.listSubmissions.fetch({ formId, limit: 100 }).catch(() => null),
-        ]);
-
-        const firstFieldId = fieldsRes?.fields[0]?.id;
-        const breakdownRes = firstFieldId
-          ? await utils.analytics.fieldBreakdown
-              .fetch({ formId, fieldId: firstFieldId })
-              .catch(() => null)
-          : null;
-
-        setApiBundle({
-          summary: summaryRes,
-          overTime: overTimeRes,
-          formFields: fieldsRes,
-          fieldBreakdown: breakdownRes,
-          submissions: subsRes,
-          allSubmissions: allSubsRes,
-        });
-        setBundleFormId(formId);
-        if (summaryRes) setApiSummary(summaryRes);
-        if (subsRes?.items) setLoadedSubmissions(subsRes.items);
-      } catch {
-        toast.error("Could not load analytics for this form");
-      } finally {
-        setFormBundleLoading(false);
-      }
-    },
-    [chartDays, utils],
-  );
+  const forms = formsPage?.items ?? initialForms?.items ?? [];
 
   const activeFormId = selectedFormId ?? forms[0]?.id;
   const isInitialForm = activeFormId === initialFormId && !submissionCursor && !submissionSearch.trim();
@@ -205,32 +145,10 @@ export default function AnalyticsContent({
     setSubmissionCursor(undefined);
   }, [submissionSearch]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/analytics", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return response.json() as Promise<{ forms?: FormsListPage; summary?: SummaryData }>;
-      })
-      .then((data) => {
-        if (cancelled || !data) return;
-        if (data.forms) setApiForms(data.forms);
-        if (data.summary) setApiSummary(data.summary);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!activeFormId) return;
-    void loadFormBundle(activeFormId);
-  }, [activeFormId, loadFormBundle]);
-
   const {
     data: summary,
     isError: summaryError,
+    isFetching: summaryFetching,
     refetch: refetchSummary,
   } = trpc.analytics.summary.useQuery(
     { formId: activeFormId },
@@ -316,11 +234,7 @@ export default function AnalyticsContent({
       ...QUERY_OPTS,
     },
   );
-  const allSubmissions =
-    allSubmissionsPage?.items ??
-    (bundleFormId === activeFormId ? apiBundle?.allSubmissions?.items : undefined) ??
-    (isInitialForm ? initialBundle?.allSubmissions?.items : undefined) ??
-    [];
+  const allSubmissions = allSubmissionsPage?.items ?? (isInitialForm ? initialBundle?.allSubmissions?.items : undefined) ?? [];
 
   useEffect(() => {
     if (!submissionsPage || submissionsLoading) return;
@@ -330,35 +244,26 @@ export default function AnalyticsContent({
   }, [submissionsPage, submissionCursor, submissionsLoading]);
 
   const activeForm = forms.find((form) => form.id === activeFormId);
-  const activeApiBundle = bundleFormId === activeFormId ? apiBundle : null;
   const submissionItemsForChart =
-    allSubmissionsPage?.items ??
-    (bundleFormId === activeFormId ? apiBundle?.allSubmissions?.items : undefined) ??
-    submissionsPage?.items ??
-    loadedSubmissions;
+    allSubmissionsPage?.items ?? submissionsPage?.items ?? loadedSubmissions;
   const fallbackOverTime =
     submissionItemsForChart.length > 0
       ? buildOverTimeFromSubmissions(submissionItemsForChart)
       : null;
   const resolvedSummary =
-    summary ??
-    apiSummary ??
-    activeApiBundle?.summary ??
-    (forms.length > 0 ? buildFallbackSummary(forms, activeForm) : null);
-  const resolvedOverTime = activeApiBundle?.overTime ?? overTime ?? fallbackOverTime;
-  const resolvedFormFields = activeApiBundle?.formFields ?? formFields;
+    summary ?? (forms.length > 0 ? buildFallbackSummary(forms, activeForm) : null);
+  const resolvedOverTime = overTime ?? fallbackOverTime;
+  const resolvedFormFields = formFields;
   const resolvedActiveFieldId = selectedFieldId ?? resolvedFormFields?.fields[0]?.id;
-  const apiFieldBreakdown =
-    activeApiBundle?.fieldBreakdown?.fieldId === resolvedActiveFieldId
-      ? activeApiBundle?.fieldBreakdown
-      : undefined;
-  const resolvedFieldBreakdown = apiFieldBreakdown ?? fieldBreakdown;
+  const resolvedFieldBreakdown = fieldBreakdown;
 
   const submissions =
     loadedSubmissions.length > 0 ? loadedSubmissions : (submissionsPage?.items ?? []);
   const activeSubmissionId = selectedSubmissionId;
 
   const statsLoading = formsLoading && forms.length === 0;
+  const formBundleLoading =
+    Boolean(activeFormId) && (summaryFetching || overTimeLoading);
   const showSubmissionsLoading =
     submissionsLoading && submissions.length === 0 && !submissionsError;
   const chartLoading = (overTimeLoading || formBundleLoading) && !resolvedOverTime;
@@ -401,12 +306,9 @@ export default function AnalyticsContent({
 
   if (forms.length === 0) {
     const serverFormCount =
-      resolvedSummary?.totalForms ?? apiSummary?.totalForms ?? initialSummary?.totalForms ?? 0;
+      resolvedSummary?.totalForms ?? initialSummary?.totalForms ?? 0;
     const serverSubmissionCount =
-      resolvedSummary?.totalSubmissions ??
-      apiSummary?.totalSubmissions ??
-      initialSummary?.totalSubmissions ??
-      0;
+      resolvedSummary?.totalSubmissions ?? initialSummary?.totalSubmissions ?? 0;
     const listBroken =
       formsListError || serverFormCount > 0 || serverSubmissionCount > 0;
 
@@ -450,10 +352,7 @@ export default function AnalyticsContent({
           <p className="text-sm text-white/70">Could not load analytics summary.</p>
           <button
             type="button"
-            onClick={() => {
-              void refetchSummary();
-              if (activeFormId) void loadFormBundle(activeFormId);
-            }}
+            onClick={() => void refetchSummary()}
             className="btn-omni font-display mt-4 inline-flex rounded-xl px-5 py-2 text-xs font-black tracking-wide uppercase"
           >
             Retry

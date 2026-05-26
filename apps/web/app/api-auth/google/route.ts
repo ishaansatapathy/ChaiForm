@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { fetchAuthProviders, getGoogleProvider } from "~/lib/fetch-auth-providers";
+import { sanitizeRedirectPath } from "@repo/services/auth/safe-redirect";
 
 export async function GET(request: NextRequest) {
-  const state = request.nextUrl.searchParams.get("state") ?? "/dashboard";
+  const state = sanitizeRedirectPath(request.nextUrl.searchParams.get("state"));
   const signInUrl = new URL("/sign-in", request.url);
 
   const providers = await fetchAuthProviders();

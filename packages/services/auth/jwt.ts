@@ -5,6 +5,7 @@ import { env } from "../env";
 import { getClearJwtCookieOptions, getJwtCookieOptions } from "./jwt-cookie-options";
 
 const refreshSecret = () => env.JWT_REFRESH_SECRET ?? env.JWT_SECRET;
+const JWT_ALGORITHMS = ["HS256"] as const;
 
 export type AccessTokenPayload = { userId: string };
 export type RefreshTokenPayload = { userId: string; type: "refresh" };
@@ -12,12 +13,13 @@ export type RefreshTokenPayload = { userId: string; type: "refresh" };
 export function issueAuthCookies(res: Response, userId: string) {
   const accessToken = jwt.sign({ userId } satisfies AccessTokenPayload, env.JWT_SECRET, {
     expiresIn: "15m",
+    algorithm: "HS256",
   });
 
   const refreshToken = jwt.sign(
     { userId, type: "refresh" } satisfies RefreshTokenPayload,
     refreshSecret(),
-    { expiresIn: "30d" },
+    { expiresIn: "30d", algorithm: "HS256" },
   );
 
   const baseOpts = getJwtCookieOptions();
@@ -41,11 +43,13 @@ export function clearAuthCookies(res: Response) {
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  return jwt.verify(token, env.JWT_SECRET) as AccessTokenPayload;
+  return jwt.verify(token, env.JWT_SECRET, { algorithms: [...JWT_ALGORITHMS] }) as AccessTokenPayload;
 }
 
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
-  const decoded = jwt.verify(token, refreshSecret()) as RefreshTokenPayload;
+  const decoded = jwt.verify(token, refreshSecret(), {
+    algorithms: [...JWT_ALGORITHMS],
+  }) as RefreshTokenPayload;
   if (decoded.type !== "refresh") {
     throw new Error("Invalid token type");
   }

@@ -6,7 +6,6 @@ import type { RouterOutputs } from "@repo/trpc/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { TRPCClientError } from "@repo/trpc/client";
 import { toast } from "sonner";
 
 import { FormFieldInput } from "~/components/forms/form-field-input";
@@ -54,8 +53,6 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   const [submitting, setSubmitting] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [checkingSubmission, setCheckingSubmission] = useState(!form.allowMultipleSubmissions);
-
-  const submitMutation = trpc.forms.submit.useMutation();
 
   const { data: user, isLoading: authLoading } = trpc.auth.me.useQuery(
     {},
@@ -142,6 +139,17 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
     return true;
   };
 
+  const validateAllVisibleSteps = () => {
+    for (const field of visibleFields) {
+      const value = values[field.id] ?? "";
+      if (field.required && isFieldEmpty(field, value)) {
+        toast.error(`"${field.label}" is required`);
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleContinue = () => {
     if (!validateCurrentStep()) return;
     if (isLastStep) {
@@ -152,7 +160,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
   };
 
   const handleSubmit = async () => {
-    if (!validateCurrentStep()) return;
+    if (!validateAllVisibleSteps()) return;
     if (turnstileEnabled && !turnstileToken) {
       toast.error("Please complete the CAPTCHA check");
       return;
@@ -160,31 +168,58 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
     const honeypot = honeypotRef.current?.value ?? "";
     const respondentKey = form.requireAuthentication ? undefined : getRespondentKey(form.id);
     const idempotencyKey = getSubmissionIdempotencyKey(form.id);
+    const payload = {
+      formId: form.id,
+      website: honeypot,
+      idempotencyKey,
+      ...(turnstileEnabled && turnstileToken ? { turnstileToken } : {}),
+      ...(form.allowMultipleSubmissions || form.requireAuthentication
+        ? {}
+        : { respondentKey }),
+      answers: fields.map((field) => ({
+        fieldId: field.id,
+        value: values[field.id] ?? "",
+      })),
+    };
 
     setSubmitting(true);
     try {
       await runWithRetry(
-        () =>
-          submitMutation.mutateAsync({
-            formId: form.id,
-            website: honeypot,
-            idempotencyKey,
-            ...(turnstileEnabled && turnstileToken ? { turnstileToken } : {}),
-            ...(form.allowMultipleSubmissions || form.requireAuthentication
-              ? {}
-              : { respondentKey }),
-            answers: fields.map((field) => ({
-              fieldId: field.id,
-              value: values[field.id] ?? "",
-            })),
-          }),
+        async () => {
+          const response = await fetch("/api/submit-form", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(payload),
+            cache: "no-store",
+            signal: AbortSignal.timeout(20_000),
+          });
+
+          if (response.ok) return;
+
+          let result: { error?: string; retryable?: boolean } = {};
+          try {
+            result = (await response.json()) as typeof result;
+          } catch {
+            throw new Error("Server did not respond. Try again.");
+          }
+
+          if (result.retryable ?? response.status >= 500) {
+            throw new Error(result.error ?? "Server is waking up — please try again.");
+          }
+
+          throw new Error(result.error ?? "Could not submit form.");
+        },
         {
           attempts: 3,
           delaysMs: [0, 2_000, 4_000],
           isRetryable: (error) => {
-            if (error instanceof TRPCClientError) {
-              const code = error.data?.code;
-              return code !== "BAD_REQUEST" && code !== "FORBIDDEN";
+            if (error instanceof Error) {
+              return (
+                error.message.includes("waking up") ||
+                error.message.includes("did not respond") ||
+                error.message.includes("Try again")
+              );
             }
             return true;
           },
@@ -197,12 +232,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
       clearSubmissionIdempotencyKey(form.id);
       router.push(thankYouPath);
     } catch (error) {
-      const message =
-        error instanceof TRPCClientError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : "Could not submit form";
+      const message = error instanceof Error ? error.message : "Could not submit form";
       toast.error(message);
     } finally {
       setSubmitting(false);

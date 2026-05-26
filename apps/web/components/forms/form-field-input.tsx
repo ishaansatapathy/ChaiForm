@@ -47,8 +47,14 @@ export function FormFieldInput({
       );
     case "rating": {
       const max = field.config?.maxRating ?? 5;
+      const groupLabel = field.label || "Rating";
       return (
-        <div className="flex flex-wrap gap-2">
+        <div
+          role="radiogroup"
+          aria-label={groupLabel}
+          aria-required={field.required || undefined}
+          className="flex flex-wrap gap-2"
+        >
           {Array.from({ length: max }, (_, index) => {
             const rating = String(index + 1);
             const active = value === rating;
@@ -56,6 +62,9 @@ export function FormFieldInput({
               <button
                 key={rating}
                 type="button"
+                role="radio"
+                aria-checked={active}
+                aria-label={`${rating} of ${max}`}
                 onClick={() => onChange(rating)}
                 className={`h-11 w-11 rounded-xl border text-sm font-bold transition-colors ${
                   active ? accent : "border-white/10 bg-white/2 text-white/50 hover:border-lime-400/30"

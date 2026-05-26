@@ -30,6 +30,15 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
     const text = textRef.current;
     if (!video || !wrapper || !videoBox || !text) return;
 
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reducedMotion) {
+      onComplete();
+      return;
+    }
+
     const startedAt = Date.now();
 
     const onTimeUpdate = () => {

@@ -8,6 +8,8 @@ import cookieParser from "cookie-parser";
 
 import helmet from "helmet";
 
+import type { Request, Response, NextFunction } from "express";
+
 import * as trpcExpress from "@trpc/server/adapters/express";
 
 import { generateOpenApiDocument, createOpenApiExpressMiddleware } from "trpc-to-openapi";
@@ -62,6 +64,28 @@ function buildOpenApiDocument() {
 
 const openApiDocument = buildOpenApiDocument();
 
+function isProduction() {
+  return env.NODE_ENV === "production" || env.NODE_ENV === "prod";
+}
+
+function requireOpenApiDocsAuth(req: Request, res: Response, next: NextFunction) {
+  if (!isProduction()) return next();
+
+  const secret = env.OPENAPI_DOCS_SECRET;
+  if (!secret) {
+    return res.status(404).json({ error: "Not found" });
+  }
+
+  const header = req.headers.authorization;
+  const bearer = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
+  const queryKey = typeof req.query.key === "string" ? req.query.key : undefined;
+  if (bearer !== secret && queryKey !== secret) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  return next();
+}
+
 app.use(
   cors({
     origin: env.CLIENT_URL,
@@ -101,7 +125,7 @@ app.post("/internal/purge-expired-forms", async (req, res) => {
 
 logger.debug(`openapi.json: ${env.BASE_URL}/openapi.json`);
 
-app.get("/openapi.json", (_req, res) => {
+app.get("/openapi.json", requireOpenApiDocsAuth, (_req, res) => {
   return res.json(openApiDocument);
 });
 
@@ -109,7 +133,7 @@ logger.debug(`docs: ${env.BASE_URL}/docs`);
 
 import("@scalar/express-api-reference")
   .then(({ apiReference }) => {
-    app.use("/docs", apiReference({ url: "/openapi.json" }));
+    app.use("/docs", requireOpenApiDocsAuth, apiReference({ url: "/openapi.json" }));
   })
   .catch((error) => {
     logger.warn("API docs disabled", {

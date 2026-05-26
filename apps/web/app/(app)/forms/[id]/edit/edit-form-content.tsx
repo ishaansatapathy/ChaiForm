@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { FormBuilderFields, type DraftField } from "~/components/forms/form-builder-fields";
 import { FormBuilderPreview } from "~/components/forms/form-builder-preview";
 import { FormThemePicker } from "~/components/forms/form-theme-picker";
 import { DeleteFormButton } from "~/components/app/delete-form-button";
+import { ShareFormModal } from "~/components/app/share-form-modal";
 import { AllowAnonymousResponsesToggle } from "~/components/app/allow-anonymous-responses-toggle";
 import { AllowMultipleResponsesToggle } from "~/components/app/allow-multiple-responses-toggle";
 import { FormRetentionPicker } from "~/components/app/form-retention-picker";
@@ -17,6 +18,7 @@ import type { FormRetentionOption } from "~/lib/form-retention";
 import { presetFromExpiresAt } from "~/lib/form-retention";
 import type { FormThemeId } from "~/lib/form-themes";
 import { getSaveErrorMessage, saveFormWithColdStart } from "~/lib/save-form";
+import { getFormShareUrl } from "~/lib/form-share-url";
 import { parseUpdateFormInput } from "~/lib/validate-form-payload";
 import { useWarmApi } from "~/lib/warm-api";
 import type { FormDetail } from "~/lib/fetch-session";
@@ -32,9 +34,11 @@ type EditFormContentProps = {
 
 export default function EditFormContent({ formId, initialForm }: EditFormContentProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const utils = trpc.useUtils();
   const updateMutation = trpc.forms.update.useMutation();
   const [saving, setSaving] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const { data: user } = trpc.auth.me.useQuery({});
 
   useWarmApi();
@@ -90,6 +94,13 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
   }, [form, hydratedFormId]);
 
   const resolvedForm = form ?? initialForm;
+
+  useEffect(() => {
+    if (searchParams.get("share") === "1" && resolvedForm) {
+      setShareOpen(true);
+    }
+  }, [searchParams, resolvedForm]);
+
   const loading = isLoading && !resolvedForm;
 
   if (loading) {
@@ -288,6 +299,15 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
           />
         </aside>
       </div>
+
+      {resolvedForm && (
+        <ShareFormModal
+          open={shareOpen}
+          shareUrl={getFormShareUrl(resolvedForm)}
+          formTitle={resolvedForm.title}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </section>
   );
 }

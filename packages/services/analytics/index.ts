@@ -9,6 +9,7 @@ import {
 } from "@repo/database/schema";
 
 import { FormError } from "../form";
+import type { UserRole } from "../auth/roles";
 
 function completionRate(submissions: number, views: number) {
   if (views <= 0) return submissions > 0 ? 100 : 0;
@@ -34,18 +35,20 @@ type SummaryResult = {
 const summaryCache = new Map<string, { expiresAt: number; value: SummaryResult }>();
 
 class AnalyticsService {
-  private async assertFormOwnership(userId: string, formId: string) {
+  private async assertFormOwnership(userId: string, formId: string, actorRole: UserRole = "user") {
     const [form] = await db
       .select()
       .from(formsTable)
       .where(and(eq(formsTable.id, formId), isNull(formsTable.deletedAt)))
       .limit(1);
     if (!form) throw new FormError("NOT_FOUND", "Form not found");
-    if (form.userId !== userId) throw new FormError("FORBIDDEN", "Not allowed");
+    if (form.userId !== userId && actorRole !== "admin") {
+      throw new FormError("FORBIDDEN", "Not allowed");
+    }
     return form;
   }
 
-  async getSummary(userId: string, formId?: string) {
+  async getSummary(userId: string, formId?: string, actorRole: UserRole = "user") {
     const cacheKey = `${userId}:${formId ?? "all"}`;
     const cached = summaryCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
@@ -85,7 +88,7 @@ class AnalyticsService {
     let selectedForm = null;
 
     if (formId) {
-      const form = await this.assertFormOwnership(userId, formId);
+      const form = await this.assertFormOwnership(userId, formId, actorRole);
 
       const [submissionCount] = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -123,8 +126,13 @@ class AnalyticsService {
     return result;
   }
 
-  async getSubmissionsOverTime(userId: string, formId: string, days: number) {
-    await this.assertFormOwnership(userId, formId);
+  async getSubmissionsOverTime(
+    userId: string,
+    formId: string,
+    days: number,
+    actorRole: UserRole = "user",
+  ) {
+    await this.assertFormOwnership(userId, formId, actorRole);
 
     const since = new Date();
     since.setDate(since.getDate() - days + 1);
@@ -183,8 +191,13 @@ class AnalyticsService {
     return values;
   }
 
-  async getFieldBreakdown(userId: string, formId: string, fieldId: string) {
-    await this.assertFormOwnership(userId, formId);
+  async getFieldBreakdown(
+    userId: string,
+    formId: string,
+    fieldId: string,
+    actorRole: UserRole = "user",
+  ) {
+    await this.assertFormOwnership(userId, formId, actorRole);
 
     const [field] = await db
       .select()
@@ -220,8 +233,8 @@ class AnalyticsService {
     };
   }
 
-  async getAllFieldStats(userId: string, formId: string) {
-    await this.assertFormOwnership(userId, formId);
+  async getAllFieldStats(userId: string, formId: string, actorRole: UserRole = "user") {
+    await this.assertFormOwnership(userId, formId, actorRole);
 
     const fields = await db
       .select()
@@ -230,7 +243,7 @@ class AnalyticsService {
       .orderBy(formFieldsTable.sortOrder);
 
     const stats = await Promise.all(
-      fields.map((field) => this.getFieldBreakdown(userId, formId, field.id)),
+      fields.map((field) => this.getFieldBreakdown(userId, formId, field.id, actorRole)),
     );
 
     return { fields: stats };

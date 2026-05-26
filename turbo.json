@@ -13,7 +13,8 @@
     "EMAIL_FROM",
     "SEED_USER_EMAIL",
     "SEED_DEMO_PASSWORD",
-    "VITEST"
+    "VITEST",
+    "OPENAPI_DOCS_SECRET"
   ],
   "tasks": {
     "build": {

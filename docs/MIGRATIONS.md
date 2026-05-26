@@ -13,13 +13,16 @@ Migration files live in `packages/database/drizzle/` and are tracked in `package
 
 ## Production (Railway + Neon)
 
-On API startup, `apps/api/src/migrate.ts` runs **idempotent bootstrap SQL** so older Neon databases that missed migrations `0010–0013` still work.
+On API startup, `apps/api/src/migrate.ts`:
+
+1. Runs **Drizzle journal migrations** (`runJournalMigrations` from `@repo/database/migrate`)
+2. Applies **idempotent bootstrap SQL** for databases that predate migrations `0010–0013`
 
 When you add a new migration:
 
 1. Add `packages/database/drizzle/00XX_name.sql`
 2. Register it in `packages/database/drizzle/meta/_journal.json`
-3. Append equivalent `ALTER TABLE … IF NOT EXISTS` patches to `ENSURE_SCHEMA_SQL` in `apps/api/src/migrate.ts` (until bootstrap is retired)
+3. Mirror critical changes in `ENSURE_SCHEMA_SQL` until bootstrap is retired
 
 Run `pnpm db:migrate` against Neon before or during deploy so journal migrations apply cleanly.
 

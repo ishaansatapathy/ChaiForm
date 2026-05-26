@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeRedirectPath } from "@repo/services/auth/safe-redirect";
+
 function GoogleIcon() {
   return (
     <svg className="size-4 text-white/80" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -19,7 +21,7 @@ type SocialButtonsProps = {
 export function SocialButtons({ googleEnabled = false, nextPath = "/dashboard" }: SocialButtonsProps) {
   if (!googleEnabled) return null;
 
-  const googleHref = `/api-auth/google?state=${encodeURIComponent(nextPath)}`;
+  const googleHref = `/api-auth/google?state=${encodeURIComponent(sanitizeRedirectPath(nextPath))}`;
 
   return (
     <div className="flex flex-col gap-2">

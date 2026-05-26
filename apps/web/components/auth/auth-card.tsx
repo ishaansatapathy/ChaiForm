@@ -16,6 +16,7 @@ import { z } from "zod";
 import { AuthField, AuthModeToggle, AuthSubmitButton } from "~/components/auth/auth-field";
 import { SocialButtons } from "~/components/auth/social-buttons";
 import { markHeroTimePending, withHeroTimeParam } from "~/lib/hero-time";
+import { sanitizeRedirectPath } from "@repo/services/auth/safe-redirect";
 import { prefetchAppRoutes } from "~/lib/prefetch-app-routes";
 import { trpc } from "~/trpc/client";
 
@@ -30,7 +31,7 @@ type SignUpValues = z.infer<typeof signUpInputSchema>;
 export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") ?? "/dashboard";
+  const nextPath = sanitizeRedirectPath(searchParams.get("next"));
   const isLogin = mode === "sign-in";
   const [loading, setLoading] = useState(false);
   const [twoFactorStep, setTwoFactorStep] = useState<{
@@ -68,7 +69,7 @@ export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
     await utils.auth.me.invalidate();
     prefetchAppRoutes(router);
     markHeroTimePending();
-    const destination = path.startsWith("/") ? path : "/dashboard";
+    const destination = sanitizeRedirectPath(path);
     window.location.assign(withHeroTimeParam(destination));
   };
 
