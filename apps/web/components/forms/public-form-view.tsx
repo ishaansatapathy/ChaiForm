@@ -16,6 +16,7 @@ import {
   markFormSubmitted,
 } from "~/lib/respondent-key";
 import { clearSubmissionIdempotencyKey, getSubmissionIdempotencyKey } from "~/lib/idempotency-key";
+import { TurnstileWidget, getClientTurnstileSiteKey } from "~/components/forms/turnstile-widget";
 import { runWithRetry, useWarmApi } from "~/lib/warm-api";
 import { trpc } from "~/trpc/client";
 
@@ -60,7 +61,10 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
 
   const [values, setValues] = useState<Record<string, string>>({});
   const [step, setStep] = useState(0);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const honeypotRef = useRef<HTMLInputElement>(null);
+  const turnstileSiteKey = getClientTurnstileSiteKey();
+  const turnstileEnabled = Boolean(turnstileSiteKey);
 
   const fields = form.fields;
   const currentField = fields[step];
@@ -136,6 +140,10 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
 
   const handleSubmit = async () => {
     if (!validateCurrentStep()) return;
+    if (turnstileEnabled && !turnstileToken) {
+      toast.error("Please complete the CAPTCHA check");
+      return;
+    }
     const honeypot = honeypotRef.current?.value ?? "";
     const respondentKey = form.requireAuthentication ? undefined : getRespondentKey(form.id);
     const idempotencyKey = getSubmissionIdempotencyKey(form.id);
@@ -143,6 +151,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
       formId: form.id,
       website: honeypot,
       idempotencyKey,
+      ...(turnstileEnabled && turnstileToken ? { turnstileToken } : {}),
       ...(form.allowMultipleSubmissions || form.requireAuthentication
         ? {}
         : { respondentKey }),
@@ -301,6 +310,12 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
                 </Wrapper>
               );
             })()}
+
+            {isLastStep && turnstileEnabled && (
+              <div className="mt-6">
+                <TurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} />
+              </div>
+            )}
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
               {step > 0 && (
