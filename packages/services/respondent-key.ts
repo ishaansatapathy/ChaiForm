@@ -2,9 +2,15 @@ import crypto from "node:crypto";
 
 import jwt from "jsonwebtoken";
 
-import { env } from "./env";
-
 const JWT_ALGORITHMS = ["HS256"] as const;
+
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret || secret.length < 16) {
+    throw new Error("JWT_SECRET is required (set on Vercel and Railway).");
+  }
+  return secret;
+}
 
 type RespondentPayload = {
   formId: string;
@@ -19,7 +25,7 @@ export function createRespondentToken(formId: string): string {
     type: "respondent",
   };
 
-  return jwt.sign(payload, env.JWT_SECRET, {
+  return jwt.sign(payload, getJwtSecret(), {
     expiresIn: "365d",
     algorithm: "HS256",
   });
@@ -27,7 +33,7 @@ export function createRespondentToken(formId: string): string {
 
 export function parseRespondentToken(token: string, formId: string): string | null {
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET, {
+    const decoded = jwt.verify(token, getJwtSecret(), {
       algorithms: [...JWT_ALGORITHMS],
     }) as RespondentPayload;
 

@@ -119,7 +119,10 @@ See `render.yaml` if you still deploy API to Render. Production demo uses **Rail
 | `NODE_ENV` | `production` |
 | `NEXT_PUBLIC_API_URL` | `/trpc` |
 | `API_INTERNAL_URL` | `https://chaiform-production.up.railway.app` |
-| `SKIP_ENV_VALIDATION` | `true` |
+| `JWT_SECRET` | **same value as Railway** (required for auth middleware) |
+| `JWT_REFRESH_SECRET` | **same value as Railway** (recommended) |
+| `TURNSTILE_SECRET_KEY` | same as Railway *(if using CAPTCHA)* |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare site key *(if using CAPTCHA)* |
 
 5. Deploy → copy URL (e.g. `https://chaiform.vercel.app`)
 
@@ -172,7 +175,7 @@ Add live URLs to README before submission.
 Set `NODE_ENV=production` on Vercel. Do not use `NODE_ENV=development` in production env vars.
 
 **Auth cookies not working**  
-Ensure `CLIENT_URL` on Render matches your Vercel URL exactly (no trailing slash). Vercel must proxy via `API_INTERNAL_URL`.
+Ensure `CLIENT_URL` on Railway matches your Vercel URL exactly (no trailing slash). Set **`JWT_SECRET` (and `JWT_REFRESH_SECRET`) on Vercel** to the same values as Railway — middleware needs them to keep you signed in across tabs.
 
 **Google OAuth redirect mismatch**  
 Redirect URI must be the **Vercel** URL (`/api-auth/google/callback`), not Render.
