@@ -23,6 +23,7 @@ export type AnalyticsBundle = {
 };
 
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
+const CLIENT_ORIGIN = process.env.CLIENT_URL ?? process.env.NEXT_PUBLIC_CLIENT_URL ?? "http://localhost:3000";
 
 function buildCookieHeader(
   cookieStore: Awaited<ReturnType<typeof cookies>>,
@@ -113,10 +114,12 @@ async function fetchTrpcMutation<T>(
     try {
       const response = await fetch(url, {
         method: "POST",
-      headers: {
+        headers: {
           "content-type": "application/json",
           "accept-encoding": "identity",
           ...(cookieHeader ? { cookie: cookieHeader } : {}),
+          ...(cookieHeader ? { "x-chaiform-csrf": "1" } : {}),
+          origin: CLIENT_ORIGIN,
         },
         body: JSON.stringify(input),
         cache: "no-store",

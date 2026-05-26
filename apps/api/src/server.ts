@@ -33,6 +33,47 @@ app.use(
   }),
 );
 
+function normalizeOrigin(value: string | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function trustedOrigins() {
+  return new Set(
+    [env.CLIENT_URL, env.BASE_URL, "http://localhost:3000", "http://localhost:8000"]
+      .map((value) => normalizeOrigin(value))
+      .filter((value): value is string => Boolean(value)),
+  );
+}
+
+function requireTrustedOrigin(req: Request, res: Response, next: NextFunction) {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return next();
+
+  const hasCookieAuth = Boolean(req.headers.cookie);
+  const origin = normalizeOrigin(req.headers.origin);
+  const referer = normalizeOrigin(req.headers.referer);
+  const observed = origin ?? referer;
+
+  if (observed && !trustedOrigins().has(observed)) {
+    return res.status(403).json({ error: "Untrusted request origin" });
+  }
+
+  if (!observed && hasCookieAuth) {
+    return res.status(403).json({ error: "Missing request origin" });
+  }
+
+  if (hasCookieAuth && req.headers["x-chaiform-csrf"] !== "1") {
+    return res.status(403).json({ error: "Missing CSRF header" });
+  }
+
+  return next();
+}
+
 type OpenApiMedia = {
   examples?: Record<string, { summary: string; value: unknown }>;
 };
@@ -134,7 +175,7 @@ function enrichOpenApiExamples(document: OpenApiDocumentWithPaths) {
   const listSubmissions = document.paths?.["/forms/{formId}/submissions"]?.get;
   if (listSubmissions) {
     listSubmissions.description =
-      "List form submissions with search and submitted date filters. Use the same filters with the tRPC exportSubmissions procedure to export matching rows.";
+      "List form submissions with search and submitted date filters. Use /forms/{formId}/submissions/export to export matching rows.";
     listSubmissions.parameters = listSubmissions.parameters?.map((parameter) => {
       if (parameter.name === "search") {
         return { ...parameter, description: "Filter by answer text", example: "pricing" };
@@ -161,7 +202,7 @@ function buildOpenApiDocument() {
     document.info = {
       ...document.info,
       description:
-        "ChaiForm REST API generated from tRPC. Authenticated routes use the `jwt` httpOnly cookie after POST /api/auth/sign-in.",
+        "ChaiForm REST API generated from tRPC. Authenticated routes use the `jwt` httpOnly cookie after POST /api/authentication/sign-in.",
     };
 
     document.servers = [{ url: env.BASE_URL.concat("/api"), description: "ChaiForm API" }];
@@ -222,6 +263,7 @@ app.use(
   }),
 );
 
+app.use(requireTrustedOrigin);
 app.use(cookieParser());
 app.use(express.json({ limit: "256kb" }));
 

@@ -37,7 +37,7 @@ async function applyRateLimit(req: Request, res: Response, config: LimitConfig):
  * the full token sequence exactly matches one of the allowed identifiers —
  * this prevents "auth.signIn" accidentally matching "auth.signInWithMagicLink".
  */
-function matchesProcedure(path: string, procedures: string[]): boolean {
+export function matchesProcedure(path: string, procedures: string[]): boolean {
   const pathTokens = path.split(".");
   return procedures.some((proc) => {
     const procTokens = proc.split(".");
@@ -51,9 +51,30 @@ const PASSWORD_RESET_PROCS  = ["auth.forgotPassword", "auth.verifyOtp", "auth.re
 const FORM_SUBMIT_PROCS     = ["forms.submit"];
 const FORM_VIEW_PROCS       = ["forms.recordView"];
 
+export function normalizeProcedurePath(path: string) {
+  const normalized = path.replace(/^\/+/, "");
+  const restProcedureMap: Record<string, string> = {
+    "authentication/sign-up": "auth.signUp",
+    "authentication/sign-in": "auth.signIn",
+    "authentication/verify-2fa": "auth.verify2FA",
+    "authentication/refresh": "auth.refresh",
+    "authentication/forgot-password": "auth.forgotPassword",
+    "authentication/verify-otp": "auth.verifyOtp",
+    "authentication/reset-password": "auth.resetPassword",
+    "forms/submit": "forms.submit",
+    "forms/views": "forms.recordView",
+  };
+
+  return restProcedureMap[normalized] ?? normalized;
+}
+
 function extractSubmitFormId(req: Request): string | null {
   const body = req.body;
   if (!body || typeof body !== "object") return null;
+
+  if ("formId" in body && body.formId) {
+    return String((body as { formId?: string }).formId);
+  }
 
   if ("json" in body && body.json && typeof body.json === "object" && "formId" in body.json) {
     return String((body.json as { formId?: string }).formId ?? "");
@@ -72,7 +93,7 @@ function extractSubmitFormId(req: Request): string | null {
 export function createTrpcRateLimitMiddleware() {
   return async (req: Request, res: Response, next: NextFunction) => {
     // tRPC path is the URL segment after /trpc/, e.g. "auth.signIn"
-    const path = req.path.replace(/^\//, "");
+    const path = normalizeProcedurePath(req.path);
     const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
 
     if (matchesProcedure(path, AUTH_CREDENTIAL_PROCS)) {

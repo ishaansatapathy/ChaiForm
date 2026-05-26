@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-import { checkRateLimit, getClientIp } from "~/lib/rate-limit";
+import { checkRateLimitAsync, getClientIp } from "~/lib/rate-limit";
 import { parseCreateFormInput, parseUpdateFormInput } from "~/lib/validate-form-payload";
 
 export const maxDuration = 30;
@@ -12,6 +12,7 @@ async function postTrpcMutation(
   procedure: string,
   input: Record<string, unknown>,
   cookieHeader: string,
+  request: NextRequest,
 ) {
   const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
   const response = await fetch(`${API_BASE}/trpc/${procedure}`, {
@@ -20,6 +21,9 @@ async function postTrpcMutation(
       "content-type": "application/json",
       "accept-encoding": "identity",
       ...(cookieHeader ? { cookie: cookieHeader } : {}),
+      ...(cookieHeader ? { "x-chaiform-csrf": "1" } : {}),
+      ...(request.headers.get("origin") ? { origin: request.headers.get("origin")! } : {}),
+      ...(request.headers.get("referer") ? { referer: request.headers.get("referer")! } : {}),
     },
     body: JSON.stringify(input),
     cache: "no-store",
@@ -57,7 +61,7 @@ async function postTrpcMutation(
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
-  if (!checkRateLimit(`save-form:${ip}`, 40, 15 * 60 * 1000)) {
+  if (!(await checkRateLimitAsync(`save-form:${ip}`, 40, 15 * 60 * 1000))) {
     return NextResponse.json({ error: "Too many save requests. Try again later." }, { status: 429 });
   }
 
@@ -94,6 +98,7 @@ export async function POST(request: NextRequest) {
     procedure,
     parsed.data as Record<string, unknown>,
     cookieHeader,
+    request,
   );
 
   if (!result.ok) {

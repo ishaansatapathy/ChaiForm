@@ -110,6 +110,7 @@ export default function AnalyticsContent({
   const { data: user } = trpc.auth.me.useQuery({});
   const utils = trpc.useUtils();
   const [exporting, setExporting] = useState(false);
+  const deleteSubmissionMutation = trpc.forms.deleteSubmission.useMutation();
   const { data: formsPage, isLoading: formsLoading, isError: formsListError } = trpc.forms.list.useQuery(
     { limit: 100 },
     {
@@ -316,6 +317,26 @@ export default function AnalyticsContent({
     }
   };
 
+  const handleDeleteSubmission = async (submissionId: string) => {
+    if (!activeFormId) return;
+    const confirmed = window.confirm("Delete this response? This cannot be undone.");
+    if (!confirmed) return;
+
+    try {
+      await deleteSubmissionMutation.mutateAsync({ submissionId });
+      setSelectedSubmissionId(undefined);
+      setLoadedSubmissions((items) => items.filter((item) => item.id !== submissionId));
+      await utils.forms.listSubmissions.invalidate({ formId: activeFormId });
+      await utils.forms.exportSubmissions.invalidate({ formId: activeFormId });
+      await utils.analytics.summary.invalidate({ formId: activeFormId });
+      await utils.analytics.allFieldStats.invalidate({ formId: activeFormId });
+      await utils.analytics.fieldBreakdown.invalidate();
+      toast.success("Response deleted");
+    } catch {
+      toast.error("Could not delete response");
+    }
+  };
+
   if (formsLoading && forms.length === 0) {
     return <p className="text-white/40">Loading forms…</p>;
   }
@@ -342,8 +363,7 @@ export default function AnalyticsContent({
                     : "Could not load your forms list."}
               </p>
               <p className="mt-2 text-sm text-white/45">
-                The API needs a database update. Redeploy Railway (migrations run on startup) or run{" "}
-                <span className="font-mono text-white/60">pnpm db:migrate</span> on Neon, then refresh.
+                Analytics could not load. Please retry in a moment. If this keeps happening, contact support.
               </p>
             </>
           ) : (
@@ -694,6 +714,7 @@ export default function AnalyticsContent({
             }
             selectedSubmissionId={activeSubmissionId}
             onSelectSubmission={setSelectedSubmissionId}
+            onDeleteSubmission={handleDeleteSubmission}
             chartsMounted={chartsMounted}
           />
         </div>

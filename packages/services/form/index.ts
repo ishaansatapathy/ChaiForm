@@ -7,6 +7,7 @@ import {
   formFieldsTable,
   formVersionsTable,
   formsTable,
+  submissionAuditEventsTable,
   submissionResponsesTable,
   submissionsTable,
 } from "@repo/database/schema";
@@ -31,6 +32,9 @@ import { fieldsChanged, fieldsToVersionSnapshot } from "./versioning";
 import { validateSubmissionAnswers } from "./validation";
 import { isTurnstileRequired, verifyTurnstileToken } from "../turnstile";
 import type { UserRole } from "../auth/roles";
+
+type FormDbClient = Pick<typeof db, "insert" | "select" | "update">;
+const MAX_EXPORT_SUBMISSIONS = 10000;
 
 export class FormError extends Error {
   constructor(
@@ -70,6 +74,19 @@ function parseSubmissionDateFilter(value: string | undefined, endExclusive = fal
   }
 
   return date;
+}
+
+function isUniqueViolation(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
+}
+
+function isLikelyDangerousRegex(pattern: string) {
+  return (
+    pattern.length > 200 ||
+    /(\\[1-9])|(\(\?<?[=!])/.test(pattern) ||
+    /(\([^)]*[+*][^)]*\)[+*?])|(\[[^\]]+\][+*]\+)|(\.\*[+*?])/.test(pattern) ||
+    /(\{[^}]+,\}\s*[+*?])|([+*?]\s*[+*?])/.test(pattern)
+  );
 }
 
 function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
@@ -149,6 +166,16 @@ function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
         config: fieldConfig,
       };
     }
+    case "description":
+      return {
+        ...base,
+        required: false,
+        type: "description",
+        config: {
+          style: config?.style === "heading" ? "heading" : "body",
+          ...(config?.showWhen ? { showWhen: config.showWhen } : {}),
+        },
+      };
     default:
       return { ...base, type: "text" };
   }
@@ -158,6 +185,7 @@ function defaultConfig(type: FormFieldInput["type"]): FieldConfigJson | undefine
   if (type === "select") return { options: ["Option 1", "Option 2"] };
   if (type === "rating") return { maxRating: 5 };
   if (type === "checkbox") return { options: ["Option 1"] };
+  if (type === "description") return { style: "body" };
   return undefined;
 }
 
@@ -185,6 +213,9 @@ class FormService {
       }
 
       if (validation.pattern) {
+        if (isLikelyDangerousRegex(validation.pattern)) {
+          throw new FormError("BAD_REQUEST", `"${field.label}" validation pattern is too complex`);
+        }
         try {
           new RegExp(validation.pattern);
         } catch {
@@ -296,7 +327,7 @@ class FormService {
     return version?.versionNumber ?? null;
   }
 
-  private async bumpFormVersion(formId: string, fields: FormField[], tx?: typeof db) {
+  private async bumpFormVersion(formId: string, fields: FormField[], tx?: FormDbClient) {
     const client = tx ?? db;
     const [latest] = await client
       .select({ versionNumber: formVersionsTable.versionNumber })
@@ -335,10 +366,11 @@ class FormService {
     return rows.map(mapFieldRow);
   }
 
-  private async insertFields(formId: string, fields: FormField[]) {
+  private async insertFields(formId: string, fields: FormField[], tx?: FormDbClient) {
     if (fields.length === 0) return;
 
-    await db.insert(formFieldsTable).values(
+    const client = tx ?? db;
+    await client.insert(formFieldsTable).values(
       fields.map((field, index) => ({
         id: field.id,
         formId,
@@ -432,26 +464,29 @@ class FormService {
     const fields = this.normalizeInputFields(input.fields);
     const slug = await createUniqueSlug(input.title);
 
-    const [created] = await db
-      .insert(formsTable)
-      .values({
-        userId,
-        title: input.title.trim(),
-        description: input.description?.trim() || null,
-        visibility: input.visibility,
-        theme: input.theme ?? "default",
-        slug,
-        viewCount: 0,
-        expiresAt: expiresAtFromRetention(input.retention ?? "forever"),
-        allowMultipleSubmissions: input.allowMultipleSubmissions ?? true,
-        requireAuthentication: input.requireAuthentication ?? false,
-      })
-      .returning();
+    const [created] = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(formsTable)
+        .values({
+          userId,
+          title: input.title.trim(),
+          description: input.description?.trim() || null,
+          visibility: input.visibility,
+          theme: input.theme ?? "default",
+          slug,
+          viewCount: 0,
+          expiresAt: expiresAtFromRetention(input.retention ?? "forever"),
+          allowMultipleSubmissions: input.allowMultipleSubmissions ?? true,
+          requireAuthentication: input.requireAuthentication ?? false,
+        })
+        .returning();
 
-    if (!created) throw new FormError("BAD_REQUEST", "Unable to create form");
+      if (!row) throw new FormError("BAD_REQUEST", "Unable to create form");
 
-    await this.insertFields(created.id, fields);
-    await this.bumpFormVersion(created.id, fields);
+      await this.insertFields(row.id, fields, tx);
+      await this.bumpFormVersion(row.id, fields, tx);
+      return [row];
+    });
 
     return this.mapForm(created, 0);
   }
@@ -471,6 +506,8 @@ class FormService {
     if (input.retention !== undefined) {
       expiresAt = expiresAtFromRetentionChange(input.retention);
     }
+
+    const shouldBumpVersion = fields ? fieldsChanged(previousFields, fields) : false;
 
     const [updated] = await db.transaction(async (tx) => {
       const [row] = await tx
@@ -510,12 +547,13 @@ class FormService {
         }
       }
 
+      if (fields && shouldBumpVersion) {
+        const version = await this.bumpFormVersion(input.formId, fields, tx);
+        return [{ ...row, currentVersionId: version.id }];
+      }
+
       return [row];
     });
-
-    if (fields && fieldsChanged(previousFields, fields)) {
-      await this.bumpFormVersion(input.formId, fields);
-    }
 
     const [countRow] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -622,7 +660,7 @@ class FormService {
 
     await db
       .update(formsTable)
-      .set({ viewCount: (row.viewCount ?? 0) + 1 })
+      .set({ viewCount: sql`${formsTable.viewCount} + 1` })
       .where(eq(formsTable.id, formId));
 
     return { success: true as const };
@@ -857,7 +895,7 @@ class FormService {
    *
    * The two stores must remain in sync. Never update one without the other.
    */
-  async submitForm(input: SubmitFormInput, submitterUserId?: string | null) {
+  async submitForm(input: SubmitFormInput, submitterUserId?: string | null, remoteIp?: string | null) {
     refineSubmitFormInput(input);
     if (input.website.length > 0) {
       throw new FormError("BAD_REQUEST", "Submission rejected");
@@ -867,7 +905,7 @@ class FormService {
       if (!input.turnstileToken) {
         throw new FormError("BAD_REQUEST", "Please complete the CAPTCHA check.");
       }
-      const captchaOk = await verifyTurnstileToken(input.turnstileToken);
+      const captchaOk = await verifyTurnstileToken(input.turnstileToken, remoteIp ?? undefined);
       if (!captchaOk) {
         throw new FormError("BAD_REQUEST", "CAPTCHA verification failed. Please try again.");
       }
@@ -957,35 +995,70 @@ class FormService {
       }
     }
 
-    const [created] = await db.transaction(async (tx) => {
-      const [submission] = await tx
-        .insert(submissionsTable)
-        .values({
-          formId: form.id,
-          formVersionId: formRow.currentVersionId ?? null,
-          submitterUserId: submitterUserId ?? null,
-          respondentKey: input.respondentKey ?? null,
-          idempotencyKey: input.idempotencyKey ?? null,
-          answers,
-        })
-        .returning();
+    let created: typeof submissionsTable.$inferSelect;
+    try {
+      [created] = await db.transaction(async (tx) => {
+        const storesRepeatIdentity = !(formRow.allowMultipleSubmissions ?? true);
+        const [submission] = await tx
+          .insert(submissionsTable)
+          .values({
+            formId: form.id,
+            formVersionId: formRow.currentVersionId ?? null,
+            submitterUserId: storesRepeatIdentity ? (submitterUserId ?? null) : null,
+            respondentKey: storesRepeatIdentity ? (input.respondentKey ?? null) : null,
+            idempotencyKey: input.idempotencyKey ?? null,
+            answers,
+          })
+          .returning();
 
-      if (!submission) throw new FormError("BAD_REQUEST", "Unable to save submission");
+        if (!submission) throw new FormError("BAD_REQUEST", "Unable to save submission");
 
-      const responseRows = answers
-        .filter((answer) => answer.value.length > 0)
-        .map((answer) => ({
-          submissionId: submission.id,
-          fieldId: answer.fieldId,
-          value: answer.value,
-        }));
+        const responseRows = answers
+          .filter((answer) => answer.value.length > 0)
+          .map((answer) => ({
+            submissionId: submission.id,
+            fieldId: answer.fieldId,
+            value: answer.value,
+          }));
 
-      if (responseRows.length > 0) {
-        await tx.insert(submissionResponsesTable).values(responseRows);
+        if (responseRows.length > 0) {
+          await tx.insert(submissionResponsesTable).values(responseRows);
+        }
+
+        return [submission];
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        if (input.idempotencyKey) {
+          const [existing] = await db
+            .select()
+            .from(submissionsTable)
+            .where(
+              and(
+                eq(submissionsTable.formId, input.formId),
+                eq(submissionsTable.idempotencyKey, input.idempotencyKey),
+              ),
+            )
+            .limit(1);
+          if (existing) {
+            return {
+              id: existing.id,
+              formId: existing.formId,
+              formVersionId: existing.formVersionId ?? null,
+              formTitle: form.title,
+              answers: existing.answers as SubmissionAnswerJson[],
+              submittedAt: toIso(existing.submittedAt),
+            };
+          }
+        }
+
+        throw new FormError(
+          "BAD_REQUEST",
+          "You have already submitted this form. Contact the form owner if you need to send another response.",
+        );
       }
-
-      return [submission];
-    });
+      throw error;
+    }
 
     void notifyCreatorOfSubmission({
       ownerUserId: formRow.userId,
@@ -1075,7 +1148,7 @@ class FormService {
       .from(submissionsTable)
       .where(and(...conditions))
       .orderBy(desc(submissionsTable.submittedAt))
-      .limit(5000);
+      .limit(MAX_EXPORT_SUBMISSIONS);
 
     return {
       formTitle: form.title,
@@ -1120,6 +1193,40 @@ class FormService {
       answers: row.submission.answers as SubmissionAnswerJson[],
       submittedAt: toIso(row.submission.submittedAt),
     };
+  }
+
+  async deleteSubmission(userId: string, submissionId: string, actorRole: UserRole = "user") {
+    const [row] = await db
+      .select({
+        submission: submissionsTable,
+        ownerId: formsTable.userId,
+      })
+      .from(submissionsTable)
+      .innerJoin(formsTable, eq(formsTable.id, submissionsTable.formId))
+      .where(eq(submissionsTable.id, submissionId))
+      .limit(1);
+
+    if (!row) throw new FormError("NOT_FOUND", "Submission not found");
+    if (row.ownerId !== userId && actorRole !== "admin") {
+      throw new FormError("FORBIDDEN", "Not allowed");
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.insert(submissionAuditEventsTable).values({
+        eventType: "submission.deleted",
+        formId: row.submission.formId,
+        submissionId: row.submission.id,
+        actorUserId: userId,
+        snapshot: {
+          submissionId: row.submission.id,
+          formVersionId: row.submission.formVersionId ?? null,
+          submittedAt: toIso(row.submission.submittedAt),
+          answers: row.submission.answers as SubmissionAnswerJson[],
+        },
+      });
+      await tx.delete(submissionsTable).where(eq(submissionsTable.id, submissionId));
+    });
+    return { success: true as const, formId: row.submission.formId };
   }
 }
 

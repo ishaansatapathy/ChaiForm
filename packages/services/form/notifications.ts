@@ -14,6 +14,15 @@ type NotifyCreatorInput = {
   answers: SubmissionAnswerJson[];
 };
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function notifyCreatorOfSubmission(input: NotifyCreatorInput): Promise<void> {
   const [owner] = await db
     .select({ email: usersTable.email, fullName: usersTable.fullName })
@@ -44,15 +53,15 @@ export async function notifyCreatorOfSubmission(input: NotifyCreatorInput): Prom
   ].join("\n");
 
   const html = `
-    <p>Hi ${owner.fullName},</p>
-    <p>Someone just submitted <strong>${input.formTitle}</strong>.</p>
+    <p>Hi ${escapeHtml(owner.fullName)},</p>
+    <p>Someone just submitted <strong>${escapeHtml(input.formTitle)}</strong>.</p>
     <ul>
       ${input.answers
         .filter((answer) => answer.value.length > 0)
-        .map((answer) => `<li><strong>${answer.label}:</strong> ${answer.value}</li>`)
+        .map((answer) => `<li><strong>${escapeHtml(answer.label)}:</strong> ${escapeHtml(answer.value)}</li>`)
         .join("")}
     </ul>
-    <p><a href="${analyticsUrl}">View analytics</a></p>
+    <p><a href="${escapeHtml(analyticsUrl)}">View analytics</a></p>
   `;
 
   await sendEmail({ email: owner.email, subject, html, text });
@@ -99,11 +108,11 @@ export async function notifyCreatorOfFormDeletion(input: NotifyFormDeletedInput)
   ].join("\n");
 
   const html = `
-    <p>Hi ${owner.fullName},</p>
-    <p>Your form <strong>${input.formTitle}</strong> has been deleted.</p>
-    <p>${reasonLine}</p>
+    <p>Hi ${escapeHtml(owner.fullName)},</p>
+    <p>Your form <strong>${escapeHtml(input.formTitle)}</strong> has been deleted.</p>
+    <p>${escapeHtml(reasonLine)}</p>
     <p><strong>${input.submissionCount}</strong> response(s) were removed with the form.</p>
-    <p><a href="${dashboardUrl}">Back to dashboard</a></p>
+    <p><a href="${escapeHtml(dashboardUrl)}">Back to dashboard</a></p>
   `;
 
   await sendEmail({ email: owner.email, subject, html, text });

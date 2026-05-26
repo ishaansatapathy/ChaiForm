@@ -1,4 +1,4 @@
-import { cacheIncr } from "./kv-store";
+import { cacheIncr, cacheIncrDistributed } from "./kv-store";
 
 export type RateLimitResult = {
   allowed: boolean;
@@ -6,12 +6,35 @@ export type RateLimitResult = {
   limit: number;
 };
 
+function isProduction() {
+  const nodeEnv = String(process.env.NODE_ENV ?? "");
+  return nodeEnv === "production" || nodeEnv === "prod";
+}
+
+function requiresDistributedRateLimit() {
+  return isProduction() && process.env.RATE_LIMIT_ALLOW_MEMORY_FALLBACK !== "true";
+}
+
 export async function checkDistributedRateLimit(
   key: string,
   limit: number,
   windowMs: number,
 ): Promise<RateLimitResult> {
-  const count = await cacheIncr(`rl:${key}`, windowMs);
+  let count: number;
+  try {
+    count = requiresDistributedRateLimit()
+      ? await cacheIncrDistributed(`rl:${key}`, windowMs)
+      : await cacheIncr(`rl:${key}`, windowMs);
+  } catch {
+    if (requiresDistributedRateLimit()) {
+      return {
+        allowed: false,
+        remaining: 0,
+        limit,
+      };
+    }
+    count = await cacheIncr(`rl:${key}`, windowMs);
+  }
   const remaining = Math.max(0, limit - count);
   return {
     allowed: count <= limit,

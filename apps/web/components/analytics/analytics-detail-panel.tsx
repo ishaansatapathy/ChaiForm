@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { BarChart3, ChevronDown, ChevronRight, GitBranch, Users, X } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronRight, GitBranch, Trash2, Users, X } from "lucide-react";
 
 import type { RouterOutputs } from "@repo/trpc/client";
 import {
@@ -32,6 +32,7 @@ type AnalyticsDetailPanelProps = {
   allSubmissionsCount: number;
   selectedSubmissionId?: string;
   onSelectSubmission: (submissionId: string | undefined) => void;
+  onDeleteSubmission?: (submissionId: string) => void;
   chartsMounted: boolean;
 };
 
@@ -42,6 +43,7 @@ export function AnalyticsDetailPanel({
   allSubmissionsCount,
   selectedSubmissionId,
   onSelectSubmission,
+  onDeleteSubmission,
   chartsMounted,
 }: AnalyticsDetailPanelProps) {
   const [viewMode, setViewMode] = useState<"graph" | "flow">("graph");
@@ -194,6 +196,7 @@ export function AnalyticsDetailPanel({
             submissions={filteredSubmissions}
             activeSubmissionId={activeSubmission?.id}
             onSelect={onSelectSubmission}
+            onDelete={onDeleteSubmission}
           />
         </div>
       ) : (
@@ -216,6 +219,7 @@ export function AnalyticsDetailPanel({
             submissions={filteredSubmissions}
             activeSubmissionId={activeSubmission?.id}
             onSelect={onSelectSubmission}
+            onDelete={onDeleteSubmission}
           />
         </div>
       )}
@@ -227,10 +231,12 @@ function ParticipantList({
   submissions,
   activeSubmissionId,
   onSelect,
+  onDelete,
 }: {
   submissions: Submission[];
   activeSubmissionId?: string;
   onSelect: (id: string | undefined) => void;
+  onDelete?: (id: string) => void;
 }) {
   if (submissions.length === 0) {
     return <p className="text-sm text-white/40">No participants match these filters.</p>;
@@ -254,11 +260,12 @@ function ParticipantList({
                   : "border-white/8 bg-white/2 hover:border-white/15 hover:bg-white/4"
               }`}
             >
-              <button
-                type="button"
-                onClick={() => onSelect(expanded ? undefined : submission.id)}
-                className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
-              >
+              <div className="flex items-center justify-between gap-3 px-4 py-4">
+                <button
+                  type="button"
+                  onClick={() => onSelect(expanded ? undefined : submission.id)}
+                  className="flex flex-1 items-center justify-between gap-3 text-left"
+                >
                 <div className="flex items-center gap-3">
                   <span
                     className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
@@ -279,7 +286,18 @@ function ParticipantList({
                 <span className="rounded-full border border-white/10 px-2 py-0.5 font-mono text-[9px] tracking-wider text-white/40 uppercase">
                   {visibleAnswers.length} answers
                 </span>
-              </button>
+                </button>
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(submission.id)}
+                    className="rounded-full border border-red-400/20 p-2 text-red-300/70 transition-colors hover:bg-red-400/10 hover:text-red-200"
+                    aria-label="Delete response"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
 
               {expanded && (
                 <div className="space-y-2 border-t border-white/8 bg-black/30 px-5 py-4">

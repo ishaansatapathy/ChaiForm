@@ -78,7 +78,7 @@ export const authRouter = router({
     .meta({ openapi: { method: "POST", path: getPath("/logout"), tags: TAGS } })
     .input(zodUndefinedModel)
     .output(messageOutputSchema)
-    .mutation(({ ctx }) => authService.logout(ctx.res)),
+    .mutation(({ ctx }) => authService.logout(ctx.req, ctx.res)),
 
   refresh: publicProcedure
     .meta({ openapi: { method: "POST", path: getPath("/refresh"), tags: TAGS } })

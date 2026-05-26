@@ -4,7 +4,7 @@ import { fetchAuthProviders, getGoogleProvider } from "~/lib/fetch-auth-provider
 import { sanitizeRedirectPath } from "@repo/services/auth/safe-redirect";
 
 export async function GET(request: NextRequest) {
-  const state = sanitizeRedirectPath(request.nextUrl.searchParams.get("state"));
+  const returnTo = sanitizeRedirectPath(request.nextUrl.searchParams.get("state"));
   const signInUrl = new URL("/sign-in", request.url);
 
   const providers = await fetchAuthProviders();
@@ -16,9 +16,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const nonce = crypto.randomUUID();
+    const state = Buffer.from(JSON.stringify({ nonce, returnTo }), "utf8").toString("base64url");
     const authUrl = new URL(google.authUrl);
     authUrl.searchParams.set("state", state);
-    return NextResponse.redirect(authUrl.toString());
+    const response = NextResponse.redirect(authUrl.toString());
+    response.cookies.set("chaiform_oauth_state", nonce, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 10 * 60,
+    });
+    return response;
   } catch {
     signInUrl.searchParams.set(
       "error",

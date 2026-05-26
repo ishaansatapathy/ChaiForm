@@ -2,10 +2,12 @@ import { jwtVerify } from "jose";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { appendProxiedSetCookies } from "~/lib/proxied-set-cookie";
 import { sanitizeRedirectPath } from "~/lib/safe-redirect";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/analytics", "/forms", "/settings"];
 const AUTH_ENTRY_PATHS = new Set(["/", "/sign-in", "/sign-up"]);
+const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
 function getJwtSecret() {
   return process.env.JWT_SECRET?.trim() ?? "";
@@ -21,7 +23,12 @@ type SessionPayload = {
   type?: string;
 };
 
-async function resolveSession(request: NextRequest): Promise<SessionPayload | null> {
+type ResolvedSession = {
+  payload: SessionPayload;
+  source: "access" | "refresh";
+};
+
+async function resolveSession(request: NextRequest): Promise<ResolvedSession | null> {
   const accessToken = request.cookies.get("jwt")?.value;
   const refreshToken = request.cookies.get("jwt_refresh")?.value;
   const jwtSecret = getJwtSecret();
@@ -35,7 +42,7 @@ async function resolveSession(request: NextRequest): Promise<SessionPayload | nu
       const { payload } = await jwtVerify(accessToken, new TextEncoder().encode(jwtSecret), {
         algorithms: ["HS256"],
       });
-      return payload as SessionPayload;
+      return { payload: payload as SessionPayload, source: "access" };
     } catch {
       // Fall through to refresh token.
     }
@@ -49,19 +56,40 @@ async function resolveSession(request: NextRequest): Promise<SessionPayload | nu
     });
     const session = payload as SessionPayload;
     if (session.type !== "refresh") return null;
-    return session;
+    return { payload: session, source: "refresh" };
   } catch {
     return null;
   }
 }
 
-function isSignedIn(session: SessionPayload | null) {
-  return Boolean(session?.userId);
+function isSignedIn(session: ResolvedSession | null) {
+  return Boolean(session?.payload.userId);
 }
 
 /** Only block when token explicitly says unverified (legacy tokens may omit the claim). */
-function isVerifiedSession(session: SessionPayload | null) {
-  return isSignedIn(session) && session?.emailVerified !== false;
+function isVerifiedSession(session: ResolvedSession | null) {
+  return isSignedIn(session) && session?.payload.emailVerified !== false;
+}
+
+async function validateRefreshSession(request: NextRequest): Promise<NextResponse | null> {
+  try {
+    const upstream = await fetch(`${API_BASE}/trpc/auth.me?input=%7B%7D`, {
+      headers: {
+        cookie: request.headers.get("cookie") ?? "",
+        "accept-encoding": "identity",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+
+    if (!upstream.ok) return null;
+
+    const response = NextResponse.next();
+    appendProxiedSetCookies(response.headers, upstream.headers);
+    return response;
+  } catch {
+    return null;
+  }
 }
 
 export async function middleware(request: NextRequest) {
@@ -90,18 +118,30 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!isSignedIn(session)) {
+  if (!session?.payload.userId) {
     const signInUrl = request.nextUrl.clone();
     signInUrl.pathname = "/sign-in";
     signInUrl.searchParams.set("next", sanitizeRedirectPath(pathname));
     return NextResponse.redirect(signInUrl);
   }
 
-  if (session?.emailVerified === false) {
+  const activeSession = session;
+
+  if (activeSession.payload.emailVerified === false) {
     const verifyUrl = request.nextUrl.clone();
     verifyUrl.pathname = "/check-email";
     verifyUrl.search = "";
     return NextResponse.redirect(verifyUrl);
+  }
+
+  if (activeSession.source === "refresh") {
+    const refreshed = await validateRefreshSession(request);
+    if (refreshed) return refreshed;
+
+    const signInUrl = request.nextUrl.clone();
+    signInUrl.pathname = "/sign-in";
+    signInUrl.searchParams.set("next", sanitizeRedirectPath(pathname));
+    return NextResponse.redirect(signInUrl);
   }
 
   return NextResponse.next();

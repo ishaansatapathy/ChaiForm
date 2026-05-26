@@ -15,6 +15,13 @@ function buildUpstreamHeaders(request: NextRequest): Headers {
   if (contentType) headers.set("content-type", contentType);
   const cookie = request.headers.get("cookie");
   if (cookie) headers.set("cookie", cookie);
+  const origin = request.headers.get("origin");
+  if (origin) headers.set("origin", origin);
+  const referer = request.headers.get("referer");
+  if (referer) headers.set("referer", referer);
+  if (cookie && request.method !== "GET" && request.method !== "HEAD") {
+    headers.set("x-chaiform-csrf", "1");
+  }
   const accept = request.headers.get("accept");
   if (accept) headers.set("accept", accept);
   // Avoid gzip/br from Render — Node fetch auto-decompresses but length/header mismatches

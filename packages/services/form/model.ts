@@ -35,7 +35,7 @@ const textLikeConfigSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const selectConfigSchema = z.object({
-  options: z.array(z.string().min(1)).min(1),
+  options: z.array(z.string().min(1).max(200)).min(1).max(100),
   placeholder: z.string().max(200).optional(),
   showWhen: fieldVisibilityRuleSchema.optional(),
 });
@@ -49,7 +49,7 @@ const ratingConfigSchema = z.object({
 
 const checkboxConfigSchema = z
   .object({
-    options: z.array(z.string().min(1).max(200)).min(1).optional(),
+    options: z.array(z.string().min(1).max(200)).min(1).max(100).optional(),
     checkboxLabel: z.string().max(200).optional(),
     showWhen: fieldVisibilityRuleSchema.optional(),
   })
@@ -148,6 +148,18 @@ function assertUniqueFieldIds(fields: { id: string }[]) {
   }
 }
 
+function assertUniqueOptions(fields: z.infer<typeof formFieldInputSchema>[]) {
+  for (const field of fields) {
+    const options =
+      field.config && "options" in field.config ? field.config.options : undefined;
+    if (!options?.length) continue;
+    const normalized = options.map((option) => option.trim().toLowerCase());
+    if (new Set(normalized).size !== normalized.length) {
+      throw new Error(`"${field.label}" has duplicate options`);
+    }
+  }
+}
+
 /** OpenAPI-safe base schema (no refinements — trpc-to-openapi cannot handle .superRefine). */
 export const createFormInputBaseSchema = z
   .object({
@@ -179,11 +191,15 @@ export const updateFormInputBaseSchema = z
 
 export function refineCreateFormInput(input: z.infer<typeof createFormInputBaseSchema>) {
   assertUniqueFieldIds(input.fields);
+  assertUniqueOptions(input.fields);
   return input;
 }
 
 export function refineUpdateFormInput(input: z.infer<typeof updateFormInputBaseSchema>) {
-  if (input.fields) assertUniqueFieldIds(input.fields);
+  if (input.fields) {
+    assertUniqueFieldIds(input.fields);
+    assertUniqueOptions(input.fields);
+  }
   return input;
 }
 
@@ -251,7 +267,7 @@ export const submissionAnswerSchema = z.object({
 const submitAnswerSchema = z
   .object({
     fieldId: z.string().uuid(),
-    value: z.string().max(5000),
+    value: z.string().max(10000),
   })
   .strict();
 
