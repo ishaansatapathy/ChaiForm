@@ -156,6 +156,25 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
             ))}
           </div>
 
+          {(field.type === "text" ||
+            field.type === "email" ||
+            field.type === "number" ||
+            field.type === "date") && (
+            <label className="mt-4 block text-xs text-white/50">
+              Placeholder
+              <input
+                value={field.config?.placeholder ?? ""}
+                onChange={(e) =>
+                  updateField(field.id, {
+                    config: { ...field.config, placeholder: e.target.value || undefined },
+                  })
+                }
+                placeholder="Optional hint text"
+                className="mt-2 w-full rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-sm text-white outline-none"
+              />
+            </label>
+          )}
+
           {field.type === "select" && (
             <textarea
               value={(field.config?.options ?? []).join("\n")}

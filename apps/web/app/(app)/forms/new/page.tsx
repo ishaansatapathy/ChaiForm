@@ -16,6 +16,7 @@ import type { FormRetentionOption } from "~/lib/form-retention";
 import { FORM_TEMPLATES } from "~/lib/form-templates";
 import type { FormThemeId } from "~/lib/form-themes";
 import { getSaveErrorMessage, saveFormWithColdStart } from "~/lib/save-form";
+import { parseCreateFormInput } from "~/lib/validate-form-payload";
 import { useWarmApi } from "~/lib/warm-api";
 import { trpc } from "~/trpc/client";
 import type { RouterInputs } from "@repo/trpc/client";
@@ -30,6 +31,7 @@ const createInitialDraftFields = (): DraftField[] => [
 export default function CreateFormPage() {
   const router = useRouter();
   const utils = trpc.useUtils();
+  const createMutation = trpc.forms.create.useMutation();
   const [saving, setSaving] = useState(false);
   const [serverReady, setServerReady] = useState(false);
 
@@ -80,8 +82,16 @@ export default function CreateFormPage() {
       fields: fields as CreateFormFields,
     };
 
+    const parsed = parseCreateFormInput(payload);
+    if (!parsed.success) {
+      toast.error(parsed.message);
+      setSaving(false);
+      return;
+    }
+
     try {
-      await saveFormWithColdStart("create", payload, {
+      await saveFormWithColdStart("create", parsed.data, {
+        mutate: () => createMutation.mutateAsync(parsed.data),
         onProgress: (message) => toast.message(message),
       });
       setServerReady(true);

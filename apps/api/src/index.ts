@@ -9,6 +9,7 @@ import { env } from "./env";
 async function init() {
   try {
     try {
+      await runMigrations();
       logger.info("Database schema patches applied");
     } catch (err) {
       logger.error("Database migration failed — forms list/analytics may break until fixed", { err });

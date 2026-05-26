@@ -7,12 +7,18 @@ import bcrypt from "bcryptjs";
 import { db, eq } from "@repo/database";
 import {
   formFieldsTable,
+  formVersionsTable,
   formsTable,
   submissionResponsesTable,
   submissionsTable,
   usersTable,
 } from "@repo/database/schema";
-import type { FormTheme, FormVisibility, SubmissionAnswerJson } from "@repo/database/schema";
+import type {
+  FormTheme,
+  FormVersionFieldSnapshot,
+  FormVisibility,
+  SubmissionAnswerJson,
+} from "@repo/database/schema";
 
 type SeedField = {
   id: string;
@@ -480,6 +486,16 @@ function buildAnswersFromSeed(form: SeedForm, submission: Record<string, string>
   }));
 }
 
+function toVersionSnapshot(fields: SeedField[]): FormVersionFieldSnapshot[] {
+  return fields.map((field) => ({
+    id: field.id,
+    label: field.label,
+    type: field.type,
+    required: field.required,
+    config: field.config ?? undefined,
+  }));
+}
+
 async function seedForm(userId: string, form: SeedForm) {
   const [existing] = await db.select().from(formsTable).where(eq(formsTable.slug, form.slug)).limit(1);
   if (existing) {
@@ -514,6 +530,22 @@ async function seedForm(userId: string, form: SeedForm) {
     })),
   );
 
+  const [version] = await db
+    .insert(formVersionsTable)
+    .values({
+      formId: createdForm.id,
+      versionNumber: 1,
+      schemaSnapshot: toVersionSnapshot(form.fields),
+    })
+    .returning();
+
+  if (version) {
+    await db
+      .update(formsTable)
+      .set({ currentVersionId: version.id })
+      .where(eq(formsTable.id, createdForm.id));
+  }
+
   for (const demo of form.submissions) {
     const submittedAt = new Date();
     submittedAt.setDate(submittedAt.getDate() - demo.daysAgo);
@@ -524,6 +556,7 @@ async function seedForm(userId: string, form: SeedForm) {
       .insert(submissionsTable)
       .values({
         formId: createdForm.id,
+        formVersionId: version?.id,
         answers,
         submittedAt,
       })

@@ -17,6 +17,7 @@ import type { FormRetentionOption } from "~/lib/form-retention";
 import { presetFromExpiresAt } from "~/lib/form-retention";
 import type { FormThemeId } from "~/lib/form-themes";
 import { getSaveErrorMessage, saveFormWithColdStart } from "~/lib/save-form";
+import { parseUpdateFormInput } from "~/lib/validate-form-payload";
 import { useWarmApi } from "~/lib/warm-api";
 import type { FormDetail } from "~/lib/fetch-session";
 import { trpc } from "~/trpc/client";
@@ -32,6 +33,7 @@ type EditFormContentProps = {
 export default function EditFormContent({ formId, initialForm }: EditFormContentProps) {
   const router = useRouter();
   const utils = trpc.useUtils();
+  const updateMutation = trpc.forms.update.useMutation();
   const [saving, setSaving] = useState(false);
   const { data: user } = trpc.auth.me.useQuery({});
 
@@ -145,8 +147,16 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
       fields: fields as UpdateFormFields,
     };
 
+    const parsed = parseUpdateFormInput(payload);
+    if (!parsed.success) {
+      toast.error(parsed.message);
+      setSaving(false);
+      return;
+    }
+
     try {
-      await saveFormWithColdStart("update", payload, {
+      await saveFormWithColdStart("update", parsed.data, {
+        mutate: () => updateMutation.mutateAsync(parsed.data),
         onProgress: (message) => toast.message(message),
       });
       await utils.forms.list.invalidate();

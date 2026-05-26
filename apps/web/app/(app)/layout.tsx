@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
 
 import { AppShell } from "~/components/app/app-shell";
 import {
@@ -11,9 +12,14 @@ export const maxDuration = 60;
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const initialUser = await fetchSessionUser();
-  const [initialForms, initialAnalytics] = initialUser
-    ? await Promise.all([fetchFormsList(100), fetchAnalyticsSummary()])
-    : [null, null];
+  if (!initialUser) {
+    redirect("/sign-in");
+  }
+
+  const [initialForms, initialAnalytics] = await Promise.all([
+    fetchFormsList(100),
+    fetchAnalyticsSummary(),
+  ]);
 
   return (
     <AppShell
