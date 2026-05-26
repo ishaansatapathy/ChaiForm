@@ -1,11 +1,18 @@
 import { z } from "zod";
 
-export const signUpInputSchema = z.object({
-  fullName: z.string().trim().min(2, "Name must be at least 2 characters").max(80),
-  email: z.string().trim().email("Invalid email").max(255),
-  password: z.string().min(8, "Password must be at least 8 characters").max(128),
-  confirmPassword: z.string(),
-});
+export const signUpInputBaseSchema = z
+  .object({
+    fullName: z.string().trim().min(2, "Name must be at least 2 characters").max(80),
+    email: z.string().trim().email("Invalid email").max(255),
+    password: z.string().min(8, "Password must be at least 8 characters").max(128),
+    confirmPassword: z.string(),
+  })
+  .strict();
+
+export const signUpInputSchema = signUpInputBaseSchema.refine(
+  (input) => input.password === input.confirmPassword,
+  { message: "Passwords do not match", path: ["confirmPassword"] },
+);
 
 export const signInInputSchema = z.object({
   email: z.string().trim().email("Invalid email"),
@@ -22,12 +29,19 @@ export const verifyOtpInputSchema = z.object({
   otp: z.string().length(6, "OTP must be 6 digits"),
 });
 
-export const resetPasswordInputSchema = z.object({
-  email: z.string().trim().email("Invalid email"),
-  newPassword: z.string().min(8, "Password must be at least 8 characters").max(128),
-  otp: z.string().length(6).optional(),
-  token: z.string().optional(),
-});
+export const resetPasswordInputBaseSchema = z
+  .object({
+    email: z.string().trim().email("Invalid email"),
+    newPassword: z.string().min(8, "Password must be at least 8 characters").max(128),
+    otp: z.string().length(6).optional(),
+    token: z.string().optional(),
+  })
+  .strict();
+
+export const resetPasswordInputSchema = resetPasswordInputBaseSchema.refine(
+  (input) => Boolean(input.otp || input.token),
+  { message: "OTP or reset token is required", path: ["otp"] },
+);
 
 export const verify2FAInputSchema = z.object({
   email: z.string().trim().email("Invalid email"),
@@ -66,11 +80,11 @@ export function assertResetPasswordCredential(input: z.infer<typeof resetPasswor
   }
 }
 
-export type SignUpInput = z.infer<typeof signUpInputSchema>;
+export type SignUpInput = z.infer<typeof signUpInputBaseSchema>;
 export type SignInInput = z.infer<typeof signInInputSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordInputSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpInputSchema>;
-export type ResetPasswordInput = z.infer<typeof resetPasswordInputSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordInputBaseSchema>;
 export type Verify2FAInput = z.infer<typeof verify2FAInputSchema>;
 export type Toggle2FAInput = z.infer<typeof toggle2FAInputSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailInputSchema>;

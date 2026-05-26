@@ -120,6 +120,7 @@ export default function AnalyticsContent({
   );
 
   const [selectedFormId, setSelectedFormId] = useState<string | undefined>(initialFormId);
+  const [chartDays, setChartDays] = useState(30);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | undefined>();
   const [selectedFieldId, setSelectedFieldId] = useState<string | undefined>();
   const [submissionSearch, setSubmissionSearch] = useState("");
@@ -157,7 +158,7 @@ export default function AnalyticsContent({
 
         const [summaryRes, overTimeRes, fieldsRes, subsRes, allSubsRes] = await Promise.all([
           utils.analytics.summary.fetch({ formId }).catch(() => null),
-          utils.analytics.submissionsOverTime.fetch({ formId, days: 30 }).catch(() => null),
+          utils.analytics.submissionsOverTime.fetch({ formId, days: chartDays }).catch(() => null),
           utils.analytics.listFormFields.fetch({ formId }).catch(() => null),
           utils.forms.listSubmissions.fetch({ formId, limit: 15 }).catch(() => null),
           utils.forms.listSubmissions.fetch({ formId, limit: 100 }).catch(() => null),
@@ -187,7 +188,7 @@ export default function AnalyticsContent({
         setFormBundleLoading(false);
       }
     },
-    [utils],
+    [chartDays, utils],
   );
 
   const activeFormId = selectedFormId ?? forms[0]?.id;
@@ -242,7 +243,7 @@ export default function AnalyticsContent({
 
   const { data: overTime, isLoading: overTimeLoading, isError: overTimeError } =
     trpc.analytics.submissionsOverTime.useQuery(
-    { formId: activeFormId!, days: 30 },
+    { formId: activeFormId!, days: chartDays },
     {
       enabled: Boolean(activeFormId),
       initialData: isInitialForm ? (initialBundle?.overTime ?? undefined) : undefined,
@@ -255,6 +256,14 @@ export default function AnalyticsContent({
     {
       enabled: Boolean(activeFormId),
       initialData: isInitialForm ? (initialBundle?.formFields ?? undefined) : undefined,
+      ...QUERY_OPTS,
+    },
+  );
+
+  const { data: allFieldStats } = trpc.analytics.allFieldStats.useQuery(
+    { formId: activeFormId! },
+    {
+      enabled: Boolean(activeFormId),
       ...QUERY_OPTS,
     },
   );
@@ -523,6 +532,22 @@ export default function AnalyticsContent({
           <div className="app-surface rounded-3xl p-6">
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="font-display text-lg font-bold text-white">Submissions over time</h3>
+              <div className="flex flex-wrap items-center gap-2">
+                {[7, 30, 90].map((days) => (
+                  <button
+                    key={days}
+                    type="button"
+                    onClick={() => setChartDays(days)}
+                    className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wider uppercase ${
+                      chartDays === days
+                        ? "bg-lime-400 text-black"
+                        : "border border-white/10 text-white/45"
+                    }`}
+                  >
+                    {days}d
+                  </button>
+                ))}
+              </div>
               {activeForm ? (
                 <p className="font-mono text-[10px] tracking-wider text-white/35 uppercase">
                   {activeForm.title} · {activeForm.submissionCount} responses
@@ -550,7 +575,7 @@ export default function AnalyticsContent({
                   <p className="text-sm text-white/50">Could not load chart data.</p>
                   <button
                     type="button"
-                    onClick={() => void utils.analytics.submissionsOverTime.invalidate({ formId: activeFormId!, days: 30 })}
+                    onClick={() => void utils.analytics.submissionsOverTime.invalidate({ formId: activeFormId!, days: chartDays })}
                     className="text-xs font-bold tracking-wider text-lime-400 uppercase"
                   >
                     Retry
@@ -561,12 +586,34 @@ export default function AnalyticsContent({
                   {(activeForm?.submissionCount ?? 0) === 0
                     ? `No submissions on “${activeForm?.title ?? "this form"}” yet. Share the link to collect responses.`
                     : resolvedOverTime && !chartHasData
-                      ? `${activeForm?.submissionCount ?? 0} responses exist, but none in the last 30 days.`
+                      ? `${activeForm?.submissionCount ?? 0} responses exist, but none in the last ${chartDays} days.`
                       : "No submission data for this period yet."}
                 </p>
               )}
             </div>
           </div>
+
+          {allFieldStats && allFieldStats.fields.length > 0 && (
+            <div className="app-surface rounded-3xl p-6">
+              <h3 className="font-display mb-4 text-lg font-bold text-white">All field stats</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {allFieldStats.fields.map((field) => (
+                  <button
+                    key={field.fieldId}
+                    type="button"
+                    onClick={() => setSelectedFieldId(field.fieldId)}
+                    className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-left transition-colors hover:border-lime-400/30"
+                  >
+                    <p className="text-sm font-medium text-white">{field.label}</p>
+                    <p className="mt-1 text-xs text-white/45">
+                      {field.totalResponses} responses
+                      {field.averageRating != null ? ` · avg ${field.averageRating}` : ""}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {resolvedFormFields && resolvedFormFields.fields.length > 0 && (
             <div className="app-surface rounded-3xl p-6">

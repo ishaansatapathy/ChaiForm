@@ -17,6 +17,7 @@ const textLikeConfigSchema = z.object({
 
 export const formFieldInputSchema = z.discriminatedUnion("type", [
   z.object({ ...fieldBaseInputSchema.shape, type: z.literal("text"), config: textLikeConfigSchema.optional() }),
+  z.object({ ...fieldBaseInputSchema.shape, type: z.literal("textarea"), config: textLikeConfigSchema.optional() }),
   z.object({ ...fieldBaseInputSchema.shape, type: z.literal("email"), config: textLikeConfigSchema.optional() }),
   z.object({ ...fieldBaseInputSchema.shape, type: z.literal("number"), config: textLikeConfigSchema.optional() }),
   z.object({ ...fieldBaseInputSchema.shape, type: z.literal("date"), config: textLikeConfigSchema.optional() }),
@@ -49,6 +50,7 @@ export const formFieldInputSchema = z.discriminatedUnion("type", [
 
 export const formFieldSchema = z.discriminatedUnion("type", [
   z.object({ id: z.string().uuid(), label: z.string().min(1).max(255), required: z.boolean(), type: z.literal("text"), config: textLikeConfigSchema.optional() }),
+  z.object({ id: z.string().uuid(), label: z.string().min(1).max(255), required: z.boolean(), type: z.literal("textarea"), config: textLikeConfigSchema.optional() }),
   z.object({ id: z.string().uuid(), label: z.string().min(1).max(255), required: z.boolean(), type: z.literal("email"), config: textLikeConfigSchema.optional() }),
   z.object({ id: z.string().uuid(), label: z.string().min(1).max(255), required: z.boolean(), type: z.literal("number"), config: textLikeConfigSchema.optional() }),
   z.object({ id: z.string().uuid(), label: z.string().min(1).max(255), required: z.boolean(), type: z.literal("date"), config: textLikeConfigSchema.optional() }),
@@ -100,7 +102,8 @@ function assertUniqueFieldIds(fields: { id: string }[]) {
   }
 }
 
-export const createFormInputSchema = z
+/** OpenAPI-safe base schema (no refinements — trpc-to-openapi cannot handle .superRefine). */
+export const createFormInputBaseSchema = z
   .object({
     title: z.string().min(1).max(255),
     description: z.string().max(2000).optional(),
@@ -111,20 +114,9 @@ export const createFormInputSchema = z
     requireAuthentication: z.boolean().default(false),
     fields: z.array(formFieldInputSchema).min(1).max(50),
   })
-  .strict()
-  .superRefine((input, ctx) => {
-    try {
-      assertUniqueFieldIds(input.fields);
-    } catch (error) {
-      ctx.addIssue({
-        code: "custom",
-        message: error instanceof Error ? error.message : "Duplicate field IDs",
-        path: ["fields"],
-      });
-    }
-  });
+  .strict();
 
-export const updateFormInputSchema = z
+export const updateFormInputBaseSchema = z
   .object({
     formId: z.string().uuid(),
     title: z.string().min(1).max(255).optional(),
@@ -137,19 +129,20 @@ export const updateFormInputSchema = z
     requireAuthentication: z.boolean().optional(),
     fields: z.array(formFieldInputSchema).min(1).max(50).optional(),
   })
-  .strict()
-  .superRefine((input, ctx) => {
-    if (!input.fields) return;
-    try {
-      assertUniqueFieldIds(input.fields);
-    } catch (error) {
-      ctx.addIssue({
-        code: "custom",
-        message: error instanceof Error ? error.message : "Duplicate field IDs",
-        path: ["fields"],
-      });
-    }
-  });
+  .strict();
+
+export function refineCreateFormInput(input: z.infer<typeof createFormInputBaseSchema>) {
+  assertUniqueFieldIds(input.fields);
+  return input;
+}
+
+export function refineUpdateFormInput(input: z.infer<typeof updateFormInputBaseSchema>) {
+  if (input.fields) assertUniqueFieldIds(input.fields);
+  return input;
+}
+
+export const createFormInputSchema = createFormInputBaseSchema;
+export const updateFormInputSchema = updateFormInputBaseSchema;
 
 export const formOutputSchema = z.object({
   id: z.string().uuid(),
@@ -209,31 +202,37 @@ export const submissionAnswerSchema = z.object({
   value: z.string(),
 });
 
-export const submitFormInputSchema = z
+const submitAnswerSchema = z
+  .object({
+    fieldId: z.string().uuid(),
+    value: z.string().max(5000),
+  })
+  .strict();
+
+/** OpenAPI-safe base schema (no .refine — validated in service layer). */
+export const submitFormInputBaseSchema = z
   .object({
     formId: z.string().uuid(),
     respondentKey: z.string().uuid().optional(),
     idempotencyKey: z.string().uuid().optional(),
-    answers: z
-      .array(
-        z
-          .object({
-            fieldId: z.string().uuid(),
-            value: z.string().max(5000),
-          })
-          .strict(),
-      )
-      .max(50)
-      .refine(
-        (answers) => new Set(answers.map((answer) => answer.fieldId)).size === answers.length,
-        { message: "Duplicate field answers are not allowed" },
-      ),
-    /** Honeypot — must always be sent and stay empty */
-    website: z.string().max(500).refine((value) => value.length === 0, {
-      message: "Submission rejected",
-    }),
+    answers: z.array(submitAnswerSchema).max(50),
+    /** Honeypot — must stay empty */
+    website: z.string().max(500).default(""),
   })
   .strict();
+
+export function refineSubmitFormInput(input: z.infer<typeof submitFormInputBaseSchema>) {
+  if (input.website.length > 0) {
+    throw new Error("Submission rejected");
+  }
+  const ids = input.answers.map((answer) => answer.fieldId);
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Duplicate field answers are not allowed");
+  }
+  return input;
+}
+
+export const submitFormInputSchema = submitFormInputBaseSchema;
 
 export const submissionOutputSchema = z.object({
   id: z.string().uuid(),

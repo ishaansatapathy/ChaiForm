@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { ZodError } from "zod";
+
 import { and, asc, db, desc, eq, gt, isNotNull, isNull, lt, or, sql } from "@repo/database";
 import {
   formFieldsTable,
@@ -19,6 +21,7 @@ import type {
   SubmitFormInput,
   UpdateFormInput,
 } from "./model";
+import { refineCreateFormInput, refineSubmitFormInput, refineUpdateFormInput } from "./model";
 import { createUniqueSlug } from "./slug";
 import { notifyCreatorOfFormDeletion, notifyCreatorOfSubmission } from "./notifications";
 import { expiresAtFromRetention, expiresAtFromRetentionChange, isFormExpired } from "./retention";
@@ -92,6 +95,7 @@ function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
       return { ...base, type: "checkbox" };
     }
     case "text":
+    case "textarea":
     case "email":
     case "number":
     case "date":
@@ -271,6 +275,7 @@ class FormService {
   }
 
   async createForm(userId: string, input: CreateFormInput) {
+    refineCreateFormInput(input);
     const fields = this.normalizeInputFields(input.fields);
     const slug = await createUniqueSlug(input.title);
 
@@ -299,6 +304,7 @@ class FormService {
   }
 
   async updateForm(userId: string, input: UpdateFormInput) {
+    refineUpdateFormInput(input);
     const existing = await this.getOwnedForm(userId, input.formId);
     const previousFields = await this.loadFields(input.formId);
     const fields = input.fields ? this.normalizeInputFields(input.fields, true) : undefined;
@@ -641,6 +647,7 @@ class FormService {
   }
 
   async submitForm(input: SubmitFormInput, submitterUserId?: string | null) {
+    refineSubmitFormInput(input);
     if (input.website.length > 0) {
       throw new FormError("BAD_REQUEST", "Submission rejected");
     }
@@ -687,6 +694,9 @@ class FormService {
     try {
       validated = validateSubmissionAnswers(form.fields, input.answers);
     } catch (error) {
+      if (error instanceof ZodError) {
+        throw new FormError("BAD_REQUEST", error.issues[0]?.message ?? "Invalid submission");
+      }
       throw new FormError("BAD_REQUEST", error instanceof Error ? error.message : "Invalid submission");
     }
 

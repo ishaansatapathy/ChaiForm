@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { submitFormInputSchema } from "./model";
+import { refineSubmitFormInput, submitFormInputSchema } from "./model";
 import { validateSubmissionAnswers } from "./validation";
 import type { FormField } from "./model";
 
@@ -21,16 +21,17 @@ const baseFields: FormField[] = [
 
 describe("submitFormInputSchema", () => {
   it("requires an empty honeypot website field", () => {
-    const result = submitFormInputSchema.safeParse({
+    const parsed = submitFormInputSchema.safeParse({
       formId: "33333333-3333-4333-8333-333333333333",
       website: "spam-bot",
       answers: [],
     });
-    expect(result.success).toBe(false);
+    expect(parsed.success).toBe(true);
+    expect(() => refineSubmitFormInput(parsed.data!)).toThrow(/Submission rejected/);
   });
 
   it("rejects duplicate field answers", () => {
-    const result = submitFormInputSchema.safeParse({
+    const parsed = submitFormInputSchema.safeParse({
       formId: "33333333-3333-4333-8333-333333333333",
       website: "",
       answers: [
@@ -38,7 +39,8 @@ describe("submitFormInputSchema", () => {
         { fieldId: "11111111-1111-4111-8111-111111111111", value: "2024-05-02" },
       ],
     });
-    expect(result.success).toBe(false);
+    expect(parsed.success).toBe(true);
+    expect(() => refineSubmitFormInput(parsed.data!)).toThrow(/Duplicate field answers/);
   });
 });
 

@@ -134,6 +134,17 @@ export function FormFieldInput({
           className={inputClassName}
         />
       );
+    case "textarea":
+      return (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required={field.required}
+          placeholder={field.config?.placeholder}
+          rows={4}
+          className={`${inputClassName} min-h-[120px] resize-y`}
+        />
+      );
     default:
       return (
         <input

@@ -1,4 +1,8 @@
-import { submitFormInputSchema, type SubmitFormInput } from "@repo/services/form/model";
+import {
+  refineSubmitFormInput,
+  submitFormInputSchema,
+  type SubmitFormInput,
+} from "@repo/services/form/model";
 
 export function parseSubmitFormInput(input: unknown):
   | { success: true; data: SubmitFormInput }
@@ -11,5 +15,9 @@ export function parseSubmitFormInput(input: unknown):
   if (!parsed.success) {
     return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid submission" };
   }
-  return { success: true, data: parsed.data };
+  try {
+    return { success: true, data: refineSubmitFormInput(parsed.data) };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Invalid submission" };
+  }
 }

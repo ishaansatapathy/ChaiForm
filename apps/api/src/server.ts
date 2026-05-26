@@ -56,11 +56,7 @@ function buildOpenApiDocument() {
     logger.error("OpenAPI document generation failed", {
       message: error instanceof Error ? error.message : error,
     });
-    return {
-      openapi: "3.0.0",
-      info: { title: "ChaiForm OpenAPI", version: "1.0.0" },
-      paths: {},
-    };
+    throw error;
   }
 }
 
