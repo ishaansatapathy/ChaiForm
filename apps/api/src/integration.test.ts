@@ -10,6 +10,13 @@ describe("ChaiForm API integration", () => {
     expect(response.body.healthy).toBe(true);
   });
 
+  it("serves generated OpenAPI documentation", async () => {
+    const response = await request(app).get("/openapi.json");
+    expect(response.status).toBe(200);
+    expect(response.body.info?.title).toBe("ChaiForm OpenAPI");
+    expect(response.body.paths?.["/forms/submit"]).toBeTruthy();
+  });
+
   it("rejects unauthenticated protected form list", async () => {
     const response = await request(app).get("/trpc/forms.list");
     expect(response.status).toBeGreaterThanOrEqual(400);

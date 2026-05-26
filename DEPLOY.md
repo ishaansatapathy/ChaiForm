@@ -45,6 +45,7 @@ Environment variables:
 | `GOOGLE_OAUTH_CLIENT_ID` | Google Cloud Console |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google Cloud Console |
 | `GOOGLE_OAUTH_REDIRECT_URI` | `https://chai-form-web.vercel.app/api-auth/google/callback` |
+| `PUBLIC_OPENAPI_DOCS` | `true` for public judge/demo docs; set `false` with `OPENAPI_DOCS_SECRET` to protect docs |
 | `CRON_SECRET` | optional — expired-form purge via Vercel keep-warm |
 
 Verify: `https://chaiform-production.up.railway.app/health` → `{ "healthy": true }`
