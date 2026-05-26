@@ -115,9 +115,18 @@ importers:
 
   apps/web:
     dependencies:
+      '@fontsource/caveat':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/exo-2':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@fontsource/orbitron':
         specifier: ^5.2.8
         version: 5.2.8
+      '@fontsource/rubik-dirt':
+        specifier: ^5.2.7
+        version: 5.2.7
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.70.0(react@19.2.0))
@@ -1071,8 +1080,17 @@ packages:
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
 
+  '@fontsource/caveat@5.2.8':
+    resolution: {integrity: sha512-9fUUfFE2IQFKbx+xOcaeQxxmh8iJguEb8z+j1PeueO4UUx+XfT4pRm/B04ZDvFA794/iRxY/IibmP8ZKtIf4rw==}
+
+  '@fontsource/exo-2@5.2.8':
+    resolution: {integrity: sha512-cOZuiqW+gKg2SJAjymCicup0A8qto4M/lpyGahal3twMeLCRma8x/okFCdLYlTvYeQesF7d3WLKi+N04iPb40A==}
+
   '@fontsource/orbitron@5.2.8':
     resolution: {integrity: sha512-ruzrDl5vnqNykk5DZWY0Ezj4aeFZSbCnwJTc/98ojNJHSsHhlhT2r7rwQrA5sptmF8JtB8TQTAvlfRvcV28RPw==}
+
+  '@fontsource/rubik-dirt@5.2.7':
+    resolution: {integrity: sha512-EngvwGsrgyebg/JGFeVixDKvecBSXO9DZtHZxqxAHUgxnX3nqyILe3eok7IAmG/xPJWqhWSkf6U9pBngNSLaog==}
 
   '@hapi/bourne@3.0.0':
     resolution: {integrity: sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==}
@@ -5811,7 +5829,13 @@ snapshots:
 
   '@floating-ui/utils@0.2.10': {}
 
+  '@fontsource/caveat@5.2.8': {}
+
+  '@fontsource/exo-2@5.2.8': {}
+
   '@fontsource/orbitron@5.2.8': {}
+
+  '@fontsource/rubik-dirt@5.2.7': {}
 
   '@hapi/bourne@3.0.0': {}
 
