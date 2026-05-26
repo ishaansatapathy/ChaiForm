@@ -12,7 +12,7 @@ function isProduction() {
 }
 
 function requiresDistributedRateLimit() {
-  return isProduction() && process.env.RATE_LIMIT_ALLOW_MEMORY_FALLBACK !== "true";
+  return isProduction() && process.env.RATE_LIMIT_REQUIRE_REDIS === "true";
 }
 
 export async function checkDistributedRateLimit(
