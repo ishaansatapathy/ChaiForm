@@ -424,17 +424,65 @@ const DEMO_FORMS: SeedForm[] = [
   },
 ];
 
-async function ensureDemoUser(email: string) {
-  const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
-  if (existingUser) {
-    if (existingUser.role !== "admin") {
-      await db.update(usersTable).set({ role: "admin" }).where(eq(usersTable.id, existingUser.id));
-    }
-    return existingUser;
+function applyDemoConditionals() {
+  const customerFeedback = DEMO_FORMS.find((form) => form.slug === "customer-feedback");
+  const recommendField = customerFeedback?.fields.find((field) => field.label === "Would recommend us");
+  const contactField = customerFeedback?.fields.find((field) => field.label === "Contact permission");
+  const ratingField = customerFeedback?.fields.find((field) => field.label === "Overall experience rating");
+  const ticketField = customerFeedback?.fields.find((field) => field.label === "Order / ticket ID");
+
+  if (ratingField) {
+    ratingField.config = {
+      ...ratingField.config,
+      lowLabel: "Poor",
+      highLabel: "Excellent",
+    };
   }
 
+  if (ticketField) {
+    ticketField.config = {
+      ...ticketField.config,
+      validation: {
+        minValue: 1000,
+        maxValue: 99999,
+      },
+    };
+  }
+
+  if (recommendField && contactField) {
+    contactField.config = {
+      ...contactField.config,
+      showWhen: {
+        fieldId: recommendField.id,
+        operator: "eq",
+        value: "false",
+      },
+    };
+  }
+}
+
+applyDemoConditionals();
+
+async function ensureDemoUser(email: string) {
   const demoPassword = process.env.SEED_DEMO_PASSWORD ?? "DemoPass123!";
   const passwordHash = await bcrypt.hash(demoPassword, 12);
+  const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  if (existingUser) {
+    const [updated] = await db
+      .update(usersTable)
+      .set({
+        fullName: "Demo Creator",
+        displayName: "DemoHero",
+        passwordHash,
+        authProvider: "local",
+        emailVerified: true,
+        role: "admin",
+      })
+      .where(eq(usersTable.id, existingUser.id))
+      .returning();
+
+    return updated ?? existingUser;
+  }
 
   const [created] = await db
     .insert(usersTable)

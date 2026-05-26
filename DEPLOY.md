@@ -123,6 +123,9 @@ See `render.yaml` if you still deploy API to Render. Production demo uses **Rail
 | `JWT_REFRESH_SECRET` | **same value as Railway** (recommended) |
 | `TURNSTILE_SECRET_KEY` | same as Railway *(if using CAPTCHA)* |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare site key *(if using CAPTCHA)* |
+| `DEMO_LOGIN_ENABLED` | `true` for judge/demo one-click login |
+| `DEMO_USER_EMAIL` | `demo@chaiform.dev` |
+| `DEMO_USER_PASSWORD` | `DemoPass123!` or your `SEED_DEMO_PASSWORD` |
 
 5. Deploy → copy URL (e.g. `https://chaiform.vercel.app`)
 

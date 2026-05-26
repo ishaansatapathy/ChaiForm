@@ -5,8 +5,17 @@ import { formsTable } from "./form";
 export type FieldConfigJson = {
   options?: string[];
   maxRating?: number;
+  lowLabel?: string;
+  highLabel?: string;
   placeholder?: string;
   checkboxLabel?: string;
+  validation?: {
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    minValue?: number;
+    maxValue?: number;
+  };
   showWhen?: {
     fieldId: string;
     operator: "eq" | "neq";

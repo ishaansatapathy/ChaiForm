@@ -4,15 +4,31 @@ import type { FormField } from "./model";
 import { sanitizeSubmissionValue } from "./sanitize";
 import { getVisibleFields } from "./visibility";
 
+function getFieldValidation(field: FormField) {
+  const config = field.config;
+  return config && "validation" in config ? config.validation : undefined;
+}
+
 function fieldValueSchema(field: FormField) {
   let schema: z.ZodString = z.string();
+  const validation = getFieldValidation(field);
 
   switch (field.type) {
     case "email":
       schema = z.string().email("Invalid email address");
       break;
     case "number":
-      schema = z.string().regex(/^-?\d+(\.\d+)?$/, "Must be a valid number");
+      schema = z
+        .string()
+        .regex(/^-?\d+(\.\d+)?$/, "Must be a valid number")
+        .refine((value) => {
+          if (validation?.minValue === undefined || value === "") return true;
+          return Number(value) >= validation.minValue;
+        }, `Must be at least ${validation?.minValue}`)
+        .refine((value) => {
+          if (validation?.maxValue === undefined || value === "") return true;
+          return Number(value) <= validation.maxValue;
+        }, `Must be at most ${validation?.maxValue}`);
       break;
     case "date":
       schema = z
@@ -102,6 +118,18 @@ function fieldValueSchema(field: FormField) {
       schema = z.string().max(5000);
   }
 
+  if (validation?.minLength !== undefined) {
+    schema = schema.min(validation.minLength, `Must be at least ${validation.minLength} characters`);
+  }
+
+  if (validation?.maxLength !== undefined) {
+    schema = schema.max(validation.maxLength, `Must be at most ${validation.maxLength} characters`);
+  }
+
+  if (validation?.pattern) {
+    schema = schema.regex(new RegExp(validation.pattern), "Invalid format");
+  }
+
   if (!field.required) {
     return z.union([z.literal(""), schema]).optional();
   }
@@ -142,12 +170,19 @@ export function validateSubmissionAnswers(fields: FormField[], answers: { fieldI
   }
 
   const visibleFields = getVisibleFields(fields, answerMap);
+  const visibleFieldIds = new Set(visibleFields.map((field) => field.id));
+  const visibleAnswerMap: Record<string, string> = {};
+  for (const field of visibleFields) {
+    visibleAnswerMap[field.id] = answerMap[field.id] ?? "";
+  }
   const schema = buildSubmissionSchema(visibleFields);
-  const parsed = schema.safeParse(answerMap);
+  const parsed = schema.safeParse(visibleAnswerMap);
 
   if (!parsed.success) {
     throw parsed.error;
   }
 
-  return answerMap;
+  return Object.fromEntries(
+    fields.map((field) => [field.id, visibleFieldIds.has(field.id) ? (parsed.data[field.id] ?? "") : ""]),
+  ) as Record<string, string>;
 }

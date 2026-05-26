@@ -9,12 +9,43 @@ import {
 } from "@repo/database/schema";
 
 import { FormError } from "../form";
+import type { FormField } from "../form/model";
+import { getVisibleFields } from "../form/visibility";
 import type { UserRole } from "../auth/roles";
 import { cacheGet, cacheSet } from "../cache/kv-store";
 
 function completionRate(submissions: number, views: number) {
   if (views <= 0) return submissions > 0 ? 100 : 0;
   return Number(((submissions / views) * 100).toFixed(1));
+}
+
+function percentage(part: number, total: number) {
+  if (total <= 0) return 0;
+  return Number(((part / total) * 100).toFixed(1));
+}
+
+function mapFieldForVisibility(row: typeof formFieldsTable.$inferSelect): FormField {
+  const config = row.config as FormField["config"];
+  const base = {
+    id: row.id,
+    label: row.label,
+    required: row.required,
+  };
+
+  if (
+    row.type === "text" ||
+    row.type === "textarea" ||
+    row.type === "email" ||
+    row.type === "number" ||
+    row.type === "date" ||
+    row.type === "select" ||
+    row.type === "rating" ||
+    row.type === "checkbox"
+  ) {
+    return { ...base, type: row.type, config } as FormField;
+  }
+
+  return { ...base, type: "text", config } as FormField;
 }
 
 const SUMMARY_CACHE_TTL_MS = 30_000;
@@ -239,6 +270,28 @@ class AnalyticsService {
     if (!field) throw new FormError("NOT_FOUND", "Field not found");
 
     const values = await this.loadFieldValues(formId, fieldId);
+    const fieldRows = await db
+      .select()
+      .from(formFieldsTable)
+      .where(eq(formFieldsTable.formId, formId))
+      .orderBy(formFieldsTable.sortOrder);
+    const formFields = fieldRows.map(mapFieldForVisibility);
+    const submissions = await db
+      .select({ answers: submissionsTable.answers })
+      .from(submissionsTable)
+      .where(eq(submissionsTable.formId, formId))
+      .limit(5000);
+
+    let eligibleResponses = 0;
+    for (const submission of submissions) {
+      const answers = submission.answers as SubmissionAnswerJson[];
+      const answerMap = Object.fromEntries(
+        answers.map((answer) => [answer.fieldId, answer.value ?? ""]),
+      ) as Record<string, string>;
+      const visibleIds = new Set(getVisibleFields(formFields, answerMap).map((item) => item.id));
+      if (visibleIds.has(fieldId)) eligibleResponses += 1;
+    }
+
     const optionCountsMap = new Map<string, number>();
 
     for (const value of values) {
@@ -256,6 +309,10 @@ class AnalyticsService {
       label: field.label,
       type: field.type,
       totalResponses: values.length,
+      eligibleResponses,
+      skippedResponses: Math.max(eligibleResponses - values.length, 0),
+      answerRate: percentage(values.length, eligibleResponses),
+      dropOffRate: percentage(Math.max(eligibleResponses - values.length, 0), eligibleResponses),
       averageRating,
       optionCounts: Array.from(optionCountsMap.entries())
         .map(([option, count]) => ({ option, count }))

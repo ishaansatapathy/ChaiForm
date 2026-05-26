@@ -124,6 +124,8 @@ export default function AnalyticsContent({
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | undefined>();
   const [selectedFieldId, setSelectedFieldId] = useState<string | undefined>();
   const [submissionSearch, setSubmissionSearch] = useState("");
+  const [submittedFrom, setSubmittedFrom] = useState("");
+  const [submittedTo, setSubmittedTo] = useState("");
   const [submissionCursor, setSubmissionCursor] = useState<string | undefined>();
   const [loadedSubmissions, setLoadedSubmissions] = useState<SubmissionItem[]>(
     initialBundle?.submissions?.items ?? [],
@@ -132,7 +134,12 @@ export default function AnalyticsContent({
   const forms = formsPage?.items ?? initialForms?.items ?? [];
 
   const activeFormId = selectedFormId ?? forms[0]?.id;
-  const isInitialForm = activeFormId === initialFormId && !submissionCursor && !submissionSearch.trim();
+  const isInitialForm =
+    activeFormId === initialFormId &&
+    !submissionCursor &&
+    !submissionSearch.trim() &&
+    !submittedFrom &&
+    !submittedTo;
 
   useEffect(() => {
     setSubmissionCursor(undefined);
@@ -143,7 +150,7 @@ export default function AnalyticsContent({
 
   useEffect(() => {
     setSubmissionCursor(undefined);
-  }, [submissionSearch]);
+  }, [submissionSearch, submittedFrom, submittedTo]);
 
   const {
     data: summary,
@@ -223,6 +230,8 @@ export default function AnalyticsContent({
       limit: 15,
       cursor: submissionCursor,
       search: submissionSearch.trim() || undefined,
+      submittedFrom: submittedFrom || undefined,
+      submittedTo: submittedTo || undefined,
     },
     {
       enabled: Boolean(activeFormId),
@@ -281,26 +290,20 @@ export default function AnalyticsContent({
     if (!activeForm || !activeFormId) return;
     setExporting(true);
     try {
-      const allRows: SubmissionItem[] = [];
-      let cursor: string | undefined;
-      do {
-        const page = await utils.forms.listSubmissions.fetch({
-          formId: activeFormId,
-          limit: 100,
-          cursor,
-          search: submissionSearch.trim() || undefined,
-        });
-        allRows.push(...page.items);
-        cursor = page.nextCursor ?? undefined;
-      } while (cursor);
+      const exportData = await utils.forms.exportSubmissions.fetch({
+        formId: activeFormId,
+        search: submissionSearch.trim() || undefined,
+        submittedFrom: submittedFrom || undefined,
+        submittedTo: submittedTo || undefined,
+      });
 
-      if (allRows.length === 0) {
+      if (exportData.items.length === 0) {
         toast.error("No submissions to export");
         return;
       }
 
-      downloadSubmissionsCsv(activeForm.title, allRows);
-      toast.success(`Exported ${allRows.length} submissions`);
+      downloadSubmissionsCsv(exportData.formTitle, exportData.items, exportData.fields);
+      toast.success(`Exported ${exportData.items.length} submissions`);
     } catch {
       toast.error("Could not export submissions");
     } finally {
@@ -422,12 +425,16 @@ export default function AnalyticsContent({
             submissions={submissions}
             activeSubmissionId={activeSubmissionId}
             submissionSearch={submissionSearch}
+            submittedFrom={submittedFrom}
+            submittedTo={submittedTo}
             showSubmissionsLoading={showSubmissionsLoading}
             submissionsError={submissionsError}
             submissionsLoading={submissionsLoading}
             submissionsPage={submissionsPage}
             exporting={exporting}
             onSearchChange={setSubmissionSearch}
+            onSubmittedFromChange={setSubmittedFrom}
+            onSubmittedToChange={setSubmittedTo}
             onSelectSubmission={setSelectedSubmissionId}
             onExportCsv={handleExportCsv}
             onLoadMore={() => setSubmissionCursor(submissionsPage?.nextCursor ?? undefined)}
@@ -539,6 +546,9 @@ export default function AnalyticsContent({
                       {field.totalResponses} responses
                       {field.averageRating != null ? ` · avg ${field.averageRating}` : ""}
                     </p>
+                    <p className="mt-1 text-[11px] text-white/35">
+                      {field.answerRate}% answered · {field.dropOffRate}% skipped
+                    </p>
                   </button>
                 ))}
               </div>
@@ -580,6 +590,8 @@ export default function AnalyticsContent({
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-4 text-sm text-white/50">
                     <span>{resolvedFieldBreakdown.totalResponses} responses</span>
+                    <span>{resolvedFieldBreakdown.answerRate}% answer rate</span>
+                    <span>{resolvedFieldBreakdown.skippedResponses} skipped</span>
                     {resolvedFieldBreakdown.averageRating !== null && (
                       <span>Avg rating: {resolvedFieldBreakdown.averageRating}</span>
                     )}
@@ -648,12 +660,16 @@ export default function AnalyticsContent({
           submissions={submissions}
           activeSubmissionId={activeSubmissionId}
           submissionSearch={submissionSearch}
+          submittedFrom={submittedFrom}
+          submittedTo={submittedTo}
           showSubmissionsLoading={showSubmissionsLoading}
           submissionsError={submissionsError}
           submissionsLoading={submissionsLoading}
           submissionsPage={submissionsPage}
           exporting={exporting}
           onSearchChange={setSubmissionSearch}
+          onSubmittedFromChange={setSubmittedFrom}
+          onSubmittedToChange={setSubmittedTo}
           onSelectSubmission={setSelectedSubmissionId}
           onExportCsv={handleExportCsv}
           onLoadMore={() => setSubmissionCursor(submissionsPage?.nextCursor ?? undefined)}
@@ -757,7 +773,7 @@ function FormsPanel({
           ))}
         </div>
         {hasMany && (
-          <div className="pointer-events-none absolute right-1 bottom-0 left-0 h-8 rounded-b-xl bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="pointer-events-none absolute right-1 bottom-0 left-0 h-8 rounded-b-xl bg-linear-to-t from-black/60 to-transparent" />
         )}
       </div>
     </div>
@@ -768,12 +784,16 @@ function SubmissionsPanel({
   submissions,
   activeSubmissionId,
   submissionSearch,
+  submittedFrom,
+  submittedTo,
   showSubmissionsLoading,
   submissionsError,
   submissionsLoading,
   submissionsPage,
   exporting,
   onSearchChange,
+  onSubmittedFromChange,
+  onSubmittedToChange,
   onSelectSubmission,
   onExportCsv,
   onLoadMore,
@@ -782,12 +802,16 @@ function SubmissionsPanel({
   submissions: SubmissionItem[];
   activeSubmissionId?: string;
   submissionSearch: string;
+  submittedFrom: string;
+  submittedTo: string;
   showSubmissionsLoading: boolean;
   submissionsError: boolean;
   submissionsLoading: boolean;
   submissionsPage?: { nextCursor: string | null };
   exporting: boolean;
   onSearchChange: (value: string) => void;
+  onSubmittedFromChange: (value: string) => void;
+  onSubmittedToChange: (value: string) => void;
   onSelectSubmission: (id: string | undefined) => void;
   onExportCsv: () => void;
   onLoadMore: () => void;
@@ -810,8 +834,28 @@ function SubmissionsPanel({
         value={submissionSearch}
         onChange={(e) => onSearchChange(e.target.value)}
         placeholder="Filter by answer…"
-        className="mb-3 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
+        className="mb-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
       />
+      <div className="mb-3 grid gap-2 sm:grid-cols-2">
+        <label className="block text-[9px] tracking-widest text-white/35 uppercase">
+          From
+          <input
+            type="date"
+            value={submittedFrom}
+            onChange={(event) => onSubmittedFromChange(event.target.value)}
+            className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none"
+          />
+        </label>
+        <label className="block text-[9px] tracking-widest text-white/35 uppercase">
+          To
+          <input
+            type="date"
+            value={submittedTo}
+            onChange={(event) => onSubmittedToChange(event.target.value)}
+            className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none"
+          />
+        </label>
+      </div>
       <div className="analytics-scroll-panel analytics-scroll-panel--submissions pr-1">
         {showSubmissionsLoading ? (
           <p className="px-2 text-sm text-white/40">Loading…</p>

@@ -356,6 +356,15 @@ export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
                 : "Sign Up"}
         </AuthSubmitButton>
 
+        {isLogin && !twoFactorStep && (
+          <Link
+            href={`/api-auth/demo?next=${encodeURIComponent(nextPath)}`}
+            className="block w-full rounded-xl border border-lime-400/30 py-3 text-center text-[10px] font-black tracking-[0.22em] text-lime-400 uppercase transition-colors hover:bg-lime-400/10"
+          >
+            Try demo account
+          </Link>
+        )}
+
         {!twoFactorStep && (
           <p className="font-mono mt-3 text-center text-[9px] tracking-[0.28em] text-white/30 uppercase">
             {isLogin ? (

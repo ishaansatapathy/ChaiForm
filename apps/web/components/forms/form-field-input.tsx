@@ -49,31 +49,39 @@ export function FormFieldInput({
       const max = field.config?.maxRating ?? 5;
       const groupLabel = field.label || "Rating";
       return (
-        <div
-          role="radiogroup"
-          aria-label={groupLabel}
-          aria-required={field.required || undefined}
-          className="flex flex-wrap gap-2"
-        >
-          {Array.from({ length: max }, (_, index) => {
-            const rating = String(index + 1);
-            const active = value === rating;
-            return (
-              <button
-                key={rating}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                aria-label={`${rating} of ${max}`}
-                onClick={() => onChange(rating)}
-                className={`h-11 w-11 rounded-xl border text-sm font-bold transition-colors ${
-                  active ? accent : "border-white/10 bg-white/2 text-white/50 hover:border-lime-400/30"
-                }`}
-              >
-                {rating}
-              </button>
-            );
-          })}
+        <div>
+          <div
+            role="radiogroup"
+            aria-label={groupLabel}
+            aria-required={field.required || undefined}
+            className="flex flex-wrap gap-2"
+          >
+            {Array.from({ length: max }, (_, index) => {
+              const rating = String(index + 1);
+              const active = value === rating;
+              return (
+                <button
+                  key={rating}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={`${rating} of ${max}`}
+                  onClick={() => onChange(rating)}
+                  className={`h-11 w-11 rounded-xl border text-sm font-bold transition-colors ${
+                    active ? accent : "border-white/10 bg-white/2 text-white/50 hover:border-lime-400/30"
+                  }`}
+                >
+                  {rating}
+                </button>
+              );
+            })}
+          </div>
+          {(field.config?.lowLabel || field.config?.highLabel) && (
+            <div className="mt-2 flex justify-between text-xs text-white/40">
+              <span>{field.config.lowLabel}</span>
+              <span>{field.config.highLabel}</span>
+            </div>
+          )}
         </div>
       );
     }
@@ -150,6 +158,8 @@ export function FormFieldInput({
           onChange={(e) => onChange(e.target.value)}
           required={field.required}
           placeholder={field.config?.placeholder}
+          minLength={field.config?.validation?.minLength}
+          maxLength={field.config?.validation?.maxLength}
           rows={4}
           className={`${inputClassName} min-h-[120px] resize-y`}
         />
@@ -162,6 +172,11 @@ export function FormFieldInput({
           onChange={(e) => onChange(e.target.value)}
           required={field.required}
           placeholder={field.config?.placeholder}
+          min={field.type === "number" ? field.config?.validation?.minValue : undefined}
+          max={field.type === "number" ? field.config?.validation?.maxValue : undefined}
+          minLength={field.type !== "number" ? field.config?.validation?.minLength : undefined}
+          maxLength={field.type !== "number" ? field.config?.validation?.maxLength : undefined}
+          pattern={field.type !== "number" ? field.config?.validation?.pattern : undefined}
           className={inputClassName}
         />
       );
