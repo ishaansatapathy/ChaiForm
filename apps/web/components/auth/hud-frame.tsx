@@ -1,6 +1,6 @@
 "use client";
 
-/** Minimal frame above/below the auth card — ChaiPoll-style, no brackets or glow. */
+/** Minimal frame above/below the auth card — no brackets or glow. */
 import type { ReactNode } from "react";
 
 export function HudFrame({ children }: { children: ReactNode }) {

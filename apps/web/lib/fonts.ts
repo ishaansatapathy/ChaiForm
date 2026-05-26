@@ -15,7 +15,7 @@ export const orbitron = Orbitron({
   display: "swap",
 });
 
-/** Handwritten annotations — ChaiPoll-style callouts */
+/** Handwritten annotations for callouts */
 export const caveat = Caveat({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
