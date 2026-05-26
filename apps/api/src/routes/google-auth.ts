@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { logger } from "@repo/logger";
 import AuthService from "@repo/services/auth";
 import { toAuthError } from "@repo/services/auth/errors";
@@ -8,18 +9,26 @@ const authService = new AuthService();
 
 export const googleAuthRouter = Router();
 
+const googleCallbackQuerySchema = z.object({
+  code: z.string().min(1).optional(),
+  state: z.string().default("/dashboard"),
+  error: z.string().optional(),
+  error_description: z.string().optional(),
+});
+
 googleAuthRouter.get("/google/callback", async (req, res) => {
-  const code = typeof req.query.code === "string" ? req.query.code : null;
-  const state = typeof req.query.state === "string" ? req.query.state : "/dashboard";
-  const oauthError = typeof req.query.error === "string" ? req.query.error : null;
+  const parsed = googleCallbackQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    return res.redirect(
+      `${env.CLIENT_URL}/sign-in?error=${encodeURIComponent("Invalid Google sign-in callback.")}`,
+    );
+  }
+
+  const { code, state, error: oauthError, error_description: errorDescription } = parsed.data;
 
   if (oauthError) {
-    const description =
-      typeof req.query.error_description === "string"
-        ? req.query.error_description
-        : "Google sign-in was cancelled or denied.";
     return res.redirect(
-      `${env.CLIENT_URL}/sign-in?error=${encodeURIComponent(description)}`,
+      `${env.CLIENT_URL}/sign-in?error=${encodeURIComponent(errorDescription ?? "Google sign-in was cancelled or denied.")}`,
     );
   }
 

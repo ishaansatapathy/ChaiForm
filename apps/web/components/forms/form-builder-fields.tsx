@@ -1,9 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
-export type FieldType = "text" | "email" | "number" | "select" | "rating" | "date" | "checkbox";
+export type FieldType =
+  | "text"
+  | "textarea"
+  | "email"
+  | "number"
+  | "select"
+  | "rating"
+  | "date"
+  | "checkbox";
 
 export interface DraftField {
   id: string;
@@ -18,7 +27,16 @@ export interface DraftField {
   };
 }
 
-const FIELD_TYPES: FieldType[] = ["text", "email", "number", "select", "rating", "date", "checkbox"];
+const FIELD_TYPES: FieldType[] = [
+  "text",
+  "textarea",
+  "email",
+  "number",
+  "select",
+  "rating",
+  "date",
+  "checkbox",
+];
 
 function defaultConfig(type: FieldType): DraftField["config"] {
   if (type === "select") return { options: ["Option 1", "Option 2"] };
@@ -46,6 +64,8 @@ interface FormBuilderFieldsProps {
 }
 
 export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
   const addField = () => {
     if (fields.length >= MAX_FIELDS) {
       toast.error(`Maximum ${MAX_FIELDS} questions per form`);
@@ -81,6 +101,16 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
     onChange(next);
   };
 
+  const reorderField = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    if (fromIndex >= fields.length || toIndex >= fields.length) return;
+    const next = [...fields];
+    const [item] = next.splice(fromIndex, 1);
+    if (!item) return;
+    next.splice(toIndex, 0, item);
+    onChange(next);
+  };
+
   const addFieldButtonClass =
     "inline-flex items-center gap-2 rounded-full bg-lime-400 px-4 py-2 text-[10px] font-black tracking-[0.2em] text-black uppercase transition-opacity hover:opacity-90";
 
@@ -95,10 +125,22 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
       </div>
 
       {fields.map((field, index) => (
-        <div key={field.id} className="app-surface rounded-[32px] p-6">
+        <div
+          key={field.id}
+          draggable
+          onDragStart={() => setDragIndex(index)}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={() => {
+            if (dragIndex === null) return;
+            reorderField(dragIndex, index);
+            setDragIndex(null);
+          }}
+          onDragEnd={() => setDragIndex(null)}
+          className={`app-surface rounded-[32px] p-6 transition-opacity ${dragIndex === index ? "opacity-60" : ""}`}
+        >
           <div className="mb-4 flex items-center justify-between">
             <span className="font-mono text-[10px] tracking-[0.3em] text-lime-400/70 uppercase">
-              Field {index + 1}
+              Field {index + 1} · drag to reorder
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -157,6 +199,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
           </div>
 
           {(field.type === "text" ||
+            field.type === "textarea" ||
             field.type === "email" ||
             field.type === "number" ||
             field.type === "date") && (

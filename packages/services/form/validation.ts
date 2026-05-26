@@ -91,6 +91,12 @@ function fieldValueSchema(field: FormField) {
       }
       return z.literal("true", { message: `"${field.label}" must be checked` });
     }
+    case "text":
+      schema = z.string().max(5000);
+      break;
+    case "textarea":
+      schema = z.string().max(10000);
+      break;
     default:
       schema = z.string().max(5000);
   }
@@ -138,8 +144,7 @@ export function validateSubmissionAnswers(fields: FormField[], answers: { fieldI
   const parsed = schema.safeParse(answerMap);
 
   if (!parsed.success) {
-    const messages = parsed.error.issues.map((issue) => issue.message).filter(Boolean);
-    throw new Error(messages[0] ?? "Invalid submission");
+    throw parsed.error;
   }
 
   return answerMap;

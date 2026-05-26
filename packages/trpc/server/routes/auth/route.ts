@@ -6,11 +6,11 @@ import {
 } from "@repo/services/auth/model";
 import {
   forgotPasswordInputSchema,
-  resetPasswordInputSchema,
+  resetPasswordInputBaseSchema,
   resendVerificationEmailInputSchema,
   setupProfileInputSchema,
   signInInputSchema,
-  signUpInputSchema,
+  signUpInputBaseSchema,
   toggle2FAInputSchema,
   verify2FAInputSchema,
   verifyEmailInputSchema,
@@ -37,7 +37,7 @@ export const authRouter = router({
 
   signUp: publicProcedure
     .meta({ openapi: { method: "POST", path: getPath("/sign-up"), tags: TAGS } })
-    .input(signUpInputSchema)
+    .input(signUpInputBaseSchema)
     .output(signUpOutputSchema)
     .mutation(async ({ input }) => {
       try {
@@ -124,7 +124,7 @@ export const authRouter = router({
 
   resetPassword: publicProcedure
     .meta({ openapi: { method: "POST", path: getPath("/reset-password"), tags: TAGS } })
-    .input(resetPasswordInputSchema)
+    .input(resetPasswordInputBaseSchema)
     .output(messageOutputSchema)
     .mutation(async ({ input }) => {
       try {

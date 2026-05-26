@@ -53,6 +53,7 @@ export default function CreateFormPage() {
 
     setTitle(template.title);
     setDescription(template.formDescription);
+    setTheme(template.theme);
     setFields(
       template.fields.map((field) => ({
         ...field,

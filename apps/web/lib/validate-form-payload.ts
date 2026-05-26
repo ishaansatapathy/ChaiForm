@@ -1,5 +1,7 @@
 import {
   createFormInputSchema,
+  refineCreateFormInput,
+  refineUpdateFormInput,
   updateFormInputSchema,
   type CreateFormInput,
   type UpdateFormInput,
@@ -12,7 +14,11 @@ export function parseCreateFormInput(input: unknown):
   if (!parsed.success) {
     return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid form data" };
   }
-  return { success: true, data: parsed.data };
+  try {
+    return { success: true, data: refineCreateFormInput(parsed.data) };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Invalid form data" };
+  }
 }
 
 export function parseUpdateFormInput(input: unknown):
@@ -22,5 +28,9 @@ export function parseUpdateFormInput(input: unknown):
   if (!parsed.success) {
     return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid form data" };
   }
-  return { success: true, data: parsed.data };
+  try {
+    return { success: true, data: refineUpdateFormInput(parsed.data) };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Invalid form data" };
+  }
 }
