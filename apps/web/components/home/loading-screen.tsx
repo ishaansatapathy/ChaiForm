@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import gsap from "gsap";
 
 import {
@@ -21,6 +21,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
   const textRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const finishedRef = useRef(false);
+  const finishRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -39,6 +40,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
     const finish = () => {
       if (finishedRef.current) return;
       finishedRef.current = true;
+      finishRef.current = null;
 
       const tl = gsap.timeline({ onComplete });
       tl.to(text, { opacity: 0, y: -18, duration: 0.35, ease: "power3.in" }, 0)
@@ -57,6 +59,8 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
         .to(videoBox, { backgroundColor: "#020202", duration: 0.25 }, 0.62)
         .to(wrapper, { opacity: 0, duration: 0.22 }, 0.72);
     };
+
+    finishRef.current = finish;
 
     const tryFinish = () => {
       const elapsed = Date.now() - startedAt;
@@ -84,11 +88,18 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
     );
 
     return () => {
+      finishRef.current = null;
       window.clearTimeout(maxTimer);
       video.removeEventListener("ended", tryFinish);
       video.removeEventListener("timeupdate", onTimeUpdate);
     };
   }, [onComplete]);
+
+  const handleSkip = useCallback(() => {
+    if (finishedRef.current) return;
+    videoRef.current?.pause();
+    finishRef.current?.();
+  }, []);
 
   return (
     <div
@@ -124,6 +135,15 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
           />
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={handleSkip}
+        className="relative z-10 mt-3 rounded-full border border-white/10 px-3 py-1 font-mono text-[9px] tracking-[0.32em] text-white/35 uppercase transition-colors hover:border-lime-400/30 hover:text-lime-400/80"
+        aria-label="Skip loading intro"
+      >
+        Skip
+      </button>
 
       <div ref={textRef} className="landing-copy relative z-10 mt-8 flex flex-col items-center gap-1.5 text-center opacity-0">
         <p
