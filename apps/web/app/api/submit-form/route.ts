@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { checkRateLimit, getClientIp, readJsonBody } from "~/lib/rate-limit";
+import { isTurnstileRequired, verifyTurnstileToken } from "~/lib/turnstile";
 import { parseSubmitFormInput } from "~/lib/validate-submit-payload";
 
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
@@ -18,7 +19,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
 
-  const validated = parseSubmitFormInput(parsed.body);
+  const rawBody = parsed.body as Record<string, unknown>;
+  const turnstileToken = typeof rawBody.turnstileToken === "string" ? rawBody.turnstileToken : "";
+
+  if (isTurnstileRequired()) {
+    if (!turnstileToken) {
+      return NextResponse.json({ error: "Please complete the CAPTCHA check." }, { status: 400 });
+    }
+    const captchaOk = await verifyTurnstileToken(turnstileToken, ip);
+    if (!captchaOk) {
+      return NextResponse.json(
+        { error: "CAPTCHA verification failed. Please try again." },
+        { status: 400 },
+      );
+    }
+  }
+
+  const { turnstileToken: _ignored, ...submitBody } = rawBody;
+  const validated = parseSubmitFormInput(submitBody);
   if (!validated.success) {
     return NextResponse.json({ error: validated.message }, { status: 400 });
   }
