@@ -15,7 +15,6 @@ export function getFieldShowWhen(field: FormField): FieldVisibilityRule | undefi
 export function isFieldVisible(
   field: FormField,
   values: Record<string, string>,
-  _allFields?: FormField[],
 ): boolean {
   const rule = getFieldShowWhen(field);
   if (!rule) return true;
@@ -31,5 +30,5 @@ export function isFieldVisible(
 }
 
 export function getVisibleFields(fields: FormField[], values: Record<string, string>): FormField[] {
-  return fields.filter((field) => isFieldVisible(field, values, fields));
+  return fields.filter((field) => isFieldVisible(field, values));
 }

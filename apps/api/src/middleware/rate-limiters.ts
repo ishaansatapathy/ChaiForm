@@ -29,10 +29,27 @@ async function applyRateLimit(req: Request, res: Response, config: LimitConfig):
   return true;
 }
 
-const AUTH_CREDENTIAL_PATHS = ["auth.signUp", "auth.signIn", "auth.verify2FA", "auth.refresh"];
-const PASSWORD_RESET_PATHS = ["auth.forgotPassword", "auth.verifyOtp", "auth.resetPassword"];
-const FORM_SUBMIT_PATHS = ["forms.submit"];
-const FORM_VIEW_PATHS = ["forms.recordView"];
+/**
+ * Match a tRPC path string (e.g. "auth.signIn") against a set of expected
+ * procedure identifiers using exact segment comparison, not substring search.
+ *
+ * A path like "auth.signIn" is tokenised as ["auth", "signIn"]. We check that
+ * the full token sequence exactly matches one of the allowed identifiers —
+ * this prevents "auth.signIn" accidentally matching "auth.signInWithMagicLink".
+ */
+function matchesProcedure(path: string, procedures: string[]): boolean {
+  const pathTokens = path.split(".");
+  return procedures.some((proc) => {
+    const procTokens = proc.split(".");
+    if (pathTokens.length !== procTokens.length) return false;
+    return pathTokens.every((token, i) => token === procTokens[i]);
+  });
+}
+
+const AUTH_CREDENTIAL_PROCS = ["auth.signUp", "auth.signIn", "auth.verify2FA", "auth.refresh"];
+const PASSWORD_RESET_PROCS  = ["auth.forgotPassword", "auth.verifyOtp", "auth.resetPassword"];
+const FORM_SUBMIT_PROCS     = ["forms.submit"];
+const FORM_VIEW_PROCS       = ["forms.recordView"];
 
 function extractSubmitFormId(req: Request): string | null {
   const body = req.body;
@@ -54,10 +71,11 @@ function extractSubmitFormId(req: Request): string | null {
 
 export function createTrpcRateLimitMiddleware() {
   return async (req: Request, res: Response, next: NextFunction) => {
+    // tRPC path is the URL segment after /trpc/, e.g. "auth.signIn"
     const path = req.path.replace(/^\//, "");
     const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
 
-    if (AUTH_CREDENTIAL_PATHS.some((p) => path.includes(p))) {
+    if (matchesProcedure(path, AUTH_CREDENTIAL_PROCS)) {
       const ok = await applyRateLimit(req, res, {
         windowMs: 15 * 60 * 1000,
         max: 40,
@@ -66,7 +84,7 @@ export function createTrpcRateLimitMiddleware() {
       return ok ? next() : undefined;
     }
 
-    if (PASSWORD_RESET_PATHS.some((p) => path.includes(p))) {
+    if (matchesProcedure(path, PASSWORD_RESET_PROCS)) {
       const ok = await applyRateLimit(req, res, {
         windowMs: 15 * 60 * 1000,
         max: 30,
@@ -75,7 +93,7 @@ export function createTrpcRateLimitMiddleware() {
       return ok ? next() : undefined;
     }
 
-    if (FORM_VIEW_PATHS.some((p) => path.includes(p))) {
+    if (matchesProcedure(path, FORM_VIEW_PROCS)) {
       const ok = await applyRateLimit(req, res, {
         windowMs: 15 * 60 * 1000,
         max: 120,
@@ -88,7 +106,7 @@ export function createTrpcRateLimitMiddleware() {
       return ok ? next() : undefined;
     }
 
-    if (FORM_SUBMIT_PATHS.some((p) => path.includes(p))) {
+    if (matchesProcedure(path, FORM_SUBMIT_PROCS)) {
       const formId = extractSubmitFormId(req);
       const perFormOk = await applyRateLimit(req, res, {
         windowMs: 15 * 60 * 1000,

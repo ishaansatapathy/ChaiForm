@@ -29,92 +29,98 @@ const textLikeConfigSchema = z.object({
   showWhen: fieldVisibilityRuleSchema.optional(),
 });
 
+// ---------------------------------------------------------------------------
+// Named config schemas — defined once, shared between formFieldInputSchema
+// and formFieldSchema so config shape is not duplicated per union member.
+// ---------------------------------------------------------------------------
+
+const selectConfigSchema = z.object({
+  options: z.array(z.string().min(1)).min(1),
+  placeholder: z.string().max(200).optional(),
+  showWhen: fieldVisibilityRuleSchema.optional(),
+});
+
+const ratingConfigSchema = z.object({
+  maxRating: z.number().int().min(1).max(10).default(5),
+  lowLabel: z.string().max(80).optional(),
+  highLabel: z.string().max(80).optional(),
+  showWhen: fieldVisibilityRuleSchema.optional(),
+});
+
+const checkboxConfigSchema = z
+  .object({
+    options: z.array(z.string().min(1).max(200)).min(1).optional(),
+    checkboxLabel: z.string().max(200).optional(),
+    showWhen: fieldVisibilityRuleSchema.optional(),
+  })
+  .optional();
+
+const descriptionConfigSchema = z.object({
+  style: z.enum(["heading", "body"]).default("body"),
+  showWhen: fieldVisibilityRuleSchema.optional(),
+});
+
+/**
+ * Type-specific shape additions shared between formFieldInputSchema and
+ * formFieldSchema. The only difference between those two schemas is the `id`
+ * field (string.min(1) for client input vs string.uuid() for stored records).
+ * All config shapes are defined here exactly once.
+ */
+const fieldTypeShapes = {
+  text:        { type: z.literal("text"),        config: textLikeConfigSchema.optional() },
+  textarea:    { type: z.literal("textarea"),    config: textLikeConfigSchema.optional() },
+  email:       { type: z.literal("email"),       config: textLikeConfigSchema.optional() },
+  number:      { type: z.literal("number"),      config: textLikeConfigSchema.optional() },
+  date:        { type: z.literal("date"),        config: textLikeConfigSchema.optional() },
+  select:      { type: z.literal("select"),      config: selectConfigSchema },
+  rating:      { type: z.literal("rating"),      config: ratingConfigSchema },
+  checkbox:    { type: z.literal("checkbox"),    config: checkboxConfigSchema },
+  /** Non-answerable section divider / heading rendered as static text in the public form. */
+  description: { type: z.literal("description"), config: descriptionConfigSchema.optional() },
+} as const;
+
+// ---------------------------------------------------------------------------
+// Base shapes
+// ---------------------------------------------------------------------------
+
 const fieldBaseInputSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1).max(255),
   required: z.boolean(),
 });
 
+const fieldBaseStoredShape = {
+  id: z.string().uuid(),
+  label: z.string().min(1).max(255),
+  required: z.boolean(),
+} as const;
+
+// ---------------------------------------------------------------------------
+// Public schemas
+// ---------------------------------------------------------------------------
+
 export const formFieldInputSchema = z.discriminatedUnion("type", [
-  z.object({ ...fieldBaseInputSchema.shape, type: z.literal("text"), config: textLikeConfigSchema.optional() }),
-  z.object({ ...fieldBaseInputSchema.shape, type: z.literal("textarea"), config: textLikeConfigSchema.optional() }),
-  z.object({ ...fieldBaseInputSchema.shape, type: z.literal("email"), config: textLikeConfigSchema.optional() }),
-  z.object({ ...fieldBaseInputSchema.shape, type: z.literal("number"), config: textLikeConfigSchema.optional() }),
-  z.object({ ...fieldBaseInputSchema.shape, type: z.literal("date"), config: textLikeConfigSchema.optional() }),
-  z.object({
-    ...fieldBaseInputSchema.shape,
-    type: z.literal("select"),
-    config: z.object({
-      options: z.array(z.string().min(1)).min(1),
-      placeholder: z.string().max(200).optional(),
-      showWhen: fieldVisibilityRuleSchema.optional(),
-    }),
-  }),
-  z.object({
-    ...fieldBaseInputSchema.shape,
-    type: z.literal("rating"),
-    config: z.object({
-      maxRating: z.number().int().min(1).max(10).default(5),
-      lowLabel: z.string().max(80).optional(),
-      highLabel: z.string().max(80).optional(),
-      showWhen: fieldVisibilityRuleSchema.optional(),
-    }),
-  }),
-  z.object({
-    ...fieldBaseInputSchema.shape,
-    type: z.literal("checkbox"),
-    config: z
-      .object({
-        options: z.array(z.string().min(1).max(200)).min(1).optional(),
-        checkboxLabel: z.string().max(200).optional(),
-        showWhen: fieldVisibilityRuleSchema.optional(),
-      })
-      .optional(),
-  }),
+  z.object({ ...fieldBaseInputSchema.shape, ...fieldTypeShapes.text }),
+  z.object({ ...fieldBaseInputSchema.shape, ...fieldTypeShapes.textarea }),
+  z.object({ ...fieldBaseInputSchema.shape, ...fieldTypeShapes.email }),
+  z.object({ ...fieldBaseInputSchema.shape, ...fieldTypeShapes.number }),
+  z.object({ ...fieldBaseInputSchema.shape, ...fieldTypeShapes.date }),
+  z.object({ ...fieldBaseInputSchema.shape, ...fieldTypeShapes.select }),
+  z.object({ ...fieldBaseInputSchema.shape, ...fieldTypeShapes.rating }),
+  z.object({ ...fieldBaseInputSchema.shape, ...fieldTypeShapes.checkbox }),
+  z.object({ ...fieldBaseInputSchema.shape, ...fieldTypeShapes.description }),
 ]);
 
 export const formFieldSchema = z.discriminatedUnion("type", [
-  z.object({ id: z.string().uuid(), label: z.string().min(1).max(255), required: z.boolean(), type: z.literal("text"), config: textLikeConfigSchema.optional() }),
-  z.object({ id: z.string().uuid(), label: z.string().min(1).max(255), required: z.boolean(), type: z.literal("textarea"), config: textLikeConfigSchema.optional() }),
-  z.object({ id: z.string().uuid(), label: z.string().min(1).max(255), required: z.boolean(), type: z.literal("email"), config: textLikeConfigSchema.optional() }),
-  z.object({ id: z.string().uuid(), label: z.string().min(1).max(255), required: z.boolean(), type: z.literal("number"), config: textLikeConfigSchema.optional() }),
-  z.object({ id: z.string().uuid(), label: z.string().min(1).max(255), required: z.boolean(), type: z.literal("date"), config: textLikeConfigSchema.optional() }),
-  z.object({
-    id: z.string().uuid(),
-    label: z.string().min(1).max(255),
-    required: z.boolean(),
-    type: z.literal("select"),
-    config: z.object({
-      options: z.array(z.string().min(1)).min(1),
-      placeholder: z.string().max(200).optional(),
-      showWhen: fieldVisibilityRuleSchema.optional(),
-    }),
-  }),
-  z.object({
-    id: z.string().uuid(),
-    label: z.string().min(1).max(255),
-    required: z.boolean(),
-    type: z.literal("rating"),
-    config: z.object({
-      maxRating: z.number().int().min(1).max(10).default(5),
-      lowLabel: z.string().max(80).optional(),
-      highLabel: z.string().max(80).optional(),
-      showWhen: fieldVisibilityRuleSchema.optional(),
-    }),
-  }),
-  z.object({
-    id: z.string().uuid(),
-    label: z.string().min(1).max(255),
-    required: z.boolean(),
-    type: z.literal("checkbox"),
-    config: z
-      .object({
-        options: z.array(z.string().min(1).max(200)).min(1).optional(),
-        checkboxLabel: z.string().max(200).optional(),
-        showWhen: fieldVisibilityRuleSchema.optional(),
-      })
-      .optional(),
-  }),
+  z.object({ ...fieldBaseStoredShape, ...fieldTypeShapes.text }),
+  z.object({ ...fieldBaseStoredShape, ...fieldTypeShapes.textarea }),
+  z.object({ ...fieldBaseStoredShape, ...fieldTypeShapes.email }),
+  z.object({ ...fieldBaseStoredShape, ...fieldTypeShapes.number }),
+  z.object({ ...fieldBaseStoredShape, ...fieldTypeShapes.date }),
+  z.object({ ...fieldBaseStoredShape, ...fieldTypeShapes.select }),
+  z.object({ ...fieldBaseStoredShape, ...fieldTypeShapes.rating }),
+  z.object({ ...fieldBaseStoredShape, ...fieldTypeShapes.checkbox }),
+  z.object({ ...fieldBaseStoredShape, ...fieldTypeShapes.description }),
 ]);
 
 export const paginationInputSchema = z

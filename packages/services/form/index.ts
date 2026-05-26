@@ -598,7 +598,7 @@ class FormService {
     };
   }
 
-  async recordView(formId: string) {
+  async recordView(formId: string, viewerKey?: string) {
     const [row] = await db
       .select()
       .from(formsTable)
@@ -606,6 +606,19 @@ class FormService {
       .limit(1);
     if (!row) throw new FormError("NOT_FOUND", "Form not found");
     this.assertFormAvailable(row);
+
+    // Deduplication: skip incrementing viewCount if this viewer already counted
+    // within the last 30 minutes. Uses the viewerKey (a per-session UUID stored
+    // in the client) as the fingerprint. Gracefully falls through if no key.
+    if (viewerKey) {
+      const dedupeKey = `view-seen:${formId}:${viewerKey}`;
+      const { cacheGet, cacheSet } = await import("../cache/kv-store");
+      const alreadySeen = await cacheGet(dedupeKey);
+      if (alreadySeen) {
+        return { success: true as const };
+      }
+      await cacheSet(dedupeKey, "1", 30 * 60 * 1000);
+    }
 
     await db
       .update(formsTable)
@@ -828,6 +841,22 @@ class FormService {
     return conditions;
   }
 
+  /**
+   * Submits a form response and persists answers in two complementary stores:
+   *
+   * 1. **JSONB column** (`submissions.answers`): a denormalized snapshot of all
+   *    answers attached directly to the submission row. Used for fast API reads
+   *    (e.g. `listSubmissions`, `getSubmission`, CSV export) without an extra
+   *    join to `submission_responses`.
+   *
+   * 2. **Normalized rows** (`submission_responses`): one row per non-empty answer,
+   *    indexed on `(field_id, submission_id)`. Used by all analytics queries
+   *    (field breakdown, funnel, option counts, `allFieldStats`) which aggregate
+   *    across many submissions — a SQL GROUP BY on this table is far cheaper than
+   *    unwinding JSONB arrays at query time.
+   *
+   * The two stores must remain in sync. Never update one without the other.
+   */
   async submitForm(input: SubmitFormInput, submitterUserId?: string | null) {
     refineSubmitFormInput(input);
     if (input.website.length > 0) {

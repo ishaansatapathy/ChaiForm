@@ -125,7 +125,7 @@ export default function CreateFormPage() {
         </Link>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-8 lg:grid-cols-2">
         <div className="space-y-6">
           <div className="app-surface rounded-[40px] p-8">
             <input
@@ -144,9 +144,7 @@ export default function CreateFormPage() {
           </div>
 
           <FormBuilderFields fields={fields} onChange={setFields} />
-        </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-10 lg:self-start">
           <div className="app-surface rounded-[40px] p-6">
             <h3 className="font-display mb-4 text-lg font-bold text-white">Publish</h3>
             <FormThemePicker value={theme} onChange={setTheme} />
@@ -216,7 +214,9 @@ export default function CreateFormPage() {
               </div>
             </div>
           </div>
+        </div>
 
+        <aside className="lg:sticky lg:top-10 lg:self-start">
           <FormBuilderPreview title={title} description={description} themeId={theme} fields={fields} />
         </aside>
       </div>

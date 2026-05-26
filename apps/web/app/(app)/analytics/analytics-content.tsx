@@ -162,6 +162,9 @@ export default function AnalyticsContent({
     {
       enabled: Boolean(activeFormId),
       initialData: isInitialForm ? (initialBundle?.summary ?? undefined) : undefined,
+      // Show the previous form's summary while the new form's data loads,
+      // eliminating the empty-state flash when switching forms in the sidebar.
+      placeholderData: (prev) => prev,
       ...QUERY_OPTS,
     },
   );
@@ -172,6 +175,8 @@ export default function AnalyticsContent({
     {
       enabled: Boolean(activeFormId),
       initialData: isInitialForm ? (initialBundle?.overTime ?? undefined) : undefined,
+      // Show previous chart data while the new form's data fetches.
+      placeholderData: (prev) => prev,
       ...QUERY_OPTS,
     },
   );

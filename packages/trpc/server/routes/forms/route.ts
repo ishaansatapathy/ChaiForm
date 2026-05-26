@@ -18,7 +18,7 @@ import {
 import { TRPCError } from "@trpc/server";
 
 import { sanitizeTrpcError } from "../../error-handler";
-import { mapAuthError, protectedProcedure, publicProcedure, router, verifiedProcedure } from "../../trpc";
+import { publicProcedure, router, verifiedProcedure } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
 
 const formService = new FormService();
@@ -136,11 +136,11 @@ export const formsRouter = router({
 
   recordView: publicProcedure
     .meta({ openapi: { method: "POST", path: getPath("/views"), tags: TAGS } })
-    .input(z.object({ formId: z.string().uuid() }))
+    .input(z.object({ formId: z.string().uuid(), viewerKey: z.string().uuid().optional() }))
     .output(z.object({ success: z.literal(true) }))
     .mutation(async ({ input }) => {
       try {
-        return await formService.recordView(input.formId);
+        return await formService.recordView(input.formId, input.viewerKey);
       } catch (error) {
         mapFormError(error);
       }
