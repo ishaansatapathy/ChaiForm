@@ -311,12 +311,6 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
               );
             })()}
 
-            {isLastStep && turnstileEnabled && (
-              <div className="mt-6">
-                <TurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} />
-              </div>
-            )}
-
             <div className="mt-8 flex flex-wrap items-center gap-3">
               {step > 0 && (
                 <button
@@ -359,6 +353,14 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
           </>
         )}
       </div>
+
+      {isLastStep && turnstileEnabled && !alreadySubmitted && !needsSignIn && (
+        <TurnstileWidget
+          siteKey={turnstileSiteKey}
+          onTokenChange={setTurnstileToken}
+          placement="bottom-right"
+        />
+      )}
     </div>
   );
 }
