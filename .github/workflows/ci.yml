@@ -33,6 +33,9 @@ jobs:
       BASE_URL: http://localhost:8000
       NEXT_PUBLIC_API_URL: /trpc
       API_INTERNAL_URL: http://localhost:8000
+      SEED_USER_EMAIL: demo@chaiform.dev
+      SEED_DEMO_PASSWORD: DemoPass123!
+      CI: true
 
     steps:
       - uses: actions/checkout@v4
@@ -50,10 +53,16 @@ jobs:
 
       - run: pnpm db:migrate
 
-      - run: pnpm check-types
+      - run: pnpm db:seed
 
-      - run: pnpm test
+      - run: pnpm check-types
 
       - run: pnpm lint
 
+      - run: pnpm test
+
       - run: pnpm build
+
+      - run: pnpm --filter web exec playwright install chromium --with-deps
+
+      - run: pnpm --filter web test:e2e

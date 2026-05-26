@@ -1,73 +1,40 @@
-import rateLimit from "express-rate-limit";
+import type { Request, Response, NextFunction } from "express";
 
-/** In-memory store — fine for single-instance demos. Use Redis store in multi-instance production. */
+import { checkDistributedRateLimit } from "@repo/services/cache/rate-limit";
 
 const skipInTests = () => process.env.VITEST === "true";
 
-export const authCredentialLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 40,
-  skip: skipInTests,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many login or signup attempts. Try again later." },
-});
+type LimitConfig = {
+  windowMs: number;
+  max: number;
+  message: string;
+  keyGenerator?: (req: Request) => string;
+};
 
-export const passwordResetLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  skip: skipInTests,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many password reset attempts. Try again in 15 minutes." },
-});
+async function applyRateLimit(req: Request, res: Response, config: LimitConfig): Promise<boolean> {
+  if (skipInTests()) return true;
 
-export const formSubmitIpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 60,
-  skip: skipInTests,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many form submissions. Try again later." },
-});
+  const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
+  const key = config.keyGenerator ? config.keyGenerator(req) : ip;
+  const result = await checkDistributedRateLimit(key, config.max, config.windowMs);
 
-export const formRecordViewLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 120,
-  skip: skipInTests,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => {
-    const formId = extractSubmitFormId(req);
-    const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
-    return formId ? `view:${ip}:${formId}` : `view:${ip}`;
-  },
-  message: { message: "Too many view requests. Try again later." },
-});
+  res.setHeader("RateLimit-Limit", String(config.max));
+  res.setHeader("RateLimit-Remaining", String(result.remaining));
 
-export const formSubmitPerFormLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  skip: skipInTests,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => {
-    const formId = extractSubmitFormId(req);
-    const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
-    return formId ? `${ip}:${formId}` : ip;
-  },
-  message: { message: "Too many submissions for this form. Try again later." },
-});
+  if (!result.allowed) {
+    res.status(429).json({ message: config.message });
+    return false;
+  }
+
+  return true;
+}
 
 const AUTH_CREDENTIAL_PATHS = ["auth.signUp", "auth.signIn", "auth.verify2FA", "auth.refresh"];
-
 const PASSWORD_RESET_PATHS = ["auth.forgotPassword", "auth.verifyOtp", "auth.resetPassword"];
-
 const FORM_SUBMIT_PATHS = ["forms.submit"];
-
 const FORM_VIEW_PATHS = ["forms.recordView"];
 
-function extractSubmitFormId(req: import("express").Request): string | null {
+function extractSubmitFormId(req: Request): string | null {
   const body = req.body;
   if (!body || typeof body !== "object") return null;
 
@@ -86,29 +53,57 @@ function extractSubmitFormId(req: import("express").Request): string | null {
 }
 
 export function createTrpcRateLimitMiddleware() {
-  return (
-    req: import("express").Request,
-    res: import("express").Response,
-    next: import("express").NextFunction,
-  ) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const path = req.path.replace(/^\//, "");
+    const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
 
     if (AUTH_CREDENTIAL_PATHS.some((p) => path.includes(p))) {
-      return authCredentialLimiter(req, res, next);
+      const ok = await applyRateLimit(req, res, {
+        windowMs: 15 * 60 * 1000,
+        max: 40,
+        message: "Too many login or signup attempts. Try again later.",
+      });
+      return ok ? next() : undefined;
     }
 
     if (PASSWORD_RESET_PATHS.some((p) => path.includes(p))) {
-      return passwordResetLimiter(req, res, next);
+      const ok = await applyRateLimit(req, res, {
+        windowMs: 15 * 60 * 1000,
+        max: 30,
+        message: "Too many password reset attempts. Try again in 15 minutes.",
+      });
+      return ok ? next() : undefined;
     }
 
     if (FORM_VIEW_PATHS.some((p) => path.includes(p))) {
-      return formRecordViewLimiter(req, res, next);
+      const ok = await applyRateLimit(req, res, {
+        windowMs: 15 * 60 * 1000,
+        max: 120,
+        keyGenerator: (request) => {
+          const formId = extractSubmitFormId(request);
+          return formId ? `view:${ip}:${formId}` : `view:${ip}`;
+        },
+        message: "Too many view requests. Try again later.",
+      });
+      return ok ? next() : undefined;
     }
 
     if (FORM_SUBMIT_PATHS.some((p) => path.includes(p))) {
-      return formSubmitPerFormLimiter(req, res, () => {
-        formSubmitIpLimiter(req, res, next);
+      const formId = extractSubmitFormId(req);
+      const perFormOk = await applyRateLimit(req, res, {
+        windowMs: 15 * 60 * 1000,
+        max: 20,
+        keyGenerator: () => (formId ? `${ip}:${formId}` : ip),
+        message: "Too many submissions for this form. Try again later.",
       });
+      if (!perFormOk) return undefined;
+
+      const ipOk = await applyRateLimit(req, res, {
+        windowMs: 15 * 60 * 1000,
+        max: 60,
+        message: "Too many form submissions. Try again later.",
+      });
+      return ipOk ? next() : undefined;
     }
 
     return next();

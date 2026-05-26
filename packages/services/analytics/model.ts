@@ -63,3 +63,22 @@ export const allFieldStatsInputSchema = z.object({
 export const allFieldStatsOutputSchema = z.object({
   fields: z.array(fieldBreakdownOutputSchema),
 });
+
+export const formFunnelInputSchema = z.object({
+  formId: z.string().uuid(),
+});
+
+export const formFunnelOutputSchema = z.object({
+  formId: z.string().uuid(),
+  title: z.string(),
+  views: z.number().int(),
+  submissions: z.number().int(),
+  completionRate: z.number(),
+  dropOffRate: z.number(),
+  stages: z.array(
+    z.object({
+      label: z.string(),
+      count: z.number().int(),
+    }),
+  ),
+});

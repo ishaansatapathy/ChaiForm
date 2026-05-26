@@ -84,9 +84,17 @@ function assertEmailVerified(user: SelectUser) {
   }
 }
 
+function toTokenUser(user: SelectUser) {
+  return {
+    id: user.id,
+    emailVerified: user.emailVerified ?? false,
+    role: user.role ?? "user",
+  } as const;
+}
+
 function issueVerifiedSession(res: Response, user: SelectUser) {
   assertEmailVerified(user);
-  issueAuthCookies(res, user.id);
+  issueAuthCookies(res, toTokenUser(user));
 }
 
 class AuthService {
@@ -163,7 +171,7 @@ class AuthService {
           clearAuthCookies(res);
           return null;
         }
-        issueAuthCookies(res, user.id);
+        issueAuthCookies(res, toTokenUser(user));
         return toPublicUser(user);
       } catch {
         if (res) clearAuthCookies(res);
@@ -287,7 +295,7 @@ class AuthService {
       }
 
       assertEmailVerified(user);
-      issueAuthCookies(res, user.id);
+      issueAuthCookies(res, toTokenUser(user));
       return toPublicUser(user);
     } catch (error) {
       clearAuthCookies(res);
@@ -422,7 +430,7 @@ class AuthService {
       throw new AuthError("INTERNAL", "Unable to verify email. Please try again.");
     }
 
-    issueAuthCookies(res, updated.id);
+    issueAuthCookies(res, toTokenUser(updated));
     return toPublicUser(updated);
   }
 
@@ -587,7 +595,7 @@ class AuthService {
         return this.buildTwoFactorSignInUrl(user.email);
       }
 
-      issueAuthCookies(res, user.id);
+      issueAuthCookies(res, toTokenUser(user));
       const destination = safeReturnTo;
       const separator = destination.includes("?") ? "&" : "?";
       return `${env.CLIENT_URL}${destination}${separator}hero=1`;

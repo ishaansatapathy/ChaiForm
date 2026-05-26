@@ -14,7 +14,9 @@
     "SEED_USER_EMAIL",
     "SEED_DEMO_PASSWORD",
     "VITEST",
-    "OPENAPI_DOCS_SECRET"
+    "OPENAPI_DOCS_SECRET",
+    "PUBLIC_OPENAPI_DOCS",
+    "REDIS_URL"
   ],
   "tasks": {
     "build": {

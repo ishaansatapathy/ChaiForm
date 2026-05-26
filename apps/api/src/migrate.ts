@@ -69,6 +69,10 @@ EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "role" varchar(20) DEFAULT 'user' NOT NULL;
 UPDATE "users" SET "role" = 'admin' WHERE "email" = 'demo@chaiform.dev' AND "role" = 'user';
+
+CREATE UNIQUE INDEX IF NOT EXISTS "submissions_form_respondent_unique_idx"
+  ON "submissions" ("form_id", "respondent_key")
+  WHERE "respondent_key" IS NOT NULL;
 `;
 
 export async function runMigrations() {

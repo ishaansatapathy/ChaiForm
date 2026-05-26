@@ -8,6 +8,8 @@ import {
   analyticsSummaryOutputSchema,
   fieldBreakdownInputSchema,
   fieldBreakdownOutputSchema,
+  formFunnelInputSchema,
+  formFunnelOutputSchema,
   submissionsOverTimeInputSchema,
   submissionsOverTimeOutputSchema,
 } from "@repo/services/analytics/model";
@@ -102,6 +104,18 @@ export const analyticsRouter = router({
       try {
         const form = await formService.getFormById(ctx.user.id, input.formId, ctx.user.role);
         return { fields: form.fields };
+      } catch (error) {
+        mapError(error);
+      }
+    }),
+
+  funnel: verifiedProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/funnel"), tags: TAGS, protect: true } })
+    .input(formFunnelInputSchema)
+    .output(formFunnelOutputSchema)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await analyticsService.getFormFunnel(ctx.user.id, input.formId, ctx.user.role);
       } catch (error) {
         mapError(error);
       }

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { checkRateLimit, getClientIp, readJsonBody } from "~/lib/rate-limit";
+import { parseRespondentToken } from "@repo/services/respondent-key";
+import { checkRateLimitAsync, getClientIp, readJsonBody } from "~/lib/rate-limit";
 import { isTurnstileRequired, verifyTurnstileToken } from "~/lib/turnstile";
 import { parseSubmitFormInput } from "~/lib/validate-submit-payload";
 
@@ -10,7 +11,7 @@ export const maxDuration = 15;
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
-  if (!checkRateLimit(`submit:${ip}`, 30, 15 * 60 * 1000)) {
+  if (!(await checkRateLimitAsync(`submit:${ip}`, 30, 15 * 60 * 1000))) {
     return NextResponse.json({ error: "Too many submissions. Try again later." }, { status: 429 });
   }
 
@@ -41,9 +42,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: validated.message }, { status: 400 });
   }
 
-  const { formId, answers, website, respondentKey, idempotencyKey } = validated.data;
+  const { formId, answers, website, respondentKey: clientRespondentKey, idempotencyKey } = validated.data;
 
-  if (!checkRateLimit(`submit-form:${formId}:${ip}`, 10, 15 * 60 * 1000)) {
+  const cookieToken = request.cookies.get(`chaiform_rk_${formId}`)?.value;
+  const signedRespondentKey = cookieToken ? parseRespondentToken(cookieToken, formId) : null;
+  const respondentKey = signedRespondentKey ?? clientRespondentKey;
+
+  if (!(await checkRateLimitAsync(`submit-form:${formId}:${ip}`, 10, 15 * 60 * 1000))) {
     return NextResponse.json({ error: "Too many submissions for this form." }, { status: 429 });
   }
 

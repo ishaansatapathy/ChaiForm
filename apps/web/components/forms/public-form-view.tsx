@@ -13,7 +13,7 @@ import { isMultiCheckboxConfig } from "~/lib/checkbox-value";
 import { getFormTheme } from "~/lib/form-themes";
 import {
   checkRemoteSubmission,
-  getRespondentKey,
+  ensureRespondentSession,
   hasLocalSubmission,
   markFormSubmitted,
 } from "~/lib/respondent-key";
@@ -122,11 +122,12 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
       return;
     }
 
-    const respondentKey = getRespondentKey(form.id);
-    void checkRemoteSubmission(form.id, respondentKey).then((submitted) => {
-      setAlreadySubmitted(submitted);
-      setCheckingSubmission(false);
-    });
+    void ensureRespondentSession(form.id).then(() =>
+      checkRemoteSubmission(form.id).then((submitted) => {
+        setAlreadySubmitted(submitted);
+        setCheckingSubmission(false);
+      }),
+    );
   }, [form.allowMultipleSubmissions, form.requireAuthentication, form.id, user, authLoading]);
 
   const validateCurrentStep = () => {
@@ -166,16 +167,13 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
       return;
     }
     const honeypot = honeypotRef.current?.value ?? "";
-    const respondentKey = form.requireAuthentication ? undefined : getRespondentKey(form.id);
+    await ensureRespondentSession(form.id);
     const idempotencyKey = getSubmissionIdempotencyKey(form.id);
     const payload = {
       formId: form.id,
       website: honeypot,
       idempotencyKey,
       ...(turnstileEnabled && turnstileToken ? { turnstileToken } : {}),
-      ...(form.allowMultipleSubmissions || form.requireAuthentication
-        ? {}
-        : { respondentKey }),
       answers: fields.map((field) => ({
         fieldId: field.id,
         value: values[field.id] ?? "",
