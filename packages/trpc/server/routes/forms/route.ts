@@ -16,7 +16,7 @@ import {
 import { TRPCError } from "@trpc/server";
 
 import { sanitizeTrpcError } from "../../error-handler";
-import { publicProcedure, router, verifiedProcedure } from "../../trpc";
+import { mapAuthError, protectedProcedure, publicProcedure, router, verifiedProcedure } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
 
 const formService = new FormService();
@@ -54,7 +54,7 @@ export const formsRouter = router({
     .output(formOutputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await formService.updateForm(ctx.user.id, input);
+        return await formService.updateForm(ctx.user.id, input, ctx.user.role);
       } catch (error) {
         mapFormError(error);
       }
@@ -66,7 +66,7 @@ export const formsRouter = router({
     .output(z.object({ success: z.literal(true) }))
     .mutation(async ({ ctx, input }) => {
       try {
-        return await formService.deleteForm(ctx.user.id, input.formId);
+        return await formService.deleteForm(ctx.user.id, input.formId, ctx.user.role);
       } catch (error) {
         mapFormError(error);
       }
@@ -78,7 +78,7 @@ export const formsRouter = router({
     .output(formOutputSchema)
     .query(async ({ ctx, input }) => {
       try {
-        return await formService.getFormById(ctx.user.id, input.formId);
+        return await formService.getFormById(ctx.user.id, input.formId, ctx.user.role);
       } catch (error) {
         mapFormError(error);
       }
@@ -190,11 +190,16 @@ export const formsRouter = router({
     .output(paginatedSubmissionsOutputSchema)
     .query(async ({ ctx, input }) => {
       try {
-        return await formService.listSubmissions(ctx.user.id, input.formId, {
-          limit: input.limit ?? 20,
-          cursor: input.cursor,
-          search: input.search,
-        });
+        return await formService.listSubmissions(
+          ctx.user.id,
+          input.formId,
+          {
+            limit: input.limit ?? 20,
+            cursor: input.cursor,
+            search: input.search,
+          },
+          ctx.user.role,
+        );
       } catch (error) {
         mapFormError(error);
       }
@@ -206,7 +211,7 @@ export const formsRouter = router({
     .output(submissionOutputSchema)
     .query(async ({ ctx, input }) => {
       try {
-        return await formService.getSubmission(ctx.user.id, input.submissionId);
+        return await formService.getSubmission(ctx.user.id, input.submissionId, ctx.user.role);
       } catch (error) {
         mapFormError(error);
       }

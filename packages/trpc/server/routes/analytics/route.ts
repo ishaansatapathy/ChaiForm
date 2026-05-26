@@ -90,7 +90,7 @@ export const analyticsRouter = router({
     .output(z.object({ fields: z.array(formFieldSchema) }))
     .query(async ({ ctx, input }) => {
       try {
-        const form = await formService.getFormById(ctx.user.id, input.formId);
+        const form = await formService.getFormById(ctx.user.id, input.formId, ctx.user.role);
         return { fields: form.fields };
       } catch (error) {
         mapError(error);

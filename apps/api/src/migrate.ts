@@ -64,6 +64,9 @@ DO $$ BEGIN
   ALTER TABLE "submissions" ADD CONSTRAINT "submissions_form_version_id_form_versions_id_fk"
     FOREIGN KEY ("form_version_id") REFERENCES "public"."form_versions"("id") ON DELETE set null ON UPDATE no action;
 EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "role" varchar(20) DEFAULT 'user' NOT NULL;
+UPDATE "users" SET "role" = 'admin' WHERE "email" = 'demo@chaiform.dev' AND "role" = 'user';
 `;
 
 export async function runMigrations() {

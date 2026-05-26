@@ -24,6 +24,11 @@ export interface DraftField {
     maxRating?: number;
     placeholder?: string;
     checkboxLabel?: string;
+    showWhen?: {
+      fieldId: string;
+      operator: "eq" | "neq";
+      value: string;
+    };
   };
 }
 
@@ -320,6 +325,110 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
             />
             Required
           </label>
+
+          {index > 0 && (
+            <div className="mt-4 space-y-3 rounded-2xl border border-white/8 bg-white/2 p-4">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-white/50">
+                <input
+                  type="checkbox"
+                  checked={Boolean(field.config?.showWhen)}
+                  onChange={(event) => {
+                    if (!event.target.checked) {
+                      const nextConfig = { ...field.config };
+                      delete nextConfig.showWhen;
+                      updateField(field.id, {
+                        config: Object.keys(nextConfig).length > 0 ? nextConfig : defaultConfig(field.type),
+                      });
+                      return;
+                    }
+                    const priorField = fields[index - 1];
+                    if (!priorField) return;
+                    updateField(field.id, {
+                      config: {
+                        ...field.config,
+                        showWhen: {
+                          fieldId: priorField.id,
+                          operator: "eq",
+                          value: "",
+                        },
+                      },
+                    });
+                  }}
+                  className="accent-lime-400"
+                />
+                Conditional — show when another answer matches
+              </label>
+
+              {field.config?.showWhen && (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <label className="block text-[10px] text-white/40">
+                    When field
+                    <select
+                      value={field.config.showWhen.fieldId}
+                      onChange={(event) =>
+                        updateField(field.id, {
+                          config: {
+                            ...field.config,
+                            showWhen: {
+                              ...field.config!.showWhen!,
+                              fieldId: event.target.value,
+                            },
+                          },
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                    >
+                      {fields.slice(0, index).map((prior) => (
+                        <option key={prior.id} value={prior.id}>
+                          {prior.label || "Untitled"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-[10px] text-white/40">
+                    Operator
+                    <select
+                      value={field.config.showWhen.operator}
+                      onChange={(event) =>
+                        updateField(field.id, {
+                          config: {
+                            ...field.config,
+                            showWhen: {
+                              ...field.config!.showWhen!,
+                              operator: event.target.value as "eq" | "neq",
+                            },
+                          },
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                    >
+                      <option value="eq">equals</option>
+                      <option value="neq">not equals</option>
+                    </select>
+                  </label>
+                  <label className="block text-[10px] text-white/40">
+                    Value
+                    <input
+                      value={field.config.showWhen.value}
+                      onChange={(event) =>
+                        updateField(field.id, {
+                          config: {
+                            ...field.config,
+                            showWhen: {
+                              ...field.config!.showWhen!,
+                              value: event.target.value,
+                            },
+                          },
+                        })
+                      }
+                      placeholder="Match value"
+                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ))}
 

@@ -10,6 +10,9 @@ import {
 export const authProviderEnum = ["local", "google"] as const;
 export type AuthProvider = (typeof authProviderEnum)[number];
 
+export const userRoleEnum = ["user", "admin"] as const;
+export type UserRole = (typeof userRoleEnum)[number];
+
 export const usersTable = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
 
@@ -34,6 +37,8 @@ export const usersTable = pgTable("users", {
   twoFactorOtpExpire: timestamp("two_factor_otp_expire"),
 
   profileImageUrl: text("profile_image_url"),
+
+  role: varchar("role", { length: 20 }).$type<UserRole>().default("user").notNull(),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),

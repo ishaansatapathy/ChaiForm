@@ -5,14 +5,23 @@ import { formRetentionPresets } from "./retention";
 
 export const formRetentionSchema = z.enum(formRetentionPresets);
 
+export const fieldVisibilityRuleSchema = z
+  .object({
+    fieldId: z.string().min(1),
+    operator: z.enum(["eq", "neq"]).default("eq"),
+    value: z.string().max(500),
+  })
+  .strict();
+
+const textLikeConfigSchema = z.object({
+  placeholder: z.string().max(200).optional(),
+  showWhen: fieldVisibilityRuleSchema.optional(),
+});
+
 const fieldBaseInputSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1).max(255),
   required: z.boolean(),
-});
-
-const textLikeConfigSchema = z.object({
-  placeholder: z.string().max(200).optional(),
 });
 
 export const formFieldInputSchema = z.discriminatedUnion("type", [
@@ -27,6 +36,7 @@ export const formFieldInputSchema = z.discriminatedUnion("type", [
     config: z.object({
       options: z.array(z.string().min(1)).min(1),
       placeholder: z.string().max(200).optional(),
+      showWhen: fieldVisibilityRuleSchema.optional(),
     }),
   }),
   z.object({
@@ -34,6 +44,7 @@ export const formFieldInputSchema = z.discriminatedUnion("type", [
     type: z.literal("rating"),
     config: z.object({
       maxRating: z.number().int().min(1).max(10).default(5),
+      showWhen: fieldVisibilityRuleSchema.optional(),
     }),
   }),
   z.object({
@@ -43,6 +54,7 @@ export const formFieldInputSchema = z.discriminatedUnion("type", [
       .object({
         options: z.array(z.string().min(1).max(200)).min(1).optional(),
         checkboxLabel: z.string().max(200).optional(),
+        showWhen: fieldVisibilityRuleSchema.optional(),
       })
       .optional(),
   }),
@@ -62,6 +74,7 @@ export const formFieldSchema = z.discriminatedUnion("type", [
     config: z.object({
       options: z.array(z.string().min(1)).min(1),
       placeholder: z.string().max(200).optional(),
+      showWhen: fieldVisibilityRuleSchema.optional(),
     }),
   }),
   z.object({
@@ -71,6 +84,7 @@ export const formFieldSchema = z.discriminatedUnion("type", [
     type: z.literal("rating"),
     config: z.object({
       maxRating: z.number().int().min(1).max(10).default(5),
+      showWhen: fieldVisibilityRuleSchema.optional(),
     }),
   }),
   z.object({
@@ -82,6 +96,7 @@ export const formFieldSchema = z.discriminatedUnion("type", [
       .object({
         options: z.array(z.string().min(1).max(200)).min(1).optional(),
         checkboxLabel: z.string().max(200).optional(),
+        showWhen: fieldVisibilityRuleSchema.optional(),
       })
       .optional(),
   }),
@@ -218,6 +233,8 @@ export const submitFormInputBaseSchema = z
     answers: z.array(submitAnswerSchema).max(50),
     /** Honeypot — must stay empty */
     website: z.string().max(500).default(""),
+    /** Cloudflare Turnstile — verified server-side when configured */
+    turnstileToken: z.string().max(4096).optional(),
   })
   .strict();
 

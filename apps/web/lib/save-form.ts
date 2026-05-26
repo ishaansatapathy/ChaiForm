@@ -4,8 +4,6 @@ import { TRPCClientError } from "@repo/trpc/client";
 
 import { isRetryableTrpcError, runWithRetry, sleep } from "~/lib/warm-api";
 
-type SaveAction = "create" | "update";
-
 class SaveFormError extends Error {
   retryable: boolean;
 
@@ -51,7 +49,6 @@ export async function warmApiUntilReady(
   onProgress?: (message: string) => void,
   maxAttempts = 4,
 ): Promise<boolean> {
-  // Quick check — if the server responds immediately, skip the warmup loop.
   if (await pingHealth()) return true;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -64,40 +61,15 @@ export async function warmApiUntilReady(
   return false;
 }
 
-async function saveViaApi(action: SaveAction, input: Record<string, unknown>) {
-  const response = await fetch("/api/save-form", {
-    method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action, input }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  let payload: { error?: string; retryable?: boolean; form?: unknown } = {};
-  try {
-    payload = (await response.json()) as typeof payload;
-  } catch {
-    throw new SaveFormError("Server did not respond. Try again.", true);
-  }
-
-  if (!response.ok || payload.error) {
-    const retryable = payload.retryable ?? (response.status >= 500 || response.status === 503);
-    throw new SaveFormError(payload.error ?? "Could not save form.", retryable);
-  }
-
-  return payload.form;
-}
-
 export async function saveFormWithColdStart<T>(
-  action: SaveAction,
-  input: Record<string, unknown>,
-  opts?: {
-    mutate?: () => Promise<T>;
+  _action: "create" | "update",
+  _input: Record<string, unknown>,
+  opts: {
+    mutate: () => Promise<T>;
     onProgress?: (message: string) => void;
   },
 ): Promise<T> {
-  const onProgress = opts?.onProgress;
+  const onProgress = opts.onProgress;
 
   const ready = await warmApiUntilReady(undefined, 4);
   if (!ready) {
@@ -113,18 +85,10 @@ export async function saveFormWithColdStart<T>(
 
   const totalAttempts = 3;
 
-  return runWithRetry(
-    async () => {
-      if (opts?.mutate) {
-        return opts.mutate();
-      }
-      return (await saveViaApi(action, input)) as T;
-    },
-    {
-      attempts: totalAttempts,
-      delaysMs: [0, 3_000, 5_000],
-      onRetry: (attempt) => onProgress?.(`Saving… retry ${attempt}/${totalAttempts}`),
-      isRetryable: isSaveRetryable,
-    },
-  );
+  return runWithRetry(() => opts.mutate(), {
+    attempts: totalAttempts,
+    delaysMs: [0, 3_000, 5_000],
+    onRetry: (attempt) => onProgress?.(`Saving… retry ${attempt}/${totalAttempts}`),
+    isRetryable: isSaveRetryable,
+  });
 }

@@ -60,6 +60,7 @@ function toPublicUser(user: SelectUser): AuthUser {
     emailVerified: user.emailVerified ?? false,
     profileImageUrl: user.profileImageUrl ?? null,
     twoFactorEnabled: user.twoFactorEnabled ?? false,
+    role: user.role ?? "user",
   };
 }
 

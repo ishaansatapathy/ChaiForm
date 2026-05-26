@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TRPCClientError } from "@repo/trpc/client";
 import {
-  assertSignUpPasswordsMatch,
   signInInputSchema,
   signUpInputSchema,
 } from "@repo/services/auth/dtos";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { AuthField, AuthModeToggle, AuthSubmitButton } from "~/components/auth/auth-field";
 import { SocialButtons } from "~/components/auth/social-buttons";
@@ -22,6 +24,9 @@ type AuthCardProps = {
   googleEnabled?: boolean;
 };
 
+type SignInValues = z.infer<typeof signInInputSchema>;
+type SignUpValues = z.infer<typeof signUpInputSchema>;
+
 export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -33,24 +38,25 @@ export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
     displayEmail: string;
     otp: string;
   } | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
   const [error, setError] = useState("");
   const initialized2FA = useRef(false);
+
+  const signInForm = useForm<SignInValues>({
+    resolver: zodResolver(signInInputSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  const signUpForm = useForm<SignUpValues>({
+    resolver: zodResolver(signUpInputSchema),
+    defaultValues: { fullName: "", email: "", password: "", confirmPassword: "" },
+  });
+
+  const passwordValue = isLogin ? signInForm.watch("password") : signUpForm.watch("password");
 
   const signUpMutation = trpc.auth.signUp.useMutation();
   const signInMutation = trpc.auth.signIn.useMutation();
   const verify2FAMutation = trpc.auth.verify2FA.useMutation();
   const utils = trpc.useUtils();
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-    setError("");
-  };
 
   const getErrorMessage = (err: unknown) => {
     if (err instanceof TRPCClientError) return err.message;
@@ -78,76 +84,66 @@ export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
     toast.info("Enter the 2FA code sent to your email");
   }, [isLogin, searchParams]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = isLogin
+    ? signInForm.handleSubmit(async (values) => {
+        setLoading(true);
+        setError("");
+        try {
+          const result = await signInMutation.mutateAsync(values);
+          if (result.twoFactorRequired) {
+            setTwoFactorStep({
+              email: result.email,
+              displayEmail: values.email.trim() || result.email,
+              otp: "",
+            });
+            toast.info(result.message);
+            return;
+          }
+          await completeSignIn(nextPath);
+        } catch (err) {
+          setError(getErrorMessage(err));
+        } finally {
+          setLoading(false);
+        }
+      })
+    : signUpForm.handleSubmit(async (values) => {
+        setLoading(true);
+        setError("");
+        try {
+          await signUpMutation.mutateAsync(values);
+          toast.success("Account created — verify your email to continue");
+          router.push(`/check-email?email=${encodeURIComponent(values.email)}`);
+        } catch (err) {
+          const message = getErrorMessage(err);
+          setError(message);
+          if (message.toLowerCase().includes("verify your email")) {
+            router.push(`/check-email?email=${encodeURIComponent(values.email)}`);
+          }
+        } finally {
+          setLoading(false);
+        }
+      });
+
+  const handleTwoFactorSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!twoFactorStep) return;
     setLoading(true);
     setError("");
 
     try {
-      if (twoFactorStep) {
-        await verify2FAMutation.mutateAsync({
-          email: twoFactorStep.email,
-          otp: twoFactorStep.otp,
-        });
-        await completeSignIn(nextPath);
-        return;
-      }
-
-      if (isLogin) {
-        const parsed = signInInputSchema.safeParse({
-          email: formData.email,
-          password: formData.password,
-        });
-        if (!parsed.success) {
-          setError(parsed.error.issues[0]?.message ?? "Invalid sign-in details");
-          return;
-        }
-
-        const result = await signInMutation.mutateAsync(parsed.data);
-
-        if (result.twoFactorRequired) {
-          setTwoFactorStep({
-            email: result.email,
-            displayEmail: formData.email.trim() || result.email,
-            otp: "",
-          });
-          toast.info(result.message);
-          return;
-        }
-
-        await completeSignIn(nextPath);
-        return;
-      }
-
-      const parsed = signUpInputSchema.safeParse(formData);
-      if (!parsed.success) {
-        setError(parsed.error.issues[0]?.message ?? "Invalid sign-up details");
-        return;
-      }
-
-      try {
-        assertSignUpPasswordsMatch(parsed.data);
-      } catch (matchError) {
-        setError(matchError instanceof Error ? matchError.message : "Passwords do not match");
-        return;
-      }
-
-      await signUpMutation.mutateAsync(parsed.data);
-
-      toast.success("Account created — verify your email to continue");
-      router.push(`/check-email?email=${encodeURIComponent(formData.email)}`);
+      await verify2FAMutation.mutateAsync({
+        email: twoFactorStep.email,
+        otp: twoFactorStep.otp,
+      });
+      await completeSignIn(nextPath);
     } catch (err) {
-      const message = getErrorMessage(err);
-      setError(message);
-      if (message.toLowerCase().includes("verify your email") && formData.email) {
-        router.push(`/check-email?email=${encodeURIComponent(formData.email)}`);
-      }
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const pwStrength = useMemo(() => computeStrength(formData.password), [formData.password]);
+  const pwStrength = useMemo(() => computeStrength(passwordValue ?? ""), [passwordValue]);
 
   return (
     <div className="auth-card relative mx-auto w-full max-w-[360px] rounded-[1.8rem] p-7 sm:p-8">
@@ -198,7 +194,7 @@ export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={twoFactorStep ? handleTwoFactorSubmit : handleSubmit} className="space-y-4">
         {twoFactorStep ? (
           <>
             <p className="font-mono text-[10px] tracking-[0.18em] text-white/45">
@@ -221,42 +217,97 @@ export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
           </>
         ) : (
           <>
-            {!isLogin && (
-              <AuthField
-                label="Full Name"
-                name="name"
-                type="text"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="John Doe"
-                required
-                autoComplete="name"
-              />
+            {isLogin ? (
+              <>
+                <AuthField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={signInForm.watch("email")}
+                  onChange={(e) => {
+                    signInForm.setValue("email", e.target.value, { shouldValidate: true });
+                    setError("");
+                  }}
+                  placeholder="name@company.com"
+                  required
+                  autoComplete="email"
+                />
+
+                <AuthField
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={signInForm.watch("password")}
+                  onChange={(e) => {
+                    signInForm.setValue("password", e.target.value, { shouldValidate: true });
+                    setError("");
+                  }}
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                />
+              </>
+            ) : (
+              <>
+                <AuthField
+                  label="Full Name"
+                  name="fullName"
+                  type="text"
+                  value={signUpForm.watch("fullName")}
+                  onChange={(e) => {
+                    signUpForm.setValue("fullName", e.target.value, { shouldValidate: true });
+                    setError("");
+                  }}
+                  placeholder="John Doe"
+                  required
+                  autoComplete="name"
+                />
+
+                <AuthField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={signUpForm.watch("email")}
+                  onChange={(e) => {
+                    signUpForm.setValue("email", e.target.value, { shouldValidate: true });
+                    setError("");
+                  }}
+                  placeholder="name@company.com"
+                  required
+                  autoComplete="email"
+                />
+
+                <AuthField
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={signUpForm.watch("password")}
+                  onChange={(e) => {
+                    signUpForm.setValue("password", e.target.value, { shouldValidate: true });
+                    setError("");
+                  }}
+                  placeholder="••••••••"
+                  required
+                  autoComplete="new-password"
+                />
+
+                {passwordValue && <PasswordStrength score={pwStrength} />}
+
+                <AuthField
+                  label="Confirm Password"
+                  name="confirmPassword"
+                  type="password"
+                  value={signUpForm.watch("confirmPassword")}
+                  onChange={(e) => {
+                    signUpForm.setValue("confirmPassword", e.target.value, { shouldValidate: true });
+                    setError("");
+                  }}
+                  placeholder="••••••••"
+                  required
+                  autoComplete="new-password"
+                />
+              </>
             )}
-
-            <AuthField
-              label="Email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="name@company.com"
-              required
-              autoComplete="email"
-            />
-
-            <AuthField
-              label="Password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              required
-              autoComplete={isLogin ? "current-password" : "new-password"}
-            />
-
-            {!isLogin && formData.password && <PasswordStrength score={pwStrength} />}
 
             {isLogin && (
               <div className="-mt-2 flex justify-end">
@@ -268,26 +319,26 @@ export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
                 </Link>
               </div>
             )}
-
-            {!isLogin && (
-              <AuthField
-                label="Confirm Password"
-                name="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="••••••••"
-                required
-                autoComplete="new-password"
-              />
-            )}
           </>
         )}
 
-        {error && (
+        {(error ||
+          signInForm.formState.errors.email?.message ||
+          signInForm.formState.errors.password?.message ||
+          signUpForm.formState.errors.fullName?.message ||
+          signUpForm.formState.errors.email?.message ||
+          signUpForm.formState.errors.password?.message ||
+          signUpForm.formState.errors.confirmPassword?.message) && (
           <p className="font-mono flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/6 px-3 py-2 text-[10.5px] font-bold tracking-widest text-red-400 uppercase">
             <span className="size-1.5 animate-pulse rounded-full bg-red-500" />
-            {error}
+            {error ||
+              (isLogin
+                ? signInForm.formState.errors.email?.message ||
+                  signInForm.formState.errors.password?.message
+                : signUpForm.formState.errors.fullName?.message ||
+                  signUpForm.formState.errors.email?.message ||
+                  signUpForm.formState.errors.password?.message ||
+                  signUpForm.formState.errors.confirmPassword?.message)}
           </p>
         )}
 
