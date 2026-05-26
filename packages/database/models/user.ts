@@ -29,16 +29,17 @@ export const usersTable = pgTable("users", {
   verificationToken: varchar("verification_token", { length: 64 }),
   verificationTokenExpire: timestamp("verification_token_expire"),
   resetPasswordToken: varchar("reset_password_token", { length: 64 }),
-  resetPasswordOtp: varchar("reset_password_otp", { length: 6 }),
+  resetPasswordOtp: varchar("reset_password_otp", { length: 64 }),
   resetPasswordExpire: timestamp("reset_password_expire"),
 
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
-  twoFactorOtp: varchar("two_factor_otp", { length: 6 }),
+  twoFactorOtp: varchar("two_factor_otp", { length: 64 }),
   twoFactorOtpExpire: timestamp("two_factor_otp_expire"),
 
   profileImageUrl: text("profile_image_url"),
 
   role: varchar("role", { length: 20 }).$type<UserRole>().default("user").notNull(),
+  tokenVersion: varchar("token_version", { length: 20 }).default("0").notNull(),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),

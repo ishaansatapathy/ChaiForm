@@ -39,15 +39,6 @@ async function bootstrap() {
   logger.info(`http server is running on 0.0.0.0:${PORT}`);
 
   try {
-    const { app } = await import("./server");
-    expressHandler = app;
-    logger.info("Express application loaded");
-  } catch (err) {
-    logger.error("Failed to load Express application", { err });
-    return;
-  }
-
-  try {
     const { runMigrations } = await import("./migrate");
     await runMigrations();
     logger.info("Database schema patches applied");
@@ -57,6 +48,15 @@ async function bootstrap() {
     if (["production", "prod"].includes(nodeEnv)) {
       process.exit(1);
     }
+  }
+
+  try {
+    const { app } = await import("./server");
+    expressHandler = app;
+    logger.info("Express application loaded");
+  } catch (err) {
+    logger.error("Failed to load Express application", { err });
+    return;
   }
 
   const { isEmailConfigured } = await import("@repo/services/env");

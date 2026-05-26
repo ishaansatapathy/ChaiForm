@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
       headers: {
         "content-type": "application/json",
         "accept-encoding": "identity",
+        "x-chaiform-csrf": "1",
+        ...(request.headers.get("origin") ? { origin: request.headers.get("origin")! } : {}),
+        ...(request.headers.get("referer") ? { referer: request.headers.get("referer")! } : {}),
       },
       body: JSON.stringify({ formId: body.formId, viewerKey: body.viewerKey }),
       cache: "no-store",

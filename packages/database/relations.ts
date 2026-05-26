@@ -4,6 +4,7 @@ import { formFieldsTable } from "./models/form-field";
 import { formVersionsTable } from "./models/form-version";
 import { formsTable } from "./models/form";
 import { submissionsTable } from "./models/submission";
+import { submissionAuditEventsTable } from "./models/submission-audit-event";
 import { submissionResponsesTable } from "./models/submission-response";
 import { usersTable } from "./models/user";
 
@@ -23,6 +24,7 @@ export const formsRelations = relations(formsTable, ({ one, many }) => ({
   fields: many(formFieldsTable),
   submissions: many(submissionsTable),
   versions: many(formVersionsTable),
+  submissionAuditEvents: many(submissionAuditEventsTable),
 }));
 
 export const formVersionsRelations = relations(formVersionsTable, ({ one, many }) => ({
@@ -61,5 +63,16 @@ export const submissionResponsesRelations = relations(submissionResponsesTable, 
   field: one(formFieldsTable, {
     fields: [submissionResponsesTable.fieldId],
     references: [formFieldsTable.id],
+  }),
+}));
+
+export const submissionAuditEventsRelations = relations(submissionAuditEventsTable, ({ one }) => ({
+  form: one(formsTable, {
+    fields: [submissionAuditEventsTable.formId],
+    references: [formsTable.id],
+  }),
+  actor: one(usersTable, {
+    fields: [submissionAuditEventsTable.actorUserId],
+    references: [usersTable.id],
   }),
 }));

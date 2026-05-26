@@ -152,7 +152,7 @@ export const formsRouter = router({
     .output(submissionOutputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await formService.submitForm(input, ctx.user?.id ?? null);
+        return await formService.submitForm(input, ctx.user?.id ?? null, ctx.req.ip ?? null);
       } catch (error) {
         mapFormError(error);
       }
@@ -201,6 +201,7 @@ export const formsRouter = router({
     }),
 
   exportSubmissions: verifiedProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/{formId}/submissions/export"), tags: TAGS, protect: true } })
     .input(
       z.object({
         formId: z.string().uuid(),
@@ -234,6 +235,18 @@ export const formsRouter = router({
     .query(async ({ ctx, input }) => {
       try {
         return await formService.getSubmission(ctx.user.id, input.submissionId, ctx.user.role);
+      } catch (error) {
+        mapFormError(error);
+      }
+    }),
+
+  deleteSubmission: verifiedProcedure
+    .meta({ openapi: { method: "DELETE", path: getPath("/submissions/{submissionId}"), tags: TAGS, protect: true } })
+    .input(z.object({ submissionId: z.string().uuid() }))
+    .output(z.object({ success: z.literal(true), formId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await formService.deleteSubmission(ctx.user.id, input.submissionId, ctx.user.role);
       } catch (error) {
         mapFormError(error);
       }

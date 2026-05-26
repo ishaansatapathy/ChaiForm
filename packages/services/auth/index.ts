@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { db, and, eq, gt } from "@repo/database";
+import { db, and, eq, gt, or } from "@repo/database";
 import { usersTable, type SelectUser } from "@repo/database/schema";
 import { logger } from "@repo/logger";
 import { cacheGet, cacheSet, cacheIncr } from "../cache/kv-store";
@@ -70,6 +70,10 @@ function generateOtp() {
   return crypto.randomInt(100_000, 1_000_000).toString();
 }
 
+function hashAuthSecret(value: string) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
 function twoFactorChallengeMessage() {
   return isDevEmailLogging()
     ? "2FA code logged in the API console (dev mode)"
@@ -90,6 +94,7 @@ function toTokenUser(user: SelectUser) {
     id: user.id,
     emailVerified: user.emailVerified ?? false,
     role: user.role ?? "user",
+    tokenVersion: user.tokenVersion ?? "0",
   } as const;
 }
 
@@ -110,13 +115,45 @@ class AuthService {
     return user ?? null;
   }
 
+  private isRefreshTokenCurrent(user: SelectUser, tokenVersion: string | undefined) {
+    return (user.tokenVersion ?? "0") === (tokenVersion ?? "0");
+  }
+
+  private async revokeRefreshTokens(userId: string) {
+    const user = await this.findUserById(userId);
+    const current = Number.parseInt(user?.tokenVersion ?? "0", 10);
+    await db
+      .update(usersTable)
+      .set({ tokenVersion: String(Number.isFinite(current) ? current + 1 : 1) })
+      .where(eq(usersTable.id, userId));
+  }
+
+  private async resolveTokenUserId(req: Request) {
+    const accessToken = req.cookies?.jwt as string | undefined;
+    const refreshToken = req.cookies?.jwt_refresh as string | undefined;
+
+    try {
+      if (accessToken) return verifyAccessToken(accessToken).userId;
+    } catch {
+      // Access token may be expired; try refresh token next.
+    }
+
+    try {
+      if (refreshToken) return verifyRefreshToken(refreshToken).userId;
+    } catch {
+      return null;
+    }
+
+    return null;
+  }
+
   private async initiateTwoFactorChallenge(user: SelectUser) {
     const otp = generateOtp();
     const expire = new Date(Date.now() + 5 * 60 * 1000);
 
     await db
       .update(usersTable)
-      .set({ twoFactorOtp: otp, twoFactorOtpExpire: expire })
+      .set({ twoFactorOtp: hashAuthSecret(otp), twoFactorOtpExpire: expire })
       .where(eq(usersTable.id, user.id));
 
     await sendEmail({
@@ -168,6 +205,10 @@ class AuthService {
         const decoded = verifyRefreshToken(refreshToken);
         const user = await this.findUserById(decoded.userId);
         if (!user) return null;
+        if (!this.isRefreshTokenCurrent(user, decoded.tokenVersion)) {
+          clearAuthCookies(res);
+          return null;
+        }
         if (!user.emailVerified) {
           clearAuthCookies(res);
           return null;
@@ -203,7 +244,7 @@ class AuthService {
         email: sanitizedEmail,
         passwordHash,
         authProvider: "local",
-        verificationToken,
+        verificationToken: hashAuthSecret(verificationToken),
         verificationTokenExpire: verificationExpiry(),
         emailVerified: false,
       })
@@ -276,7 +317,10 @@ class AuthService {
       .where(
         and(
           eq(usersTable.email, sanitizedEmail),
-          eq(usersTable.twoFactorOtp, input.otp),
+          or(
+            eq(usersTable.twoFactorOtp, hashAuthSecret(input.otp)),
+            eq(usersTable.twoFactorOtp, input.otp),
+          ),
           gt(usersTable.twoFactorOtpExpire, now),
         ),
       )
@@ -297,7 +341,9 @@ class AuthService {
     return toPublicUser(user);
   }
 
-  public logout(res: Response) {
+  public async logout(req: Request, res: Response) {
+    const userId = await this.resolveTokenUserId(req);
+    if (userId) await this.revokeRefreshTokens(userId);
     clearAuthCookies(res);
     return { message: "Logged out successfully" };
   }
@@ -313,6 +359,9 @@ class AuthService {
       const user = await this.findUserById(decoded.userId);
       if (!user) {
         throw new AuthError("UNAUTHORIZED", "User not found");
+      }
+      if (!this.isRefreshTokenCurrent(user, decoded.tokenVersion)) {
+        throw new AuthError("UNAUTHORIZED", "Refresh token revoked");
       }
 
       assertEmailVerified(user);
@@ -338,8 +387,8 @@ class AuthService {
     await db
       .update(usersTable)
       .set({
-        resetPasswordToken: resetToken,
-        resetPasswordOtp: otp,
+        resetPasswordToken: hashAuthSecret(resetToken),
+        resetPasswordOtp: hashAuthSecret(otp),
         resetPasswordExpire: expire,
       })
       .where(eq(usersTable.id, user.id));
@@ -374,7 +423,10 @@ class AuthService {
       .where(
         and(
           eq(usersTable.email, sanitizedEmail),
-          eq(usersTable.resetPasswordOtp, input.otp),
+          or(
+            eq(usersTable.resetPasswordOtp, hashAuthSecret(input.otp)),
+            eq(usersTable.resetPasswordOtp, input.otp),
+          ),
           gt(usersTable.resetPasswordExpire, now),
         ),
       )
@@ -394,12 +446,18 @@ class AuthService {
     const whereClause = input.otp
       ? and(
           eq(usersTable.email, sanitizedEmail),
-          eq(usersTable.resetPasswordOtp, input.otp),
+          or(
+            eq(usersTable.resetPasswordOtp, hashAuthSecret(input.otp)),
+            eq(usersTable.resetPasswordOtp, input.otp),
+          ),
           gt(usersTable.resetPasswordExpire, now),
         )
       : and(
           eq(usersTable.email, sanitizedEmail),
-          eq(usersTable.resetPasswordToken, input.token!),
+          or(
+            eq(usersTable.resetPasswordToken, hashAuthSecret(input.token!)),
+            eq(usersTable.resetPasswordToken, input.token!),
+          ),
           gt(usersTable.resetPasswordExpire, now),
         );
 
@@ -430,7 +488,12 @@ class AuthService {
     const [user] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.verificationToken, input.token))
+      .where(
+        or(
+          eq(usersTable.verificationToken, hashAuthSecret(input.token)),
+          eq(usersTable.verificationToken, input.token),
+        ),
+      )
       .limit(1);
 
     if (!user) {
@@ -466,7 +529,7 @@ class AuthService {
     const verificationToken = crypto.randomBytes(32).toString("hex");
     await db
       .update(usersTable)
-      .set({ verificationToken, verificationTokenExpire: verificationExpiry() })
+      .set({ verificationToken: hashAuthSecret(verificationToken), verificationTokenExpire: verificationExpiry() })
       .where(eq(usersTable.id, user.id));
 
     await sendVerificationEmail(user.email, verificationToken);
@@ -486,7 +549,7 @@ class AuthService {
     const verificationToken = crypto.randomBytes(32).toString("hex");
     await db
       .update(usersTable)
-      .set({ verificationToken, verificationTokenExpire: verificationExpiry() })
+      .set({ verificationToken: hashAuthSecret(verificationToken), verificationTokenExpire: verificationExpiry() })
       .where(eq(usersTable.id, user.id));
 
     await sendVerificationEmail(user.email, verificationToken);

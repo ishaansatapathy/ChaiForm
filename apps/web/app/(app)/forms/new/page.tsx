@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -28,6 +28,8 @@ const createInitialDraftFields = (): DraftField[] => [
   { id: crypto.randomUUID(), label: "Email address", type: "email", required: true },
 ];
 
+const CREATE_FORM_DRAFT_KEY = "chaiform:create-form-draft";
+
 export default function CreateFormPage() {
   const router = useRouter();
   const utils = trpc.useUtils();
@@ -46,6 +48,59 @@ export default function CreateFormPage() {
   const [allowAnonymousResponses, setAllowAnonymousResponses] = useState(true);
   const [fields, setFields] = useState<DraftField[]>(createInitialDraftFields);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem(CREATE_FORM_DRAFT_KEY);
+    if (!raw) return;
+
+    try {
+      const draft = JSON.parse(raw) as {
+        title?: string;
+        description?: string;
+        visibility?: "public" | "unlisted" | "draft";
+        theme?: FormThemeId;
+        retention?: FormRetentionOption;
+        allowMultipleSubmissions?: boolean;
+        allowAnonymousResponses?: boolean;
+        fields?: DraftField[];
+      };
+      if (draft.title) setTitle(draft.title);
+      if (draft.description) setDescription(draft.description);
+      if (draft.visibility) setVisibility(draft.visibility);
+      if (draft.theme) setTheme(draft.theme);
+      if (draft.retention) setRetention(draft.retention);
+      if (typeof draft.allowMultipleSubmissions === "boolean") {
+        setAllowMultipleSubmissions(draft.allowMultipleSubmissions);
+      }
+      if (typeof draft.allowAnonymousResponses === "boolean") {
+        setAllowAnonymousResponses(draft.allowAnonymousResponses);
+      }
+      if (draft.fields?.length) setFields(draft.fields);
+      toast.info("Recovered your unsaved draft");
+    } catch {
+      window.localStorage.removeItem(CREATE_FORM_DRAFT_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      window.localStorage.setItem(
+        CREATE_FORM_DRAFT_KEY,
+        JSON.stringify({
+          title,
+          description,
+          visibility,
+          theme,
+          retention,
+          allowMultipleSubmissions,
+          allowAnonymousResponses,
+          fields,
+        }),
+      );
+    }, 500);
+
+    return () => window.clearTimeout(handle);
+  }, [title, description, visibility, theme, retention, allowMultipleSubmissions, allowAnonymousResponses, fields]);
 
   const applyTemplate = (templateId: string) => {
     const template = FORM_TEMPLATES.find((item) => item.id === templateId);
@@ -99,6 +154,7 @@ export default function CreateFormPage() {
       await utils.forms.list.invalidate();
       await utils.analytics.summary.invalidate();
       toast.success("Form published");
+      window.localStorage.removeItem(CREATE_FORM_DRAFT_KEY);
       router.push(`/forms/${created.id}/edit?share=1`);
     } catch (error) {
       toast.error(getSaveErrorMessage(error));

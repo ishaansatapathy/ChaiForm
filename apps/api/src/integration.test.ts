@@ -15,6 +15,49 @@ describe("ChaiForm API integration", () => {
     expect(response.status).toBeGreaterThanOrEqual(400);
   });
 
+  it("rejects cookie-authenticated mutations without an origin", async () => {
+    const response = await request(app)
+      .post("/trpc/forms.submit")
+      .set("cookie", "jwt=fake-token")
+      .send({});
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe("Missing request origin");
+  });
+
+  it("rejects cookie-authenticated mutations from untrusted origins", async () => {
+    const response = await request(app)
+      .post("/trpc/forms.submit")
+      .set("cookie", "jwt=fake-token")
+      .set("origin", "https://evil.example")
+      .send({});
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe("Untrusted request origin");
+  });
+
+  it("allows trusted-origin mutations past the CSRF gate", async () => {
+    const response = await request(app)
+      .post("/trpc/forms.submit")
+      .set("cookie", "jwt=fake-token")
+      .set("origin", "http://localhost:3000")
+      .set("x-chaiform-csrf", "1")
+      .send({});
+
+    expect(response.status).not.toBe(403);
+  });
+
+  it("rejects trusted-origin cookie mutations without the CSRF header", async () => {
+    const response = await request(app)
+      .post("/trpc/forms.submit")
+      .set("cookie", "jwt=fake-token")
+      .set("origin", "http://localhost:3000")
+      .send({});
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe("Missing CSRF header");
+  });
+
   it("signs in seeded demo user and lists forms", async () => {
     const signIn = await request(app)
       .post("/api/authentication/sign-in")

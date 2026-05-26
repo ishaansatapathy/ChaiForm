@@ -32,6 +32,10 @@ type EditFormContentProps = {
   initialForm: FormDetail | null;
 };
 
+function editDraftKey(formId: string) {
+  return `chaiform:edit-form-draft:${formId}`;
+}
+
 export default function EditFormContent({ formId, initialForm }: EditFormContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -77,6 +81,8 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
   );
   const [fields, setFields] = useState<DraftField[]>((initialForm?.fields as DraftField[]) ?? []);
   const [hydratedFormId, setHydratedFormId] = useState<string | null>(initialForm?.id ?? null);
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const resolvedForm = form ?? initialForm;
 
   useEffect(() => {
     if (!form || form.id === hydratedFormId) return;
@@ -93,7 +99,76 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
     setHydratedFormId(form.id);
   }, [form, hydratedFormId]);
 
-  const resolvedForm = form ?? initialForm;
+  useEffect(() => {
+    if (draftHydrated || !resolvedForm) return;
+    setDraftHydrated(true);
+
+    const raw = window.localStorage.getItem(editDraftKey(formId));
+    if (!raw) return;
+    try {
+      const draft = JSON.parse(raw) as {
+        title?: string;
+        description?: string;
+        slug?: string;
+        visibility?: "public" | "unlisted" | "draft";
+        theme?: FormThemeId;
+        retention?: FormRetentionOption;
+        allowMultipleSubmissions?: boolean;
+        allowAnonymousResponses?: boolean;
+        fields?: DraftField[];
+      };
+      if (draft.title) setTitle(draft.title);
+      if (draft.description !== undefined) setDescription(draft.description);
+      if (draft.slug !== undefined) setSlug(draft.slug);
+      if (draft.visibility) setVisibility(draft.visibility);
+      if (draft.theme) setTheme(draft.theme);
+      if (draft.retention) setRetention(draft.retention);
+      if (typeof draft.allowMultipleSubmissions === "boolean") {
+        setAllowMultipleSubmissions(draft.allowMultipleSubmissions);
+      }
+      if (typeof draft.allowAnonymousResponses === "boolean") {
+        setAllowAnonymousResponses(draft.allowAnonymousResponses);
+      }
+      if (draft.fields?.length) setFields(draft.fields);
+      toast.info("Recovered unsaved edits");
+    } catch {
+      window.localStorage.removeItem(editDraftKey(formId));
+    }
+  }, [draftHydrated, formId, resolvedForm]);
+
+  useEffect(() => {
+    if (!resolvedForm) return;
+    const handle = window.setTimeout(() => {
+      window.localStorage.setItem(
+        editDraftKey(formId),
+        JSON.stringify({
+          title,
+          description,
+          slug,
+          visibility,
+          theme,
+          retention,
+          allowMultipleSubmissions,
+          allowAnonymousResponses,
+          fields,
+        }),
+      );
+    }, 500);
+
+    return () => window.clearTimeout(handle);
+  }, [
+    resolvedForm,
+    formId,
+    title,
+    description,
+    slug,
+    visibility,
+    theme,
+    retention,
+    allowMultipleSubmissions,
+    allowAnonymousResponses,
+    fields,
+  ]);
 
   useEffect(() => {
     if (searchParams.get("share") === "1" && resolvedForm) {
@@ -174,6 +249,7 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
       await utils.forms.getById.invalidate({ formId });
       await utils.analytics.summary.invalidate();
       toast.success("Form updated");
+      window.localStorage.removeItem(editDraftKey(formId));
       router.push("/dashboard");
     } catch (error) {
       toast.error(getSaveErrorMessage(error));

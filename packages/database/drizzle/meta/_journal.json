@@ -113,6 +113,34 @@
       "when": 1767592965706,
       "tag": "0015_respondent_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1767592965707,
+      "tag": "0016_security_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1767592965708,
+      "tag": "0017_preserve_submission_responses",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1767592965709,
+      "tag": "0018_submission_audit_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1767592965710,
+      "tag": "0019_hash_auth_secrets",
+      "breakpoints": true
     }
   ]
 }

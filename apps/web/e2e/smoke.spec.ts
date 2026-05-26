@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
 const apiURL = process.env.E2E_API_URL ?? "http://127.0.0.1:8000";
+const demoEmail = process.env.SEED_USER_EMAIL ?? "demo@chaiform.dev";
+const demoPassword = process.env.SEED_DEMO_PASSWORD ?? "DemoPass123!";
 
 test.describe("ChaiForm smoke", () => {
   test("homepage loads", async ({ page }) => {
@@ -31,5 +33,22 @@ test.describe("ChaiForm smoke", () => {
     expect(response.ok()).toBeTruthy();
     const body = (await response.json()) as { healthy?: boolean };
     expect(body.healthy).toBe(true);
+  });
+
+  test("demo creator can sign in and reach dashboard", async ({ page }) => {
+    test.skip(
+      !(process.env.CI || process.env.E2E_RUN_AUTH_SMOKE === "true"),
+      "auth smoke requires a seeded demo user",
+    );
+
+    await page.goto("/sign-in");
+    await page.getByLabel("Email").fill(demoEmail);
+    await page.getByLabel("Password").fill(demoPassword);
+    await page.getByRole("button", { name: /sign in/i }).click();
+
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
+    await expect(page.getByRole("link", { name: /new form/i })).toBeVisible({
+      timeout: 20_000,
+    });
   });
 });

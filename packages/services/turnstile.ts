@@ -6,9 +6,7 @@ type TurnstileVerifyResponse = {
 };
 
 export function isTurnstileRequired(env: NodeJS.ProcessEnv = process.env) {
-  return Boolean(
-    env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() && env.TURNSTILE_SECRET_KEY?.trim(),
-  );
+  return Boolean(env.TURNSTILE_SECRET_KEY?.trim());
 }
 
 export async function verifyTurnstileToken(

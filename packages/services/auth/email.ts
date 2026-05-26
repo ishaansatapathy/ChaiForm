@@ -11,6 +11,10 @@ type SendEmailInput = {
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
+function isProduction() {
+  return env.NODE_ENV === "production" || env.NODE_ENV === "prod";
+}
+
 export async function sendEmail(input: SendEmailInput): Promise<void> {
   if (isEmailConfigured()) {
     const response = await fetch(RESEND_API_URL, {
@@ -38,6 +42,14 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
     return;
   }
 
+  if (isProduction()) {
+    logger.error("Email provider is not configured in production", {
+      to: input.email,
+      subject: input.subject,
+    });
+    throw new Error("Email delivery is not configured. Please contact support.");
+  }
+
   logger.warn("DEV EMAIL — set RESEND_API_KEY to send real mail", {
     to: input.email,
     subject: input.subject,
@@ -46,5 +58,5 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
 }
 
 export function isDevEmailLogging(): boolean {
-  return !isEmailConfigured();
+  return !isEmailConfigured() && !isProduction();
 }

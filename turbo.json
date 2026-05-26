@@ -17,6 +17,7 @@
     "OPENAPI_DOCS_SECRET",
     "PUBLIC_OPENAPI_DOCS",
     "REDIS_URL",
+    "RATE_LIMIT_ALLOW_MEMORY_FALLBACK",
     "PORT",
     "CRON_SECRET",
     "DEMO_LOGIN_ENABLED",
@@ -24,6 +25,7 @@
     "DEMO_USER_PASSWORD",
     "E2E_API_URL",
     "E2E_BASE_URL",
+    "E2E_RUN_AUTH_SMOKE",
     "CI"
   ],
   "tasks": {

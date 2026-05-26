@@ -30,11 +30,15 @@ type RedisClient = {
   expire(key: string, seconds: number): Promise<unknown>;
 };
 
+function redisUrl() {
+  return process.env.REDIS_URL?.trim();
+}
+
 let redisClient: RedisClient | null = null;
 let redisInit: Promise<RedisClient | null> | null = null;
 
 async function getRedisClient(): Promise<RedisClient | null> {
-  const url = process.env.REDIS_URL?.trim();
+  const url = redisUrl();
   if (!url) return null;
 
   if (redisClient) return redisClient;
@@ -49,6 +53,22 @@ async function getRedisClient(): Promise<RedisClient | null> {
   }
 
   return redisInit;
+}
+
+export function isRedisConfigured(): boolean {
+  return Boolean(redisUrl());
+}
+
+export async function cacheIncrDistributed(key: string, ttlMs: number): Promise<number> {
+  const redis = await getRedisClient();
+  if (!redis) {
+    throw new Error("Redis is not configured");
+  }
+
+  const count = await redis.incr(key);
+  const ttlSec = Math.max(1, Math.ceil(ttlMs / 1000));
+  await redis.expire(key, ttlSec);
+  return count;
 }
 
 export async function cacheGet(key: string): Promise<string | null> {

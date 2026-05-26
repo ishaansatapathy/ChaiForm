@@ -210,8 +210,7 @@ export default function DashboardPage() {
                 : totalResponses > 0
                   ? `You have ${totalResponses} response(s), but the forms list could not load.`
                   : "The forms list could not load."}{" "}
-              Redeploy Railway so migrations run on startup, or run{" "}
-              <span className="font-mono text-amber-100/80">pnpm db:migrate</span> on Neon.
+              Please retry in a moment. If this keeps happening, contact support.
             </p>
             <button
               type="button"

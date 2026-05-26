@@ -2,7 +2,6 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { parseRespondentToken } from "@repo/services/respondent-key";
 import { checkRateLimitAsync, getClientIp, readJsonBody } from "~/lib/rate-limit";
-import { isTurnstileRequired, verifyTurnstileToken } from "~/lib/turnstile";
 import { parseSubmitFormInput } from "~/lib/validate-submit-payload";
 
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
@@ -21,29 +20,12 @@ export async function POST(request: NextRequest) {
   }
 
   const rawBody = parsed.body as Record<string, unknown>;
-  const turnstileToken = typeof rawBody.turnstileToken === "string" ? rawBody.turnstileToken : "";
-
-  if (isTurnstileRequired()) {
-    if (!turnstileToken) {
-      return NextResponse.json({ error: "Please complete the CAPTCHA check." }, { status: 400 });
-    }
-    const captchaOk = await verifyTurnstileToken(turnstileToken, ip);
-    if (!captchaOk) {
-      return NextResponse.json(
-        { error: "CAPTCHA verification failed. Please try again." },
-        { status: 400 },
-      );
-    }
-  }
-
-  const submitBody = { ...rawBody };
-  delete submitBody.turnstileToken;
-  const validated = parseSubmitFormInput(submitBody);
+  const validated = parseSubmitFormInput(rawBody);
   if (!validated.success) {
     return NextResponse.json({ error: validated.message }, { status: 400 });
   }
 
-  const { formId, answers, website, respondentKey: clientRespondentKey, idempotencyKey } = validated.data;
+  const { formId, answers, website, respondentKey: clientRespondentKey, idempotencyKey, turnstileToken } = validated.data;
 
   const cookieToken = request.cookies.get(`chaiform_rk_${formId}`)?.value;
   const signedRespondentKey = cookieToken ? parseRespondentToken(cookieToken, formId) : null;
@@ -61,6 +43,13 @@ export async function POST(request: NextRequest) {
         "content-type": "application/json",
         "accept-encoding": "identity",
         ...(cookieHeader ? { cookie: cookieHeader } : {}),
+        ...(cookieHeader ? { "x-chaiform-csrf": "1" } : {}),
+        ...(request.headers.get("origin") ? { origin: request.headers.get("origin")! } : {}),
+        ...(request.headers.get("referer") ? { referer: request.headers.get("referer")! } : {}),
+        ...(request.headers.get("x-forwarded-for")
+          ? { "x-forwarded-for": request.headers.get("x-forwarded-for")! }
+          : {}),
+        ...(request.headers.get("x-real-ip") ? { "x-real-ip": request.headers.get("x-real-ip")! } : {}),
       },
       body: JSON.stringify({
         formId,
@@ -68,6 +57,7 @@ export async function POST(request: NextRequest) {
         website,
         ...(respondentKey ? { respondentKey } : {}),
         ...(idempotencyKey ? { idempotencyKey } : {}),
+        ...(turnstileToken ? { turnstileToken } : {}),
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(12_000),

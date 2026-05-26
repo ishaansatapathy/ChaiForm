@@ -1,7 +1,7 @@
 /* eslint-disable no-control-regex */
 
 /** Strip control chars and cap length for stored submission values. */
-export function sanitizeSubmissionValue(value: string, maxLength = 5000): string {
+export function sanitizeSubmissionValue(value: string, maxLength = 10000): string {
   return value
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
     .trim()

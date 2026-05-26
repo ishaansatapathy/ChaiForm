@@ -500,6 +500,9 @@ importers:
 
   packages/trpc:
     dependencies:
+      '@repo/logger':
+        specifier: workspace:*
+        version: link:../logger
       '@repo/services':
         specifier: workspace:*
         version: link:../services

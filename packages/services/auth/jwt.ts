@@ -19,12 +19,14 @@ export type RefreshTokenPayload = {
   type: "refresh";
   emailVerified: boolean;
   role: UserRole;
+  tokenVersion: string;
 };
 
 export type AuthTokenUser = {
   id: string;
   emailVerified: boolean;
   role: UserRole;
+  tokenVersion: string;
 };
 
 export function issueAuthCookies(res: Response, user: AuthTokenUser) {
@@ -47,6 +49,7 @@ export function issueAuthCookies(res: Response, user: AuthTokenUser) {
       type: "refresh",
       emailVerified: user.emailVerified,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     } satisfies RefreshTokenPayload,
     refreshSecret(),
     { expiresIn: "30d", algorithm: "HS256" },

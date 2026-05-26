@@ -3,6 +3,7 @@ import { z } from "zod";
 import { logger } from "@repo/logger";
 import AuthService from "@repo/services/auth";
 import { toAuthError } from "@repo/services/auth/errors";
+import { sanitizeRedirectPath } from "@repo/services/auth/safe-redirect";
 import { env } from "../env";
 
 const authService = new AuthService();
@@ -11,10 +12,30 @@ export const googleAuthRouter = Router();
 
 const googleCallbackQuerySchema = z.object({
   code: z.string().min(1).optional(),
-  state: z.string().default("/dashboard"),
+  state: z.string().min(1).optional(),
   error: z.string().optional(),
   error_description: z.string().optional(),
 });
+
+function decodeOAuthState(state: string | undefined) {
+  if (!state) return null;
+  try {
+    const raw = Buffer.from(state, "base64url").toString("utf8");
+    const parsed = z
+      .object({
+        nonce: z.string().uuid(),
+        returnTo: z.string().default("/dashboard"),
+      })
+      .safeParse(JSON.parse(raw));
+    if (!parsed.success) return null;
+    return {
+      nonce: parsed.data.nonce,
+      returnTo: sanitizeRedirectPath(parsed.data.returnTo),
+    };
+  } catch {
+    return null;
+  }
+}
 
 googleAuthRouter.get("/google/callback", async (req, res) => {
   const parsed = googleCallbackQuerySchema.safeParse(req.query);
@@ -38,8 +59,23 @@ googleAuthRouter.get("/google/callback", async (req, res) => {
     );
   }
 
+  const oauthState = decodeOAuthState(state);
+  const expectedNonce = req.cookies?.chaiform_oauth_state as string | undefined;
+  res.clearCookie("chaiform_oauth_state", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: env.NODE_ENV === "production" || env.NODE_ENV === "prod",
+    path: "/",
+  });
+
+  if (!oauthState || !expectedNonce || oauthState.nonce !== expectedNonce) {
+    return res.redirect(
+      `${env.CLIENT_URL}/sign-in?error=${encodeURIComponent("Google sign-in session expired. Please try again.")}`,
+    );
+  }
+
   try {
-    const redirectUrl = await authService.handleGoogleCallback(code, res, state);
+    const redirectUrl = await authService.handleGoogleCallback(code, res, oauthState.returnTo);
     return res.redirect(redirectUrl);
   } catch (error) {
     const authError = toAuthError(error, "Google sign-in failed. Please try again.");
