@@ -239,7 +239,7 @@ function isProduction() {
 function requireOpenApiDocsAuth(req: Request, res: Response, next: NextFunction) {
   if (!isProduction()) return next();
 
-  if (env.PUBLIC_OPENAPI_DOCS === "true") return next();
+  if (env.PUBLIC_OPENAPI_DOCS !== "false") return next();
 
   const secret = env.OPENAPI_DOCS_SECRET;
   if (!secret) {
