@@ -27,6 +27,6 @@ describe("field visibility", () => {
 
     expect(getVisibleFields(fields, { role: "" })).toHaveLength(1);
     expect(getVisibleFields(fields, { role: "Engineer" })).toHaveLength(2);
-    expect(isFieldVisible(fields[1]!, { role: "Designer" }, fields)).toBe(false);
+    expect(isFieldVisible(fields[1]!, { role: "Designer" })).toBe(false);
   });
 });

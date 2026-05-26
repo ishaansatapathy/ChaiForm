@@ -108,6 +108,8 @@ function fieldValueSchema(field: FormField) {
       }
       return z.literal("true", { message: `"${field.label}" must be checked` });
     }
+    case "description":
+      return z.string().optional();
     case "text":
       schema = z.string().max(5000);
       break;

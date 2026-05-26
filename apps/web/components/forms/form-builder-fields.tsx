@@ -12,7 +12,8 @@ export type FieldType =
   | "select"
   | "rating"
   | "date"
-  | "checkbox";
+  | "checkbox"
+  | "description";
 
 export interface DraftField {
   id: string;
@@ -26,6 +27,7 @@ export interface DraftField {
     highLabel?: string;
     placeholder?: string;
     checkboxLabel?: string;
+    style?: "heading" | "body";
     validation?: {
       minLength?: number;
       maxLength?: number;
@@ -50,12 +52,14 @@ const FIELD_TYPES: FieldType[] = [
   "rating",
   "date",
   "checkbox",
+  "description",
 ];
 
 function defaultConfig(type: FieldType): DraftField["config"] {
   if (type === "select") return { options: ["Option 1", "Option 2"] };
   if (type === "rating") return { maxRating: 5, lowLabel: "Low", highLabel: "High" };
   if (type === "checkbox") return { options: ["Option 1"] };
+  if (type === "description") return { style: "body" };
   return undefined;
 }
 
@@ -382,6 +386,39 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
             </div>
           )}
 
+          {field.type === "description" && (
+            <div className="mt-4 flex gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-white/50">
+                <input
+                  type="radio"
+                  name={`desc-style-${field.id}`}
+                  checked={field.config?.style !== "heading"}
+                  onChange={() =>
+                    updateField(field.id, {
+                      config: { ...field.config, style: "body" },
+                    })
+                  }
+                  className="accent-lime-400"
+                />
+                Body text
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-white/50">
+                <input
+                  type="radio"
+                  name={`desc-style-${field.id}`}
+                  checked={field.config?.style === "heading"}
+                  onChange={() =>
+                    updateField(field.id, {
+                      config: { ...field.config, style: "heading" },
+                    })
+                  }
+                  className="accent-lime-400"
+                />
+                Heading text
+              </label>
+            </div>
+          )}
+
           {(field.type === "text" ||
             field.type === "textarea" ||
             field.type === "email" ||
@@ -497,15 +534,17 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
             </div>
           )}
 
-          <label className="mt-4 flex cursor-pointer items-center gap-2 text-xs text-white/50">
-            <input
-              type="checkbox"
-              checked={field.required}
-              onChange={(e) => updateField(field.id, { required: e.target.checked })}
-              className="accent-lime-400"
-            />
-            Required
-          </label>
+          {field.type !== "description" && (
+            <label className="mt-4 flex cursor-pointer items-center gap-2 text-xs text-white/50">
+              <input
+                type="checkbox"
+                checked={field.required}
+                onChange={(e) => updateField(field.id, { required: e.target.checked })}
+                className="accent-lime-400"
+              />
+              Required
+            </label>
+          )}
 
           {index > 0 && (
             <div className="mt-4 space-y-3 rounded-2xl border border-white/8 bg-white/2 p-4">

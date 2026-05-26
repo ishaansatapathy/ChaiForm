@@ -1,3 +1,5 @@
+/* eslint-disable no-control-regex */
+
 /** Strip control chars and cap length for stored submission values. */
 export function sanitizeSubmissionValue(value: string, maxLength = 5000): string {
   return value

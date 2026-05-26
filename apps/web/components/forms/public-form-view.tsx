@@ -89,10 +89,18 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
 
   useEffect(() => {
     if (!form.id) return;
+    // Generate a stable per-session viewer key so the server can deduplicate
+    // view counts from the same visitor refreshing within a 30-minute window.
+    const SESSION_KEY = `cf_viewer_${form.id}`;
+    let viewerKey = sessionStorage.getItem(SESSION_KEY);
+    if (!viewerKey) {
+      viewerKey = crypto.randomUUID();
+      sessionStorage.setItem(SESSION_KEY, viewerKey);
+    }
     void fetch("/api/record-view", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ formId: form.id }),
+      body: JSON.stringify({ formId: form.id, viewerKey }),
       cache: "no-store",
     }).catch(() => undefined);
   }, [form.id]);
@@ -132,6 +140,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
 
   const validateCurrentStep = () => {
     if (!currentField) return true;
+    if (currentField.type === "description") return true;
     const value = values[currentField.id] ?? "";
     if (currentField.required && isFieldEmpty(currentField, value)) {
       toast.error(`"${currentField.label}" is required`);
@@ -142,6 +151,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
 
   const validateAllVisibleSteps = () => {
     for (const field of visibleFields) {
+      if (field.type === "description") continue;
       const value = values[field.id] ?? "";
       if (field.required && isFieldEmpty(field, value)) {
         toast.error(`"${field.label}" is required`);
@@ -318,7 +328,7 @@ export function PublicFormView({ form, thankYouPath }: PublicFormViewProps) {
 
               return (
                 <Wrapper className="block space-y-3">
-                  {(currentField.type !== "checkbox" || multiCheckbox) && (
+                  {(currentField.type !== "checkbox" || multiCheckbox) && currentField.type !== "description" && (
                     <span className="text-base font-medium text-white/90 sm:text-lg">
                       {currentField.label}
                       {currentField.required && <span className={theme.accentText}> *</span>}

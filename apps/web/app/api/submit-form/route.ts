@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { turnstileToken: _ignored, ...submitBody } = rawBody;
+  const submitBody = { ...rawBody };
+  delete submitBody.turnstileToken;
   const validated = parseSubmitFormInput(submitBody);
   if (!validated.success) {
     return NextResponse.json({ error: validated.message }, { status: 400 });

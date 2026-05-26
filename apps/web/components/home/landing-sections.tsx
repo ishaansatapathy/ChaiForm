@@ -291,6 +291,19 @@ export function LandingSections({ part = "all" }: { part?: "all" | "workflow" | 
 
           </div>
 
+          <div className="mt-8 w-full max-w-md overflow-hidden rounded-[24px] border border-lime-400/20 bg-lime-400/5 p-6 backdrop-blur-md transition-all hover:border-lime-400/30 hover:bg-lime-400/10">
+            <h3 className="font-display text-lg font-bold text-white mb-2">Try the Live Demo</h3>
+            <p className="text-xs text-white/60 mb-4 leading-relaxed">
+              Experience the respondent flow right now. No account needed — just answer and submit.
+            </p>
+            <Link
+              href="/f/s/product-feedback"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-5 py-2.5 text-center font-mono text-[11px] font-black tracking-[0.2em] text-black uppercase transition-opacity hover:opacity-90"
+            >
+              Launch Demo Form
+            </Link>
+          </div>
+
         </div>
 
       </section>

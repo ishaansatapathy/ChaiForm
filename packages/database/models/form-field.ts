@@ -9,6 +9,7 @@ export type FieldConfigJson = {
   highLabel?: string;
   placeholder?: string;
   checkboxLabel?: string;
+  style?: "heading" | "body";
   validation?: {
     minLength?: number;
     maxLength?: number;

@@ -164,6 +164,22 @@ export function FormFieldInput({
           className={`${inputClassName} min-h-[120px] resize-y`}
         />
       );
+    case "description":
+      // Non-answerable section divider — rendered as static heading or body text.
+      return (
+        <div className="py-3">
+          <p
+            className={
+              field.config && "style" in field.config && field.config.style === "heading"
+                ? "font-display text-xl font-bold text-white"
+                : "text-sm leading-relaxed text-white/60"
+            }
+          >
+            {field.label}
+          </p>
+          <div className="mt-3 h-px w-full bg-white/8" />
+        </div>
+      );
     default:
       return (
         <input

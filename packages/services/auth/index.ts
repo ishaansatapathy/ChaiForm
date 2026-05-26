@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { db, and, eq, gt } from "@repo/database";
 import { usersTable, type SelectUser } from "@repo/database/schema";
 import { logger } from "@repo/logger";
+import { cacheGet, cacheSet, cacheIncr } from "../cache/kv-store";
 import type { Request, Response } from "express";
 
 import { env } from "../env";
@@ -222,11 +223,31 @@ class AuthService {
 
   public async signIn(input: SignInInput, res: Response): Promise<SignInOutput> {
     const sanitizedEmail = sanitizeEmail(input.email);
+
+    // Account lockout: block after 5 consecutive failures within 15 minutes.
+    const lockKey = `auth:fail:${sanitizedEmail}`;
+    const lockCountRaw = await cacheGet(lockKey);
+    const lockCount = lockCountRaw ? Number.parseInt(lockCountRaw, 10) : 0;
+    const MAX_ATTEMPTS = 5;
+    const LOCK_WINDOW_MS = 15 * 60 * 1000;
+
+    if (lockCount >= MAX_ATTEMPTS) {
+      throw new AuthError(
+        "FORBIDDEN",
+        "Account temporarily locked due to too many failed attempts. Try again in 15 minutes.",
+      );
+    }
+
     const user = await this.findUserByEmail(sanitizedEmail);
 
     if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
+      // Increment failure counter; TTL extends on each failure within the window.
+      await cacheIncr(lockKey, LOCK_WINDOW_MS);
       throw new AuthError("UNAUTHORIZED", "Invalid email or password");
     }
+
+    // Successful sign-in — clear the failure counter.
+    await cacheSet(lockKey, "0", LOCK_WINDOW_MS);
 
     assertEmailVerified(user);
 

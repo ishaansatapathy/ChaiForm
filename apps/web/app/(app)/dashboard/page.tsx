@@ -23,6 +23,16 @@ export default function DashboardPage() {
   const [pages, setPages] = useState<FormListItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null | undefined>(undefined);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [dismissed, setDismissed] = useState(true);
+
+  useEffect(() => {
+    setDismissed(localStorage.getItem("cf_onboarding_dismissed") === "true");
+  }, []);
+
+  const handleDismissOnboarding = () => {
+    localStorage.setItem("cf_onboarding_dismissed", "true");
+    setDismissed(true);
+  };
 
   const {
     data: formsPage,
@@ -95,6 +105,63 @@ export default function DashboardPage() {
           Your forms are ready to deploy.
         </p>
       </div>
+
+      {formsCount === 0 && !dismissed && (
+        <div className="animate-in fade-in slide-in-from-top-4 mb-10 overflow-hidden rounded-[32px] border border-lime-400/20 bg-lime-400/5 p-6 backdrop-blur-md">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-display text-xl font-bold text-white mb-2">Getting Started Checklist</h3>
+              <p className="text-xs text-white/60 mb-6 max-w-xl leading-relaxed">
+                Welcome to ChaiForm! Complete these 3 quick steps to start gathering responses and analyzing data.
+              </p>
+            </div>
+            <button
+              onClick={handleDismissOnboarding}
+              className="rounded-full border border-white/10 p-1.5 text-white/40 hover:border-white/20 hover:text-white transition-colors"
+              aria-label="Dismiss onboarding"
+            >
+              <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="flex gap-4">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-lime-400/10 font-mono text-xs font-bold text-lime-400">
+                1
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Create a Form</p>
+                <p className="mt-1 text-xs text-white/50 leading-relaxed">
+                  Click the button below to add fields and customize your form theme.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-lime-400/10 font-mono text-xs font-bold text-lime-400">
+                2
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Share the Link</p>
+                <p className="mt-1 text-xs text-white/50 leading-relaxed">
+                  Copy the public or unlisted URL and send it to your respondents.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-lime-400/10 font-mono text-xs font-bold text-lime-400">
+                3
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">See Responses</p>
+                <p className="mt-1 text-xs text-white/50 leading-relaxed">
+                  View instant analytics and detailed answers as soon as they roll in.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-12 flex flex-wrap items-end justify-between gap-6 border-b border-white/5 pb-10">
         <div>

@@ -3,9 +3,9 @@ import { type NextRequest, NextResponse } from "next/server";
 const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
 export async function POST(request: NextRequest) {
-  let body: { formId?: string };
+  let body: { formId?: string; viewerKey?: string };
   try {
-    body = (await request.json()) as { formId?: string };
+    body = (await request.json()) as { formId?: string; viewerKey?: string };
   } catch {
     return NextResponse.json({ ok: true });
   }
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         "content-type": "application/json",
         "accept-encoding": "identity",
       },
-      body: JSON.stringify({ formId: body.formId }),
+      body: JSON.stringify({ formId: body.formId, viewerKey: body.viewerKey }),
       cache: "no-store",
       signal: AbortSignal.timeout(8_000),
     });

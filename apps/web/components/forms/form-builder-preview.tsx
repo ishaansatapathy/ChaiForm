@@ -68,10 +68,12 @@ export function FormBuilderPreview({ title, description, themeId, fields }: Form
             <p className="font-mono text-[9px] tracking-[0.22em] text-white/35 uppercase">
               Question {step + 1} of {visibleFields.length}
             </p>
-            <p className="text-sm font-medium text-white/80">
-              {previewField.label}
-              {previewField.required && <span className={theme.accentText}> *</span>}
-            </p>
+            {previewField.type !== "description" && (
+              <p className="text-sm font-medium text-white/80">
+                {previewField.label}
+                {previewField.required && <span className={theme.accentText}> *</span>}
+              </p>
+            )}
             <FormFieldInput
               field={previewField as Parameters<typeof FormFieldInput>[0]["field"]}
               theme={theme}
