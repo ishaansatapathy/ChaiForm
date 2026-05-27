@@ -35,6 +35,18 @@ test.describe("ChaiForm smoke", () => {
     expect(body.healthy).toBe(true);
   });
 
+  test("API readiness endpoint reports checks", async ({ request }) => {
+    const response = await request.get(`${apiURL}/ready`);
+    expect([200, 503]).toContain(response.status());
+    const body = (await response.json()) as {
+      ready?: boolean;
+      checks?: Record<string, { ok: boolean; message: string }>;
+    };
+    expect(typeof body.ready).toBe("boolean");
+    expect(body.checks?.database).toBeTruthy();
+    expect(body.checks?.coreEnv).toBeTruthy();
+  });
+
   test("demo creator can sign in and reach dashboard", async ({ page }) => {
     test.skip(
       !(process.env.CI || process.env.E2E_RUN_AUTH_SMOKE === "true"),

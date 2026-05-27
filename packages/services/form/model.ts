@@ -305,6 +305,54 @@ export function refineSubmitFormInput(input: z.infer<typeof submitFormInputBaseS
 
 export const submitFormInputSchema = submitFormInputBaseSchema;
 
+type ParseSuccess<T> = { success: true; data: T };
+type ParseFailure = { success: false; message: string };
+type ParseResult<T> = ParseSuccess<T> | ParseFailure;
+
+function parseFailure(message: string | undefined, fallback: string): ParseFailure {
+  return { success: false, message: message ?? fallback };
+}
+
+export function parseCreateFormInput(input: unknown): ParseResult<CreateFormInput> {
+  const parsed = createFormInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return parseFailure(parsed.error.issues[0]?.message, "Invalid form data");
+  }
+  try {
+    return { success: true, data: refineCreateFormInput(parsed.data) };
+  } catch (error) {
+    return parseFailure(error instanceof Error ? error.message : undefined, "Invalid form data");
+  }
+}
+
+export function parseUpdateFormInput(input: unknown): ParseResult<UpdateFormInput> {
+  const parsed = updateFormInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return parseFailure(parsed.error.issues[0]?.message, "Invalid form data");
+  }
+  try {
+    return { success: true, data: refineUpdateFormInput(parsed.data) };
+  } catch (error) {
+    return parseFailure(error instanceof Error ? error.message : undefined, "Invalid form data");
+  }
+}
+
+export function parseSubmitFormInput(input: unknown): ParseResult<SubmitFormInput> {
+  const normalized =
+    typeof input === "object" && input !== null
+      ? { website: "", ...(input as Record<string, unknown>) }
+      : input;
+  const parsed = submitFormInputSchema.safeParse(normalized);
+  if (!parsed.success) {
+    return parseFailure(parsed.error.issues[0]?.message, "Invalid submission");
+  }
+  try {
+    return { success: true, data: refineSubmitFormInput(parsed.data) };
+  } catch (error) {
+    return parseFailure(error instanceof Error ? error.message : undefined, "Invalid submission");
+  }
+}
+
 export const submissionOutputSchema = z.object({
   id: z.string().uuid(),
   formId: z.string().uuid(),

@@ -12,6 +12,8 @@ import {
   formFunnelOutputSchema,
   submissionsOverTimeInputSchema,
   submissionsOverTimeOutputSchema,
+  topFormsInputSchema,
+  topFormsOutputSchema,
 } from "@repo/services/analytics/model";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -116,6 +118,21 @@ export const analyticsRouter = router({
     .query(async ({ ctx, input }) => {
       try {
         return await analyticsService.getFormFunnel(ctx.user.id, input.formId, ctx.user.role);
+      } catch (error) {
+        mapError(error);
+      }
+    }),
+
+  topForms: verifiedProcedure
+    .meta({ openapi: { method: "GET", path: getPath("/top-forms"), tags: TAGS, protect: true } })
+    .input(topFormsInputSchema)
+    .output(topFormsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await analyticsService.getTopForms(
+          ctx.user.id,
+          { limit: input.limit, visibility: input.visibility },
+        );
       } catch (error) {
         mapError(error);
       }

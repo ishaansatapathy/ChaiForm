@@ -86,3 +86,23 @@ export const formFunnelOutputSchema = z.object({
     }),
   ),
 });
+
+export const topFormsInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(20).default(5),
+    visibility: z.enum(["public", "unlisted", "draft"]).optional(),
+  })
+  .strict();
+
+export const topFormsOutputSchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.string().uuid(),
+      title: z.string(),
+      visibility: z.enum(["public", "unlisted", "draft"]),
+      submissionCount: z.number().int(),
+      viewCount: z.number().int(),
+      completionRate: z.number(),
+    }),
+  ),
+});
