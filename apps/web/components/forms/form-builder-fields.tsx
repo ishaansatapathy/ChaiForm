@@ -70,9 +70,8 @@ function hasCustomValidation(field: DraftField): boolean {
 
 function removeValidationFromConfig(field: DraftField): DraftField["config"] {
   if (!field.config || !("validation" in field.config)) return field.config;
-  const { validation: _validation, ...rest } = field.config as DraftField["config"] & {
-    validation?: unknown;
-  };
+  const rest = { ...field.config };
+  delete rest.validation;
   return Object.keys(rest).length > 0 ? rest : undefined;
 }
 
