@@ -1,6 +1,7 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { OpenApiMeta } from "trpc-to-openapi";
 import { AuthError } from "@repo/services/auth/errors";
+import { logger } from "@repo/logger";
 import { ZodError } from "zod";
 
 import { createContext } from "./context";
@@ -27,9 +28,34 @@ export const tRPCContext = initTRPC
 
 export const router = tRPCContext.router;
 
-export const publicProcedure = tRPCContext.procedure;
+const observabilityMiddleware = tRPCContext.middleware(async ({ path, type, ctx, next }) => {
+  const started = Date.now();
+  try {
+    const result = await next();
+    logger.debug("tRPC procedure completed", {
+      path,
+      type,
+      requestId: ctx.requestId,
+      durationMs: Date.now() - started,
+    });
+    return result;
+  } catch (error) {
+    logger.warn("tRPC procedure failed", {
+      path,
+      type,
+      requestId: ctx.requestId,
+      durationMs: Date.now() - started,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+});
 
-export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
+const baseProcedure = tRPCContext.procedure.use(observabilityMiddleware);
+
+export const publicProcedure = baseProcedure;
+
+export const protectedProcedure = baseProcedure.use(({ ctx, next }) => {
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Not authenticated" });
   }

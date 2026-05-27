@@ -645,17 +645,28 @@ class AuthService {
         }
 
         user = created;
-      } else if (user.authProvider === "local" && !user.providerId) {
-        await db
-          .update(usersTable)
-          .set({
-            authProvider: "google",
-            providerId: payload.sub,
-            profileImageUrl: user.profileImageUrl ?? payload.picture ?? null,
-            emailVerified: user.emailVerified || (payload.email_verified ?? false),
-          })
-          .where(eq(usersTable.id, user.id));
-        user = (await this.findUserById(user.id))!;
+      } else if (user.authProvider === "local") {
+        throw new AuthError(
+          "CONFLICT",
+          "An account with this email already exists. Sign in with your password first.",
+        );
+      } else if (user.authProvider === "google") {
+        if (user.providerId && user.providerId !== payload.sub) {
+          throw new AuthError("CONFLICT", "This email is linked to a different Google account.");
+        }
+        if (!user.providerId) {
+          await db
+            .update(usersTable)
+            .set({
+              providerId: payload.sub,
+              profileImageUrl: user.profileImageUrl ?? payload.picture ?? null,
+              emailVerified: user.emailVerified || (payload.email_verified ?? false),
+            })
+            .where(eq(usersTable.id, user.id));
+          user = (await this.findUserById(user.id))!;
+        }
+      } else {
+        throw new AuthError("CONFLICT", "Sign in with your existing account method for this email.");
       }
 
       if (!user) {

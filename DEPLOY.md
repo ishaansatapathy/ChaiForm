@@ -79,9 +79,10 @@ Verify: `https://chaiform-production.up.railway.app/health` → `{ "healthy": tr
 | `JWT_REFRESH_SECRET` | **same value as Railway** (recommended) |
 | `TURNSTILE_SECRET_KEY` | same as Railway *(if using CAPTCHA)* |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare site key *(if using CAPTCHA)* |
-| `DEMO_LOGIN_ENABLED` | `true` for judge/demo one-click login |
-| `DEMO_USER_EMAIL` | `demo@chaiform.dev` |
-| `DEMO_USER_PASSWORD` | `DemoPass123!` or your `SEED_DEMO_PASSWORD` |
+| `DEMO_LOGIN_ENABLED` | `false` in production; `true` only for judge/demo environments |
+| `DEMO_USER_EMAIL` | Seeded creator email (from `SEED_USER_EMAIL`) |
+| `DEMO_USER_PASSWORD` | Seeded password (from `SEED_DEMO_PASSWORD`) |
+| `REQUIRE_TURNSTILE_IN_PROD` | `true` to reject public submits when `TURNSTILE_SECRET_KEY` is unset |
 
 5. Deploy → copy URL (e.g. `https://chaiform.vercel.app`)
 
@@ -108,23 +109,18 @@ Redeploy Railway if you changed env vars.
 
 - [ ] `https://chaiform-production.up.railway.app/health` → `{ "healthy": true }`
 - [ ] `https://YOUR-APP.vercel.app` loads landing page
-- [ ] Sign in: `demo@chaiform.dev` / `DemoPass123!` (after seed)
+- [ ] Sign in with seeded credentials (after `pnpm db:seed` on Neon)
 - [ ] Create form → dashboard shows it
 - [ ] Public form submit works
 - [ ] 2FA enable → logout → login asks for OTP
 
 ---
 
-## Demo credentials (judges)
+## Judge demo (optional)
 
-After `pnpm db:seed` against production Neon:
-
-| Field | Value |
-|-------|-------|
-| Email | `demo@chaiform.dev` |
-| Password | `DemoPass123!` |
-
-Add live URLs to README before submission.
+1. Run `pnpm db:seed` against production Neon with `SEED_USER_EMAIL` / `SEED_DEMO_PASSWORD`.
+2. On Vercel, set `DEMO_LOGIN_ENABLED=true` and matching `DEMO_USER_*` vars for one-click login.
+3. Keep demo credentials out of git — share privately with judges if needed.
 
 ---
 

@@ -8,14 +8,14 @@ Live URLs:
 | API + Scalar docs | https://chaiform-production.up.railway.app/docs |
 | Sample public form | https://chai-form-web.vercel.app/f/s/product-feedback |
 
-Demo login: `demo@chaiform.dev` / `DemoPass123!`
+Sign in with the seeded creator account (credentials shared separately) or use **Try demo account** when `DEMO_LOGIN_ENABLED=true` on Vercel.
 
 ---
 
 ## 1. Sign in (10s)
 
 1. Open https://chai-form-web.vercel.app/sign-in
-2. Sign in with demo credentials
+2. Sign in (email/password or Google OAuth)
 3. Land on **Dashboard** — seeded forms and submission counts
 
 ## 2. Create & publish a form (15s)
@@ -39,21 +39,6 @@ Demo login: `demo@chaiform.dev` / `DemoPass123!`
 3. Click a field for breakdown stats
 4. Export **CSV**
 
-## 5. API docs (10s)
+## 5. API docs (5s)
 
-1. Open https://chaiform-production.up.railway.app/docs
-2. Scalar UI shows **OpenAPI** endpoints (forms, auth, analytics)
-3. Try **GET /health** — confirms API is live
-
----
-
-## Rubric highlights
-
-- **Monorepo:** Turborepo + pnpm workspaces (`apps/api`, `apps/web`, `packages/*`)
-- **Auth:** Email/password, Google OAuth, 2FA, JWT cookies
-- **Builder:** 8 field types, themes, drag reorder, conditional visibility
-- **Validation:** Zod strict schemas server + client
-- **tRPC:** Typed routers; save/submit via `forms.create` / `forms.submit`
-- **Drizzle:** Migrations + form versioning + soft delete
-- **Public submit:** Rate limits, honeypot, idempotency, Turnstile CAPTCHA
-- **Analytics:** Charts, field stats, CSV export
+Open https://chaiform-production.up.railway.app/docs — Scalar UI with cookie auth + `forms.submit` example.

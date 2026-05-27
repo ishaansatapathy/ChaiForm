@@ -202,8 +202,22 @@ function buildOpenApiDocument() {
     document.info = {
       ...document.info,
       description:
-        "ChaiForm REST API generated from tRPC. Authenticated routes use the `jwt` httpOnly cookie after POST /api/authentication/sign-in.",
+        "ChaiForm REST API generated from tRPC. Authenticated routes use the `jwt` httpOnly cookie after POST /api/authentication/sign-in. Google OAuth (browser): GET {CLIENT_URL}/api-auth/google → Google consent → GET {CLIENT_URL}/api-auth/google/callback.",
     };
+
+    const oauthPaths = document.paths ?? {};
+    oauthPaths["/authentication/google-oauth"] = {
+      get: {
+        tags: ["Authentication"],
+        summary: "Google OAuth (web redirect flow)",
+        description:
+          "Implemented on the Next.js app, not this Express host. Start: GET {CLIENT_URL}/api-auth/google. Callback: GET {CLIENT_URL}/api-auth/google/callback. Configure GOOGLE_OAUTH_* on Railway and matching redirect URI in Google Cloud Console.",
+        responses: {
+          "302": { description: "Redirect to Google consent or back to sign-in" },
+        },
+      },
+    };
+    document.paths = oauthPaths;
 
     document.servers = [{ url: env.BASE_URL.concat("/api"), description: "ChaiForm API" }];
 

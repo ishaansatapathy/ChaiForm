@@ -26,6 +26,7 @@ function memoryIncr(key: string, ttlMs: number): number {
 type RedisClient = {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, options?: { EX?: number }): Promise<unknown>;
+  del(key: string): Promise<unknown>;
   incr(key: string): Promise<number>;
   expire(key: string, seconds: number): Promise<unknown>;
 };
@@ -81,6 +82,18 @@ export async function cacheGet(key: string): Promise<string | null> {
     }
   }
   return memoryGet(key);
+}
+
+export async function cacheDelete(key: string): Promise<void> {
+  memory.delete(key);
+  const redis = await getRedisClient();
+  if (redis) {
+    try {
+      await redis.del(key);
+    } catch {
+      // Best-effort invalidation.
+    }
+  }
 }
 
 export async function cacheSet(key: string, value: string, ttlMs: number): Promise<void> {

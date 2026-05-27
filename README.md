@@ -63,14 +63,10 @@ chaiform/
 | Analytics | Summary, trend chart, field breakdown, **full CSV export**, flow chart, pagination |
 | Scalar | https://chaiform-production.up.railway.app/docs |
 
-## Demo credentials (for judges)
+## Judge / demo access (local or staging only)
 
-After `pnpm db:seed`:
-
-| Field | Value |
-|-------|-------|
-| Email | `demo@chaiform.dev` |
-| Password | `DemoPass123!` |
+After `pnpm db:seed`, sign in with the credentials you set in `.env` (`SEED_USER_EMAIL`, `SEED_DEMO_PASSWORD`).  
+For one-click demo on Vercel, enable `DEMO_LOGIN_ENABLED=true` and set `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD` — never commit real passwords to the repo.
 
 Quick links after seed:
 
@@ -120,7 +116,7 @@ pnpm db:migrate
 pnpm db:seed   # optional — creates demo user, themed sample forms, submissions + views
 ```
 
-Set `SEED_USER_EMAIL` in `.env` to the email you signed up with (defaults to `demo@chaiform.dev`).
+Set `SEED_USER_EMAIL` and `SEED_DEMO_PASSWORD` in `.env` before running `pnpm db:seed`.
 
 ### 4. Dev
 
@@ -169,8 +165,6 @@ See **[DEPLOY.md](./DEPLOY.md)** for **Neon + Railway (API) + Vercel (web)** set
 | **API health** | https://chaiform-production.up.railway.app/health |
 | **Scalar API docs** | https://chaiform-production.up.railway.app/docs |
 | **OpenAPI JSON** | https://chaiform-production.up.railway.app/openapi.json |
-
-**Demo login:** `demo@chaiform.dev` / `DemoPass123!` (run `pnpm db:seed` on production Neon once; user is email-verified in seed)
 
 **Sample public form:** https://chai-form-web.vercel.app/f/s/product-feedback
 

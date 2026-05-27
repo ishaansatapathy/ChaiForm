@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import type { FormFieldInput } from "@repo/services/form/model";
+
+/** Builder draft shape — validated on save via `createFormInputSchema`. */
+export type DraftField = FormFieldInput;
 
 export type FieldType =
   | "text"
@@ -14,34 +18,6 @@ export type FieldType =
   | "date"
   | "checkbox"
   | "description";
-
-export interface DraftField {
-  id: string;
-  label: string;
-  type: FieldType;
-  required: boolean;
-  config?: {
-    options?: string[];
-    maxRating?: number;
-    lowLabel?: string;
-    highLabel?: string;
-    placeholder?: string;
-    checkboxLabel?: string;
-    style?: "heading" | "body";
-    validation?: {
-      minLength?: number;
-      maxLength?: number;
-      pattern?: string;
-      minValue?: number;
-      maxValue?: number;
-    };
-    showWhen?: {
-      fieldId: string;
-      operator: "eq" | "neq";
-      value: string;
-    };
-  };
-}
 
 const FIELD_TYPES: FieldType[] = [
   "text",
@@ -56,10 +32,10 @@ const FIELD_TYPES: FieldType[] = [
 ];
 
 function defaultConfig(type: FieldType): DraftField["config"] {
-  if (type === "select") return { options: ["Option 1", "Option 2"] };
-  if (type === "rating") return { maxRating: 5, lowLabel: "Low", highLabel: "High" };
-  if (type === "checkbox") return { options: ["Option 1"] };
-  if (type === "description") return { style: "body" };
+  if (type === "select") return { options: ["Option 1", "Option 2"] } as DraftField["config"];
+  if (type === "rating") return { maxRating: 5, lowLabel: "Low", highLabel: "High" } as DraftField["config"];
+  if (type === "checkbox") return { options: ["Option 1"] } as DraftField["config"];
+  if (type === "description") return { style: "body" } as DraftField["config"];
   return undefined;
 }
 
@@ -74,9 +50,11 @@ function numberOrUndefined(value: string) {
 }
 
 function getCheckboxOptions(field: DraftField): string[] {
-  const options = field.config?.options?.map((option) => option.trim()).filter(Boolean);
+  if (field.type !== "checkbox") return ["Option 1"];
+  const config = field.config;
+  const options = config?.options?.map((option: string) => option.trim()).filter(Boolean);
   if (options?.length) return options;
-  if (field.config?.checkboxLabel?.trim()) return [field.config.checkboxLabel];
+  if (config?.checkboxLabel?.trim()) return [config.checkboxLabel];
   return ["Option 1"];
 }
 
@@ -133,7 +111,9 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
   };
 
   const updateField = (id: string, patch: Partial<DraftField>) => {
-    onChange(fields.map((field) => (field.id === id ? { ...field, ...patch } : field)));
+    onChange(
+      fields.map((field) => (field.id === id ? ({ ...field, ...patch } as DraftField) : field)),
+    );
   };
 
   const moveField = (index: number, direction: -1 | 1) => {
@@ -232,7 +212,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                   updateField(field.id, {
                     type,
                     config: defaultConfig(type),
-                  })
+                  } as Partial<DraftField>)
                 }
                 className={`rounded-full px-3 py-1 text-[10px] font-bold tracking-wide uppercase ${
                   field.type === type ? "bg-lime-400 text-black" : "border border-white/10 text-white/45"
@@ -512,6 +492,28 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                   </label>
                 </div>
               )}
+              {(field.type === "text" || field.type === "textarea" || field.type === "email") && (
+                <label className="block text-[10px] text-white/40">
+                  Regex pattern (optional)
+                  <input
+                    type="text"
+                    value={field.config?.validation?.pattern ?? ""}
+                    placeholder="^[A-Za-z0-9]+$"
+                    onChange={(event) =>
+                      updateField(field.id, {
+                        config: {
+                          ...field.config,
+                          validation: {
+                            ...field.config?.validation,
+                            pattern: emptyToUndefined(event.target.value),
+                          },
+                        },
+                      })
+                    }
+                    className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 font-mono text-xs text-white outline-none"
+                  />
+                </label>
+              )}
             </div>
           )}
 
@@ -532,13 +534,18 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
               <label className="flex cursor-pointer items-center gap-2 text-xs text-white/50">
                 <input
                   type="checkbox"
-                  checked={Boolean(field.config?.showWhen)}
+                  checked={Boolean(
+                    field.config && "showWhen" in field.config && field.config.showWhen,
+                  )}
                   onChange={(event) => {
                     if (!event.target.checked) {
-                      const nextConfig = { ...field.config };
+                      const nextConfig = { ...(field.config ?? {}) } as Record<string, unknown>;
                       delete nextConfig.showWhen;
                       updateField(field.id, {
-                        config: Object.keys(nextConfig).length > 0 ? nextConfig : defaultConfig(field.type),
+                        config:
+                          Object.keys(nextConfig).length > 0
+                            ? (nextConfig as DraftField["config"])
+                            : defaultConfig(field.type),
                       });
                       return;
                     }
@@ -560,7 +567,7 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                 Conditional — show when another answer matches
               </label>
 
-              {field.config?.showWhen && (
+              {field.config && "showWhen" in field.config && field.config.showWhen && (
                 <div className="grid gap-2 sm:grid-cols-3">
                   <label className="block text-[10px] text-white/40">
                     When field

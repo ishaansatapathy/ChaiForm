@@ -6,8 +6,12 @@ export default function PrivacyPage() {
         <p className="text-white/60">Last updated: May 2026</p>
         <section className="space-y-3 text-sm leading-relaxed text-white/70">
           <p>
-            ChaiForm stores account information (name, email, authentication metadata) and form data you
-            create, including submissions collected through your published forms.
+            ChaiForm stores account information (name, email, authentication metadata) and form data
+            you create, including submissions collected through your published forms.
+          </p>
+          <p>
+            When you sign in with Google, we receive your email address, name, and profile image URL
+            from Google solely to authenticate you and personalize your account.
           </p>
           <p>
             Submission data is accessible only to the form owner through authenticated dashboard and
@@ -18,8 +22,11 @@ export default function PrivacyPage() {
             email providers. Cookies are used for session management with httpOnly JWT tokens.
           </p>
           <p>
-            For data deletion requests, delete your forms from the dashboard or contact your platform
-            administrator.
+            To request account or data deletion, delete your forms from the dashboard or email{" "}
+            <a href="mailto:support@chaiform.dev" className="text-lime-400 hover:text-lime-300">
+              support@chaiform.dev
+            </a>
+            .
           </p>
         </section>
         <a href="/sign-in" className="inline-block text-sm text-lime-400 hover:text-lime-300">

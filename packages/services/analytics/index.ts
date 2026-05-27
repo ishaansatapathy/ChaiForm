@@ -12,7 +12,7 @@ import { FormError } from "../form";
 import type { FormField } from "../form/model";
 import { getVisibleFields } from "../form/visibility";
 import type { UserRole } from "../auth/roles";
-import { cacheGet, cacheSet } from "../cache/kv-store";
+import { cacheDelete, cacheGet, cacheSet } from "../cache/kv-store";
 
 function completionRate(submissions: number, views: number) {
   if (views <= 0) return submissions > 0 ? 100 : 0;
@@ -49,6 +49,13 @@ function mapFieldForVisibility(row: typeof formFieldsTable.$inferSelect): FormFi
 }
 
 const SUMMARY_CACHE_TTL_MS = 30_000;
+
+export async function invalidateAnalyticsSummaryCache(userId: string, formId?: string) {
+  await cacheDelete(`analytics:summary:${userId}:all`);
+  if (formId) {
+    await cacheDelete(`analytics:summary:${userId}:${formId}`);
+  }
+}
 type SummaryResult = {
   totalForms: number;
   totalSubmissions: number;
