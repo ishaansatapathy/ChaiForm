@@ -141,10 +141,18 @@ export const submissionPaginationInputSchema = z
   })
   .strict();
 
+/** Thrown by refine* helpers — mapped to tRPC BAD_REQUEST in forms router. */
+export class FormInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FormInputError";
+  }
+}
+
 function assertUniqueFieldIds(fields: { id: string }[]) {
   const ids = fields.map((field) => field.id);
   if (new Set(ids).size !== ids.length) {
-    throw new Error("Duplicate field IDs are not allowed");
+    throw new FormInputError("Duplicate field IDs are not allowed");
   }
 }
 
@@ -155,7 +163,7 @@ function assertUniqueOptions(fields: z.infer<typeof formFieldInputSchema>[]) {
     if (!options?.length) continue;
     const normalized = options.map((option) => option.trim().toLowerCase());
     if (new Set(normalized).size !== normalized.length) {
-      throw new Error(`"${field.label}" has duplicate options`);
+      throw new FormInputError(`"${field.label}" has duplicate options`);
     }
   }
 }
@@ -287,11 +295,11 @@ export const submitFormInputBaseSchema = z
 
 export function refineSubmitFormInput(input: z.infer<typeof submitFormInputBaseSchema>) {
   if (input.website.length > 0) {
-    throw new Error("Submission rejected");
+    throw new FormInputError("Submission rejected");
   }
   const ids = input.answers.map((answer) => answer.fieldId);
   if (new Set(ids).size !== ids.length) {
-    throw new Error("Duplicate field answers are not allowed");
+    throw new FormInputError("Duplicate field answers are not allowed");
   }
   return input;
 }

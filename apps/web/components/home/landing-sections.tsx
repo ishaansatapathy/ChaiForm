@@ -65,7 +65,7 @@ const BEN10_PRICING = [
     cadence: "per month",
     signal: "Scale mode",
     copy: "For high-volume campaigns, launches, communities, and events.",
-    features: ["Advanced analytics", "Priority limits", "Audit-ready response ops"],
+    features: ["Advanced analytics", "Priority limits", "Retention + export controls"],
   },
 ];
 
@@ -293,10 +293,6 @@ export function LandingSections({ part = "all" }: { part?: "all" | "workflow" | 
               </h2>
 
             </div>
-
-            <p className="landing-body max-w-md font-mono text-sm leading-relaxed">
-              Judge-friendly plans styled like a real SaaS pricing section. No payment integration required.
-            </p>
 
           </div>
 

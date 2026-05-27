@@ -92,7 +92,7 @@ async function validateRefreshSession(request: NextRequest): Promise<NextRespons
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const session = await resolveSession(request);
 

@@ -84,8 +84,8 @@ function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-/** Wake Render free-tier instance before heavy mutations (quick ping only). */
-export async function wakeRenderApi(maxAttempts = 2): Promise<boolean> {
+/** Ping API before heavy mutations (helps after deploy or cold upstream). */
+export async function wakeApi(maxAttempts = 2): Promise<boolean> {
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       const response = await fetch(`${API_BASE}/health`, {
@@ -161,7 +161,7 @@ async function fetchTrpcMutation<T>(
 }
 
 export async function createFormOnServer(input: FormCreateInput) {
-  await wakeRenderApi();
+  await wakeApi();
   const cookieStore = await cookies();
   const cookieHeader = buildCookieHeader(cookieStore);
   if (!cookieHeader.includes("jwt") && !cookieHeader.includes("jwt_refresh")) {
@@ -175,7 +175,7 @@ export async function createFormOnServer(input: FormCreateInput) {
 }
 
 export async function updateFormOnServer(input: FormUpdateInput) {
-  await wakeRenderApi();
+  await wakeApi();
   const cookieStore = await cookies();
   const cookieHeader = buildCookieHeader(cookieStore);
   if (!cookieHeader.includes("jwt") && !cookieHeader.includes("jwt_refresh")) {
