@@ -54,7 +54,7 @@ chaiform/
 | Form builder | Create/edit/delete, 7 field types, **themes picker**, **live preview**, one-question public flow |
 | Pricing | Ben 10 themed fake pricing section on the landing page |
 | Public explore | `/explore` lists public forms only |
-| Email notifications | Creator notified on new submission (Resend) |
+| Email notifications | Creator notified on new submission (Brevo) |
 | Spam protection | Rate limits + **required honeypot** on public submit |
 | Zod validation | Field schemas + dynamic submission validator + duplicate/bounds checks |
 | tRPC | Type-safe `forms`, `analytics`, `auth` routers + structured Zod errors |

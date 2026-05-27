@@ -7,7 +7,7 @@ import {
 import {
   forgotPasswordInputSchema,
   resetPasswordInputBaseSchema,
-  resendVerificationEmailInputSchema,
+  sendVerificationEmailAgainInputSchema,
   setupProfileInputSchema,
   signInInputSchema,
   signUpInputBaseSchema,
@@ -149,25 +149,25 @@ export const authRouter = router({
       }
     }),
 
-  resendVerificationEmail: publicProcedure
-    .meta({ openapi: { method: "POST", path: getPath("/resend-verification-email"), tags: TAGS } })
-    .input(resendVerificationEmailInputSchema)
+  sendVerificationEmailAgain: publicProcedure
+    .meta({ openapi: { method: "POST", path: getPath("/send-verification-email-again"), tags: TAGS } })
+    .input(sendVerificationEmailAgainInputSchema)
     .output(messageOutputSchema)
     .mutation(async ({ input }) => {
       try {
-        return await authService.resendVerificationEmail(input);
+        return await authService.sendVerificationEmailAgain(input);
       } catch (error) {
         mapAuthError(error);
       }
     }),
 
-  resendVerification: protectedProcedure
-    .meta({ openapi: { method: "POST", path: getPath("/resend-verification"), tags: TAGS, protect: true } })
+  sendVerificationAgain: protectedProcedure
+    .meta({ openapi: { method: "POST", path: getPath("/send-verification-again"), tags: TAGS, protect: true } })
     .input(zodUndefinedModel)
     .output(messageOutputSchema)
     .mutation(async ({ ctx }) => {
       try {
-        return await authService.resendVerification(ctx.user.id);
+        return await authService.sendVerificationAgain(ctx.user.id);
       } catch (error) {
         mapAuthError(error);
       }
