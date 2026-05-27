@@ -8,14 +8,14 @@ Live URLs:
 | API + Scalar docs | https://chaiform-production.up.railway.app/docs |
 | Sample public form | https://chai-form-web.vercel.app/f/s/product-feedback |
 
-Sign in with the seeded creator account (credentials shared separately) or use **Try demo account** when `DEMO_LOGIN_ENABLED=true` on Vercel.
+Demo login: `demo@chaiform.dev` / `DemoPass123!`
 
 ---
 
 ## 1. Sign in (10s)
 
 1. Open https://chai-form-web.vercel.app/sign-in
-2. Sign in (email/password or Google OAuth)
+2. Sign in with demo credentials (or click **Try demo account**)
 3. Land on **Dashboard** — seeded forms and submission counts
 
 ## 2. Create & publish a form (15s)

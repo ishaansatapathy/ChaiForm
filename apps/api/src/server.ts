@@ -116,9 +116,9 @@ function enrichOpenApiExamples(document: OpenApiDocumentWithPaths) {
     document,
     "/authentication/sign-in",
     "post",
-    "creatorSignIn",
-    "Creator sign-in",
-    { email: "creator@example.com", password: "your-password" },
+    "demoSignIn",
+    "Demo creator sign-in",
+    { email: "demo@chaiform.dev", password: "DemoPass123!" },
   );
 
   addJsonRequestExample(

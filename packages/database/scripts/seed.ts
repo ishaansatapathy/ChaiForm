@@ -465,7 +465,6 @@ applyDemoConditionals();
 
 async function ensureDemoUser(email: string) {
   const demoPassword = process.env.SEED_DEMO_PASSWORD ?? "DemoPass123!";
-  const demoRole = process.env.SEED_DEMO_ADMIN === "true" ? "admin" : "user";
   const passwordHash = await bcrypt.hash(demoPassword, 12);
   const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
   if (existingUser) {
@@ -477,7 +476,7 @@ async function ensureDemoUser(email: string) {
         passwordHash,
         authProvider: "local",
         emailVerified: true,
-        role: demoRole,
+        role: "admin",
       })
       .where(eq(usersTable.id, existingUser.id))
       .returning();
@@ -494,7 +493,7 @@ async function ensureDemoUser(email: string) {
       passwordHash,
       authProvider: "local",
       emailVerified: true,
-      role: demoRole,
+      role: "admin",
     })
     .returning();
 
