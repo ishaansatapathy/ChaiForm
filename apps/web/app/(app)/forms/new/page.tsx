@@ -48,6 +48,30 @@ export default function CreateFormPage() {
   const [allowAnonymousResponses, setAllowAnonymousResponses] = useState(true);
   const [fields, setFields] = useState<DraftField[]>(createInitialDraftFields);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+  const [draftRecovered, setDraftRecovered] = useState(false);
+
+  const resetForm = () => {
+    if (
+      !window.confirm(
+        "Discard this draft and start a blank form? Unsaved changes will be lost.",
+      )
+    ) {
+      return;
+    }
+
+    window.localStorage.removeItem(CREATE_FORM_DRAFT_KEY);
+    setTitle("");
+    setDescription("");
+    setVisibility("public");
+    setTheme("default");
+    setRetention("forever");
+    setAllowMultipleSubmissions(true);
+    setAllowAnonymousResponses(true);
+    setFields(createInitialDraftFields());
+    setActiveTemplateId(null);
+    setDraftRecovered(false);
+    toast.success("Form reset — start fresh");
+  };
 
   useEffect(() => {
     const raw = window.localStorage.getItem(CREATE_FORM_DRAFT_KEY);
@@ -76,6 +100,7 @@ export default function CreateFormPage() {
         setAllowAnonymousResponses(draft.allowAnonymousResponses);
       }
       if (draft.fields?.length) setFields(draft.fields);
+      setDraftRecovered(true);
       toast.info("Recovered your unsaved draft");
     } catch {
       window.localStorage.removeItem(CREATE_FORM_DRAFT_KEY);
@@ -176,10 +201,36 @@ export default function CreateFormPage() {
           </h1>
           <p className="mt-3 text-sm text-white/45">Build fields, publish, and share a public or unlisted link.</p>
         </div>
-        <Link href="/dashboard" className="text-sm text-white/40 hover:text-white">
-          ← Back to dashboard
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          {(draftRecovered || title.trim() || description.trim()) && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="rounded-full border border-white/15 px-4 py-2 text-[10px] font-bold tracking-[0.2em] text-white/55 uppercase transition-colors hover:border-red-400/40 hover:text-red-300"
+            >
+              Reset form
+            </button>
+          )}
+          <Link href="/dashboard" className="text-sm text-white/40 hover:text-white">
+            ← Back to dashboard
+          </Link>
+        </div>
       </div>
+
+      {draftRecovered && (
+        <div className="app-surface mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3">
+          <p className="text-sm text-amber-100/85">
+            You&apos;re editing a recovered draft. Want a clean slate instead?
+          </p>
+          <button
+            type="button"
+            onClick={resetForm}
+            className="rounded-full border border-amber-400/35 px-4 py-1.5 text-[10px] font-bold tracking-[0.18em] text-amber-200 uppercase hover:bg-amber-400/10"
+          >
+            Start new form
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="space-y-6">
