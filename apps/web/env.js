@@ -6,14 +6,18 @@ export const env = createEnv({
    * Specify your server-side environment variables schema here. This way you can ensure the app
    * isn't built with invalid env vars.
    */
-  server: {},
+  server: {
+    /** Required by apps/web/proxy.ts for session verification (must match Railway API). */
+    JWT_SECRET: z.string().min(16),
+    JWT_REFRESH_SECRET: z.string().min(16).optional(),
+    API_INTERNAL_URL: z.string().url().optional(),
+    DEMO_LOGIN_ENABLED: z.enum(["true", "false"]).optional(),
+  },
 
   /**
    * Specify your client-side environment variables schema here. This way you can ensure the app
    * isn't built with invalid env vars. To expose them to the client, prefix them with
    * `NEXT_PUBLIC_`.
-   *
-   * JWT_SECRET is read in middleware via process.env (same value as Railway). See DEPLOY.md.
    */
   client: {
     NEXT_PUBLIC_API_URL: z.string().optional(),
@@ -24,6 +28,10 @@ export const env = createEnv({
    * middlewares) or client-side so we need to destruct manually.
    */
   runtimeEnv: {
+    JWT_SECRET: process.env.JWT_SECRET,
+    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+    API_INTERNAL_URL: process.env.API_INTERNAL_URL,
+    DEMO_LOGIN_ENABLED: process.env.DEMO_LOGIN_ENABLED,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   },
   /**

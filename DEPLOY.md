@@ -50,54 +50,9 @@ Environment variables:
 
 Verify: `https://chaiform-production.up.railway.app/health` → `{ "healthy": true }`
 
-> **Note:** Railway stays warm — no free-tier spin-down like Render.
+> **Note:** Railway stays warm — no free-tier spin-down.
 
-### Legacy: Render (optional)
-
-See `render.yaml` if you still deploy API to Render. Production demo uses **Railway** URLs above.
-
-## 2b. Render (API / backend) — legacy
-
-### Option A — Blueprint (recommended)
-
-1. Push this repo to GitHub
-2. https://dashboard.render.com → **New** → **Blueprint**
-3. Connect repo → Render reads `render.yaml`
-4. Fill in secret env vars when prompted (`DATABASE_URL`, JWT secrets, etc.)
-
-### Option B — Manual Web Service
-
-1. **New** → **Web Service** → connect GitHub repo
-2. Settings:
-
-| Setting | Value |
-|---------|-------|
-| **Root Directory** | *(leave empty — repo root)* |
-| **Runtime** | Node |
-| **Build Command** | `pnpm install --frozen-lockfile --prod=false && pnpm --filter @repo/api run build` |
-| **Start Command** | `node apps/api/dist/index.js` |
-| **Health Check Path** | `/health` |
-
-3. Environment variables:
-
-| Variable | Example |
-|----------|---------|
-| `DATABASE_URL` | Neon pooled URL |
-| `NODE_ENV` | `production` |
-| `BASE_URL` | `https://chaiform-api.onrender.com` |
-| `CLIENT_URL` | `https://YOUR-APP.vercel.app` *(set after Vercel deploy)* |
-| `JWT_SECRET` | long random string (32+ chars) |
-| `JWT_REFRESH_SECRET` | another long random string |
-| `RESEND_API_KEY` | from Resend *(optional)* |
-| `EMAIL_FROM` | `ChaiForm <onboarding@resend.dev>` |
-| `GOOGLE_OAUTH_CLIENT_ID` | Google Cloud Console |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | Google Cloud Console |
-| `GOOGLE_OAUTH_REDIRECT_URI` | `https://YOUR-APP.vercel.app/api-auth/google/callback` |
-
-4. Deploy → copy public URL (e.g. `https://chaiform-api.onrender.com`)
-5. Verify: `https://YOUR-API.onrender.com/health`
-
-> **Note:** Render free tier spins down after inactivity — first request may take ~30s.
+> **Legacy:** `render.yaml` remains for optional Render deploys. Production demo uses **Railway** only.
 
 ---
 
@@ -182,10 +137,10 @@ Set `NODE_ENV=production` on Vercel. Do not use `NODE_ENV=development` in produc
 Ensure `CLIENT_URL` on Railway matches your Vercel URL exactly (no trailing slash). Set **`JWT_SECRET` (and `JWT_REFRESH_SECRET`) on Vercel** to the same values as Railway — middleware needs them to keep you signed in across tabs.
 
 **Google OAuth redirect mismatch**  
-Redirect URI must be the **Vercel** URL (`/api-auth/google/callback`), not Render.
+Redirect URI must be the **Vercel** URL (`/api-auth/google/callback`), matching `GOOGLE_OAUTH_REDIRECT_URI` on Railway.
 
-**Render API slow on first request**  
-Free tier cold start — wait ~30s or upgrade plan.
+**API slow on first request after deploy**  
+Railway may need a few seconds to route traffic — retry `/health` (checks database connectivity).
 
 **Emails not sending**  
-Set `RESEND_API_KEY` + `EMAIL_FROM` on Render. Without Resend, OTP/links appear in Render logs only.
+Set `RESEND_API_KEY` + `EMAIL_FROM` on Railway. Without Resend, OTP/links appear in Railway logs only.

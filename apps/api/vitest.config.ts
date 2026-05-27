@@ -9,5 +9,8 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts"],
     testTimeout: 30_000,
+    env: {
+      HEALTH_CHECK_DATABASE: "false",
+    },
   },
 });

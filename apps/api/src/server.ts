@@ -116,9 +116,9 @@ function enrichOpenApiExamples(document: OpenApiDocumentWithPaths) {
     document,
     "/authentication/sign-in",
     "post",
-    "demoSignIn",
-    "Demo creator sign-in",
-    { email: "demo@chaiform.dev", password: "DemoPass123!" },
+    "creatorSignIn",
+    "Creator sign-in",
+    { email: "creator@example.com", password: "your-password" },
   );
 
   addJsonRequestExample(
@@ -271,8 +271,28 @@ app.get("/", (_req, res) => {
   return res.json({ message: "ChaiForm API is up and running..." });
 });
 
-app.get("/health", (_req, res) => {
-  return res.json({ message: "ChaiForm API is healthy", healthy: true });
+app.get("/health", async (_req, res) => {
+  const checkDatabase = process.env.HEALTH_CHECK_DATABASE !== "false";
+  try {
+    if (checkDatabase) {
+      const { pingDatabase } = await import("@repo/database/health");
+      await pingDatabase();
+    }
+    return res.json({
+      message: "ChaiForm API is healthy",
+      healthy: true,
+      ...(checkDatabase ? { database: "ok" as const } : {}),
+    });
+  } catch (error) {
+    logger.error("Health check failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return res.status(503).json({
+      message: "ChaiForm API is unhealthy",
+      healthy: false,
+      database: "error",
+    });
+  }
 });
 
 app.post("/internal/purge-expired-forms", async (req, res) => {

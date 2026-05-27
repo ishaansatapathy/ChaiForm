@@ -4,6 +4,7 @@ import FormService, { FormError } from "@repo/services/form";
 import {
   createFormInputSchema,
   exportSubmissionsOutputSchema,
+  FormInputError,
   formOutputSchema,
   paginatedFormsOutputSchema,
   paginatedPublicFormsOutputSchema,
@@ -26,6 +27,9 @@ const TAGS = ["Forms"];
 const getPath = generatePath("/forms");
 
 function mapFormError(error: unknown): never {
+  if (error instanceof FormInputError) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+  }
   if (error instanceof FormError) {
     const codeMap = {
       NOT_FOUND: "NOT_FOUND",

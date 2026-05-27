@@ -24,7 +24,7 @@ function buildUpstreamHeaders(request: NextRequest): Headers {
   }
   const accept = request.headers.get("accept");
   if (accept) headers.set("accept", accept);
-  // Avoid gzip/br from Render — Node fetch auto-decompresses but length/header mismatches
+  // Request identity encoding — avoids length/header mismatches when re-proxied through Vercel.
   // break browsers with ERR_CONTENT_DECODING_FAILED when re-proxied through Vercel.
   headers.set("accept-encoding", "identity");
   return headers;

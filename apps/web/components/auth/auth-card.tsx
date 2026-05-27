@@ -23,12 +23,13 @@ import { trpc } from "~/trpc/client";
 type AuthCardProps = {
   mode: "sign-in" | "sign-up";
   googleEnabled?: boolean;
+  demoLoginEnabled?: boolean;
 };
 
 type SignInValues = z.infer<typeof signInInputSchema>;
 type SignUpValues = z.infer<typeof signUpInputSchema>;
 
-export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
+export function AuthCard({ mode, googleEnabled = false, demoLoginEnabled = false }: AuthCardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = sanitizeRedirectPath(searchParams.get("next"));
@@ -356,7 +357,7 @@ export function AuthCard({ mode, googleEnabled = false }: AuthCardProps) {
                 : "Sign Up"}
         </AuthSubmitButton>
 
-        {isLogin && !twoFactorStep && (
+        {isLogin && !twoFactorStep && demoLoginEnabled && (
           <Link
             href={`/api-auth/demo?next=${encodeURIComponent(nextPath)}`}
             className="block w-full rounded-xl border border-lime-400/30 py-3 text-center text-[10px] font-black tracking-[0.22em] text-lime-400 uppercase transition-colors hover:bg-lime-400/10"

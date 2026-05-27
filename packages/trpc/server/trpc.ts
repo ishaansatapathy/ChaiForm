@@ -4,6 +4,7 @@ import { AuthError } from "@repo/services/auth/errors";
 import { ZodError } from "zod";
 
 import { createContext } from "./context";
+import { sanitizeTrpcError } from "./error-handler";
 
 export const tRPCContext = initTRPC
   .meta<OpenApiMeta>()
@@ -76,5 +77,5 @@ export function mapAuthError(error: unknown): never {
     });
   }
 
-  throw error;
+  sanitizeTrpcError(error);
 }

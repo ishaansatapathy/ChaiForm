@@ -2,6 +2,11 @@
   "name": "@repo/trpc",
   "version": "1.0.0",
   "private": true,
+  "exports": {
+    ".": "./server/index.ts",
+    "./client": "./client/index.ts",
+    "./server": "./server/index.ts"
+  },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit"

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "exports": {
     ".": "./index.ts",
+    "./health": "./health.ts",
     "./migrate": "./migrate.ts",
     "./schema": "./schema.ts",
     "./relations": "./relations.ts"
