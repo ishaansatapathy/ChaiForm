@@ -9,7 +9,9 @@ function loadRootEnv() {
   for (let i = 0; i < 6; i++) {
     const envPath = path.join(dir, ".env");
     if (fs.existsSync(envPath)) {
-      config({ path: envPath });
+      // In dev/watch mode, the process can restart without a full env reset.
+      // Override ensures the repo root .env stays the source of truth.
+      config({ path: envPath, override: true });
       return;
     }
     dir = path.dirname(dir);
@@ -53,6 +55,6 @@ export function isGoogleOAuthConfigured() {
 
 export function isEmailConfigured() {
   const from = env.EMAIL_FROM?.trim();
-  const brevo = env.BREVO_API_KEY?.trim();
-  return Boolean(from && brevo);
+  const apiKey = env.BREVO_API_KEY?.trim();
+  return Boolean(from && apiKey);
 }

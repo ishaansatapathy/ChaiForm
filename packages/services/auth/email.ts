@@ -16,6 +16,11 @@ function isProduction() {
   return nodeEnv === "production" || nodeEnv === "prod";
 }
 
+function isBrevoApiKey(key: string) {
+  // Brevo API keys start with xkeysib-
+  return key.startsWith("xkeysib-");
+}
+
 function parseSenderAddress(from: string) {
   const trimmed = from.trim();
   const bracketMatch = trimmed.match(/^(.+?)\s*<([^>]+)>$/);
@@ -32,6 +37,10 @@ async function sendViaBrevo(input: SendEmailInput) {
   const apiKey = env.BREVO_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("Email delivery is not configured. Please contact support.");
+  }
+  if (!isBrevoApiKey(apiKey)) {
+    logger.error("Brevo API key format is invalid", { prefix: apiKey.slice(0, 10) });
+    throw new Error("Email delivery is misconfigured. Please contact support.");
   }
 
   const sender = parseSenderAddress(env.EMAIL_FROM!);

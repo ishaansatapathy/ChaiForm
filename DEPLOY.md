@@ -40,7 +40,7 @@ Environment variables:
 | `CLIENT_URL` | `https://chai-form-web.vercel.app` |
 | `JWT_SECRET` | long random string (32+ chars) |
 | `JWT_REFRESH_SECRET` | another long random string |
-| `BREVO_API_KEY` | from [Brevo](https://app.brevo.com) → SMTP & API → API keys |
+| `BREVO_API_KEY` | Brevo **API key** (starts with `xkeysib-`) from [Brevo](https://app.brevo.com) → SMTP & API → API keys |
 | `EMAIL_PROVIDER` | `brevo` |
 | `EMAIL_FROM` | `ChaiForm <your-sender@email.com>` *(same address you verified in Brevo — domain DNS not required)* |
 | `EMAIL_SENDER_NAME` | `ChaiForm` *(optional if name is in EMAIL_FROM)* |
