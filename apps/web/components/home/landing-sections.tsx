@@ -279,7 +279,7 @@ export function LandingSections({ part = "all" }: { part?: "all" | "workflow" | 
 
       {/* Pricing */}
 
-      <section id="pricing" className="landing-section border-t border-[#70b404]/15 px-[clamp(1.25rem,5vw,5rem)] py-28 md:px-[5%]">
+      <section id="pricing" className="landing-section border-t border-lime-400/15 px-[clamp(1.25rem,5vw,5rem)] py-28 md:px-[5%]">
 
         <div className="landing-copy landing-reveal mx-auto max-w-[1440px]">
 
@@ -287,40 +287,57 @@ export function LandingSections({ part = "all" }: { part?: "all" | "workflow" | 
 
             <div>
 
-              <p className="landing-label mb-4 text-[11px] tracking-[0.36em]">Fake pricing · demo mode</p>
+              <p className="font-mono mb-4 text-[11px] tracking-[0.36em] text-lime-400/70 uppercase">
+                {"// omnitrix loadout · demo pricing"}
+              </p>
               <h2 className="font-display text-[clamp(2.35rem,5vw,4rem)] font-normal leading-tight tracking-[-0.04em] text-white">
-                Choose your <span className="landing-accent-text">Omnitrix</span> loadout.
+                Choose your <span className="text-lime-400">Omnitrix</span> loadout.
               </h2>
 
             </div>
 
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-5 lg:grid-cols-3">
 
             {BEN10_PRICING.map((plan) => (
 
-              <div
+              <article
                 key={plan.tier}
-                className={`group relative overflow-hidden rounded-[34px] border p-6 backdrop-blur-md transition-colors ${
+                className={`group relative overflow-hidden rounded-[28px] border bg-[#030603] p-6 shadow-none transition-colors ${
                   plan.featured
-                    ? "border-[#70b404]/55 bg-[#70b404]/12"
-                    : "border-white/10 bg-white/3 hover:border-[#70b404]/35 hover:bg-[#70b404]/6"
+                    ? "border-lime-400/45"
+                    : "border-lime-400/15 hover:border-lime-400/30"
                 }`}
               >
-
                 <div
-                  className="pointer-events-none absolute -top-20 -right-16 size-44 rounded-full border border-[#70b404]/20 bg-[#70b404]/8 transition-transform duration-500 group-hover:scale-110"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-lime-400/55 to-transparent"
+                  aria-hidden="true"
+                />
+                <span
+                  className="pointer-events-none absolute top-3 left-3 size-3 border-t-2 border-l-2 border-lime-400/35"
+                  aria-hidden="true"
+                />
+                <span
+                  className="pointer-events-none absolute top-3 right-3 size-3 border-t-2 border-r-2 border-lime-400/35"
+                  aria-hidden="true"
+                />
+                <span
+                  className="pointer-events-none absolute bottom-3 left-3 size-3 border-b-2 border-l-2 border-lime-400/35"
+                  aria-hidden="true"
+                />
+                <span
+                  className="pointer-events-none absolute right-3 bottom-3 size-3 border-r-2 border-b-2 border-lime-400/35"
                   aria-hidden="true"
                 />
 
-                <div className="relative">
+                <div className="relative px-1 pt-1">
 
                   <div className="mb-6 flex items-start justify-between gap-4">
 
                     <div>
 
-                      <p className="font-mono mb-2 text-[10px] tracking-[0.28em] text-[#9eea1a]/80 uppercase">
+                      <p className="font-mono mb-2 text-[10px] tracking-[0.28em] text-lime-400/75 uppercase">
                         {plan.signal}
                       </p>
                       <h3 className="font-display text-2xl font-bold tracking-tight text-white">{plan.tier}</h3>
@@ -328,39 +345,44 @@ export function LandingSections({ part = "all" }: { part?: "all" | "workflow" | 
                     </div>
 
                     {plan.featured && (
-                      <span className="rounded-full border border-[#70b404]/40 bg-[#70b404]/15 px-3 py-1 font-mono text-[9px] font-black tracking-[0.22em] text-[#b8f038] uppercase">
+                      <span className="font-mono shrink-0 rounded-full border border-lime-400/30 bg-lime-400/8 px-3 py-1 text-[9px] font-black tracking-[0.22em] text-lime-300 uppercase">
                         Hero pick
                       </span>
                     )}
 
                   </div>
 
-                  <div className="mb-6">
+                  <div className="mb-6 flex items-baseline gap-3">
 
                     <span className="font-display text-5xl font-black tracking-[-0.06em] text-white">{plan.price}</span>
-                    <span className="ml-3 font-mono text-[10px] tracking-[0.2em] text-white/35 uppercase">{plan.cadence}</span>
+                    <span className="font-mono text-[10px] tracking-[0.2em] text-lime-400/45 uppercase">{plan.cadence}</span>
 
                   </div>
 
-                  <p className="mb-6 min-h-12 text-sm leading-relaxed text-white/55">{plan.copy}</p>
+                  <p className="mb-6 min-h-12 text-sm leading-relaxed text-white/50">{plan.copy}</p>
 
-                  <div className="space-y-3 border-t border-white/8 pt-6">
+                  <ul className="space-y-2.5 border-t border-lime-400/12 pt-6">
 
                     {plan.features.map((feature) => (
-                      <div key={feature} className="flex items-center gap-3 text-sm text-white/70">
-                        <span className="size-1.5 rounded-full bg-[#70b404]" />
-                        {feature}
-                      </div>
+                      <li
+                        key={feature}
+                        className="font-mono flex items-start gap-2.5 text-[11px] tracking-wide text-white/65 uppercase"
+                      >
+                        <span className="mt-0.5 text-lime-400" aria-hidden="true">
+                          ▸
+                        </span>
+                        <span className="normal-case tracking-normal">{feature}</span>
+                      </li>
                     ))}
 
-                  </div>
+                  </ul>
 
                   <Link
                     href="/sign-up"
-                    className={`mt-8 inline-flex w-full items-center justify-center rounded-2xl px-5 py-3 font-mono text-[11px] font-black tracking-[0.22em] uppercase transition-colors ${
+                    className={`mt-8 inline-flex w-full items-center justify-center rounded-2xl px-5 py-3 font-mono text-[11px] font-black tracking-[0.18em] uppercase transition-opacity ${
                       plan.featured
-                        ? "bg-[#b8f038] text-black hover:bg-white"
-                        : "border border-[#70b404]/35 text-[#b8f038] hover:bg-[#70b404]/10"
+                        ? "border border-lime-400/35 bg-lime-400 text-black hover:opacity-90"
+                        : "border border-lime-400/25 bg-lime-400/5 text-lime-300 hover:bg-lime-400/10"
                     }`}
                   >
                     Activate plan
@@ -368,7 +390,7 @@ export function LandingSections({ part = "all" }: { part?: "all" | "workflow" | 
 
                 </div>
 
-              </div>
+              </article>
 
             ))}
 
