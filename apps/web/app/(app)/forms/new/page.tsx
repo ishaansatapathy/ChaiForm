@@ -233,7 +233,7 @@ export default function CreateFormPage() {
         <div className="app-surface mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-lime-400/20 bg-lime-400/5 px-4 py-3">
           <p className="text-sm text-lime-100/85">
             {draftRecovered
-              ? "You&apos;re editing a recovered draft. Want a clean slate instead?"
+              ? "You're editing a recovered draft. Want a clean slate instead?"
               : "Changed your mind? Start a blank form anytime."}
           </p>
           <button
