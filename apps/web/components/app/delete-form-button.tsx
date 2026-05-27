@@ -65,11 +65,13 @@ export function DeleteFormButton({
           disabled={deleteForm.isPending}
           className={className}
         >
-          {deleteForm.isPending ? "Deleting…" : (
-            <>
-              <Trash2 size={13} />
-              {label}
-            </>
+          {deleteForm.isPending ? (
+            "Deleting…"
+          ) : (
+            <span className="inline-flex items-center justify-center gap-2">
+              <Trash2 size={14} className="shrink-0" />
+              <span>{label}</span>
+            </span>
           )}
         </button>
       </AlertDialogTrigger>
