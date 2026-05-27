@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { FormBuilderFields, type DraftField } from "~/components/forms/form-builder-fields";
@@ -11,6 +12,7 @@ import { FormThemePicker } from "~/components/forms/form-theme-picker";
 import { FormRetentionPicker } from "~/components/app/form-retention-picker";
 import { AllowAnonymousResponsesToggle } from "~/components/app/allow-anonymous-responses-toggle";
 import { AllowMultipleResponsesToggle } from "~/components/app/allow-multiple-responses-toggle";
+import { ChaiConfirmDialog } from "~/components/app/chai-confirm-dialog";
 import { Highlight } from "~/components/app/highlight";
 import type { FormRetentionOption } from "~/lib/form-retention";
 import { FORM_TEMPLATES } from "~/lib/form-templates";
@@ -49,16 +51,9 @@ export default function CreateFormPage() {
   const [fields, setFields] = useState<DraftField[]>(createInitialDraftFields);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
   const [draftRecovered, setDraftRecovered] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   const resetForm = () => {
-    if (
-      !window.confirm(
-        "Discard this draft and start a blank form? Unsaved changes will be lost.",
-      )
-    ) {
-      return;
-    }
-
     window.localStorage.removeItem(CREATE_FORM_DRAFT_KEY);
     setTitle("");
     setDescription("");
@@ -205,8 +200,8 @@ export default function CreateFormPage() {
           {(draftRecovered || title.trim() || description.trim()) && (
             <button
               type="button"
-              onClick={resetForm}
-              className="rounded-full border border-white/15 px-4 py-2 text-[10px] font-bold tracking-[0.2em] text-white/55 uppercase transition-colors hover:border-red-400/40 hover:text-red-300"
+              onClick={() => setResetConfirmOpen(true)}
+              className="rounded-full border border-white/15 px-4 py-2 text-[10px] font-bold tracking-[0.2em] text-white/55 uppercase transition-colors hover:border-lime-400/40 hover:text-lime-300"
             >
               Reset form
             </button>
@@ -218,19 +213,30 @@ export default function CreateFormPage() {
       </div>
 
       {draftRecovered && (
-        <div className="app-surface mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3">
-          <p className="text-sm text-amber-100/85">
+        <div className="app-surface mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-lime-400/20 bg-lime-400/5 px-4 py-3">
+          <p className="text-sm text-lime-100/85">
             You&apos;re editing a recovered draft. Want a clean slate instead?
           </p>
           <button
             type="button"
-            onClick={resetForm}
-            className="rounded-full border border-amber-400/35 px-4 py-1.5 text-[10px] font-bold tracking-[0.18em] text-amber-200 uppercase hover:bg-amber-400/10"
+            onClick={() => setResetConfirmOpen(true)}
+            className="rounded-full border border-lime-400/35 px-4 py-1.5 text-[10px] font-bold tracking-[0.18em] text-lime-300 uppercase hover:bg-lime-400/10"
           >
             Start new form
           </button>
         </div>
       )}
+
+      <ChaiConfirmDialog
+        open={resetConfirmOpen}
+        onOpenChange={setResetConfirmOpen}
+        title="Start a blank form?"
+        description="Discard this draft and start fresh. Unsaved changes will be lost."
+        confirmLabel="Reset form"
+        badge="Omnitrix reset"
+        icon={<RotateCcw size={22} />}
+        onConfirm={resetForm}
+      />
 
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="space-y-6">

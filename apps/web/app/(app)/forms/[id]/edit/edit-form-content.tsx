@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { History } from "lucide-react";
 import { toast } from "sonner";
 
 import { FormBuilderFields, type DraftField } from "~/components/forms/form-builder-fields";
 import { FormBuilderPreview } from "~/components/forms/form-builder-preview";
 import { FormThemePicker } from "~/components/forms/form-theme-picker";
+import { ChaiConfirmDialog } from "~/components/app/chai-confirm-dialog";
 import { DeleteFormButton } from "~/components/app/delete-form-button";
 import { ShareFormModal } from "~/components/app/share-form-modal";
 import { AllowAnonymousResponsesToggle } from "~/components/app/allow-anonymous-responses-toggle";
@@ -83,6 +85,7 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
   const [hydratedFormId, setHydratedFormId] = useState<string | null>(initialForm?.id ?? null);
   const [draftHydrated, setDraftHydrated] = useState(false);
   const [draftRecovered, setDraftRecovered] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const resolvedForm = form ?? initialForm;
 
   const applySavedForm = (source: FormDetail) => {
@@ -100,13 +103,6 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
 
   const resetToSaved = () => {
     if (!resolvedForm) return;
-    if (
-      !window.confirm(
-        "Discard unsaved changes and restore the last saved version? This cannot be undone.",
-      )
-    ) {
-      return;
-    }
 
     window.localStorage.removeItem(editDraftKey(formId));
     applySavedForm(resolvedForm);
@@ -308,8 +304,8 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
           {(draftRecovered || title.trim() || description.trim()) && (
             <button
               type="button"
-              onClick={resetToSaved}
-              className="rounded-full border border-white/15 px-4 py-2 text-[10px] font-bold tracking-[0.2em] text-white/55 uppercase transition-colors hover:border-red-400/40 hover:text-red-300"
+              onClick={() => setResetConfirmOpen(true)}
+              className="rounded-full border border-white/15 px-4 py-2 text-[10px] font-bold tracking-[0.2em] text-white/55 uppercase transition-colors hover:border-lime-400/40 hover:text-lime-300"
             >
               Reset to saved
             </button>
@@ -321,19 +317,30 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
       </div>
 
       {draftRecovered && (
-        <div className="app-surface mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3">
-          <p className="text-sm text-amber-100/85">
+        <div className="app-surface mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-lime-400/20 bg-lime-400/5 px-4 py-3">
+          <p className="text-sm text-lime-100/85">
             Unsaved draft recovered. Discard it to go back to your last saved form.
           </p>
           <button
             type="button"
-            onClick={resetToSaved}
-            className="rounded-full border border-amber-400/35 px-4 py-1.5 text-[10px] font-bold tracking-[0.18em] text-amber-200 uppercase hover:bg-amber-400/10"
+            onClick={() => setResetConfirmOpen(true)}
+            className="rounded-full border border-lime-400/35 px-4 py-1.5 text-[10px] font-bold tracking-[0.18em] text-lime-300 uppercase hover:bg-lime-400/10"
           >
             Restore saved version
           </button>
         </div>
       )}
+
+      <ChaiConfirmDialog
+        open={resetConfirmOpen}
+        onOpenChange={setResetConfirmOpen}
+        title="Restore saved version?"
+        description="Discard unsaved changes and reload the last saved form from the server. This cannot be undone."
+        confirmLabel="Restore"
+        badge="Plumber mode"
+        icon={<History size={22} />}
+        onConfirm={resetToSaved}
+      />
 
       {(resolvedForm.submissionCount ?? 0) > 0 ? (
         <div className="app-surface mb-8 rounded-2xl border border-amber-400/20 p-4">
