@@ -492,28 +492,6 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
                   </label>
                 </div>
               )}
-              {(field.type === "text" || field.type === "textarea" || field.type === "email") && (
-                <label className="block text-[10px] text-white/40">
-                  Regex pattern (optional)
-                  <input
-                    type="text"
-                    value={field.config?.validation?.pattern ?? ""}
-                    placeholder="^[A-Za-z0-9]+$"
-                    onChange={(event) =>
-                      updateField(field.id, {
-                        config: {
-                          ...field.config,
-                          validation: {
-                            ...field.config?.validation,
-                            pattern: emptyToUndefined(event.target.value),
-                          },
-                        },
-                      })
-                    }
-                    className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 font-mono text-xs text-white outline-none"
-                  />
-                </label>
-              )}
             </div>
           )}
 
