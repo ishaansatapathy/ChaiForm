@@ -5,8 +5,18 @@ type TurnstileVerifyResponse = {
   "error-codes"?: string[];
 };
 
+function isProductionEnv(env: NodeJS.ProcessEnv) {
+  const nodeEnv = String(env.NODE_ENV ?? "");
+  return nodeEnv === "production" || nodeEnv === "prod";
+}
+
 export function isTurnstileRequired(env: NodeJS.ProcessEnv = process.env) {
   return Boolean(env.TURNSTILE_SECRET_KEY?.trim());
+}
+
+/** When true, production rejects public submits if Turnstile secret is missing. */
+export function isTurnstileMandatoryInProduction(env: NodeJS.ProcessEnv = process.env) {
+  return isProductionEnv(env) && env.REQUIRE_TURNSTILE_IN_PROD === "true";
 }
 
 export async function verifyTurnstileToken(
@@ -15,7 +25,10 @@ export async function verifyTurnstileToken(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<boolean> {
   const secret = env.TURNSTILE_SECRET_KEY?.trim();
-  if (!secret) return true;
+  if (!secret) {
+    if (isTurnstileMandatoryInProduction(env)) return false;
+    return !isTurnstileRequired(env);
+  }
   if (!token) return false;
 
   const params = new URLSearchParams({ secret, response: token });

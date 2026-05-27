@@ -30,7 +30,8 @@ import { expiresAtFromRetention, expiresAtFromRetentionChange, isFormExpired } f
 import { sanitizeLabel } from "./sanitize";
 import { fieldsChanged, fieldsToVersionSnapshot } from "./versioning";
 import { validateSubmissionAnswers } from "./validation";
-import { isTurnstileRequired, verifyTurnstileToken } from "../turnstile";
+import { cacheDelete } from "../cache/kv-store";
+import { isTurnstileMandatoryInProduction, isTurnstileRequired, verifyTurnstileToken } from "../turnstile";
 import type { UserRole } from "../auth/roles";
 
 type FormDbClient = Pick<typeof db, "insert" | "select" | "update">;
@@ -901,6 +902,13 @@ class FormService {
       throw new FormError("BAD_REQUEST", "Submission rejected");
     }
 
+    if (isTurnstileMandatoryInProduction() && !isTurnstileRequired()) {
+      throw new FormError(
+        "BAD_REQUEST",
+        "CAPTCHA is required in production. Configure TURNSTILE_SECRET_KEY on the API.",
+      );
+    }
+
     if (isTurnstileRequired()) {
       if (!input.turnstileToken) {
         throw new FormError("BAD_REQUEST", "Please complete the CAPTCHA check.");
@@ -1059,6 +1067,11 @@ class FormService {
       }
       throw error;
     }
+
+    void Promise.all([
+      cacheDelete(`analytics:summary:${formRow.userId}:all`),
+      cacheDelete(`analytics:summary:${formRow.userId}:${form.id}`),
+    ]).catch(() => undefined);
 
     void notifyCreatorOfSubmission({
       ownerUserId: formRow.userId,

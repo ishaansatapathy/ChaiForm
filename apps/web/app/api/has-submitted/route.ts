@@ -34,12 +34,18 @@ export async function POST(request: NextRequest) {
     });
 
     if (!upstream.ok) {
-      return NextResponse.json({ submitted: false });
+      return NextResponse.json(
+        { submitted: true, error: "Unable to verify submission status." },
+        { status: 503 },
+      );
     }
 
     const payload = (await upstream.json()) as { result?: { data?: { submitted?: boolean } } };
     return NextResponse.json({ submitted: payload.result?.data?.submitted === true });
   } catch {
-    return NextResponse.json({ submitted: false }, { status: 503 });
+    return NextResponse.json(
+      { submitted: true, error: "Unable to verify submission status." },
+      { status: 503 },
+    );
   }
 }

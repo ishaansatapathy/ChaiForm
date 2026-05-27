@@ -15,6 +15,7 @@ describe("ChaiForm API integration", () => {
     expect(response.status).toBe(200);
     expect(response.body.info?.title).toBe("ChaiForm OpenAPI");
     expect(response.body.paths?.["/forms/submit"]).toBeTruthy();
+    expect(response.body.paths?.["/authentication/google-oauth"]).toBeTruthy();
   });
 
   it("rejects unauthenticated protected form list", async () => {
