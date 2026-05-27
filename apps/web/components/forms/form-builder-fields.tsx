@@ -49,6 +49,33 @@ function numberOrUndefined(value: string) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function hasCustomValidation(field: DraftField): boolean {
+  if (
+    field.type !== "text" &&
+    field.type !== "textarea" &&
+    field.type !== "email" &&
+    field.type !== "number"
+  ) {
+    return false;
+  }
+  const validation = field.config?.validation;
+  if (!validation) return false;
+  return (
+    validation.minLength !== undefined ||
+    validation.maxLength !== undefined ||
+    validation.minValue !== undefined ||
+    validation.maxValue !== undefined
+  );
+}
+
+function removeValidationFromConfig(field: DraftField): DraftField["config"] {
+  if (!field.config || !("validation" in field.config)) return field.config;
+  const { validation: _validation, ...rest } = field.config as DraftField["config"] & {
+    validation?: unknown;
+  };
+  return Object.keys(rest).length > 0 ? rest : undefined;
+}
+
 function getCheckboxOptions(field: DraftField): string[] {
   if (field.type !== "checkbox") return ["Option 1"];
   const config = field.config;
@@ -404,94 +431,113 @@ export function FormBuilderFields({ fields, onChange }: FormBuilderFieldsProps) 
             field.type === "email" ||
             field.type === "number") && (
             <div className="mt-4 space-y-3 rounded-2xl border border-white/8 bg-white/2 p-4">
-              <p className="text-xs font-semibold tracking-wide text-white/55 uppercase">
-                Validation rules
-              </p>
-              {field.type === "number" ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="block text-[10px] text-white/40">
-                    Min value
-                    <input
-                      type="number"
-                      value={field.config?.validation?.minValue ?? ""}
-                      onChange={(event) =>
-                        updateField(field.id, {
-                          config: {
-                            ...field.config,
-                            validation: {
-                              ...field.config?.validation,
-                              minValue: numberOrUndefined(event.target.value),
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-white/50">
+                <input
+                  type="checkbox"
+                  checked={hasCustomValidation(field)}
+                  onChange={(event) => {
+                    if (!event.target.checked) {
+                      updateField(field.id, { config: removeValidationFromConfig(field) });
+                      return;
+                    }
+                    updateField(field.id, {
+                      config: {
+                        ...field.config,
+                        validation: field.config?.validation ?? {},
+                      },
+                    });
+                  }}
+                  className="accent-lime-400"
+                />
+                Enable custom validation rules
+              </label>
+
+              {hasCustomValidation(field) &&
+                (field.type === "number" ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="block text-[10px] text-white/40">
+                      Min value
+                      <input
+                        type="number"
+                        value={field.config?.validation?.minValue ?? ""}
+                        onChange={(event) =>
+                          updateField(field.id, {
+                            config: {
+                              ...field.config,
+                              validation: {
+                                ...field.config?.validation,
+                                minValue: numberOrUndefined(event.target.value),
+                              },
                             },
-                          },
-                        })
-                      }
-                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
-                    />
-                  </label>
-                  <label className="block text-[10px] text-white/40">
-                    Max value
-                    <input
-                      type="number"
-                      value={field.config?.validation?.maxValue ?? ""}
-                      onChange={(event) =>
-                        updateField(field.id, {
-                          config: {
-                            ...field.config,
-                            validation: {
-                              ...field.config?.validation,
-                              maxValue: numberOrUndefined(event.target.value),
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </label>
+                    <label className="block text-[10px] text-white/40">
+                      Max value
+                      <input
+                        type="number"
+                        value={field.config?.validation?.maxValue ?? ""}
+                        onChange={(event) =>
+                          updateField(field.id, {
+                            config: {
+                              ...field.config,
+                              validation: {
+                                ...field.config?.validation,
+                                maxValue: numberOrUndefined(event.target.value),
+                              },
                             },
-                          },
-                        })
-                      }
-                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
-                    />
-                  </label>
-                </div>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="block text-[10px] text-white/40">
-                    Min length
-                    <input
-                      type="number"
-                      min={0}
-                      value={field.config?.validation?.minLength ?? ""}
-                      onChange={(event) =>
-                        updateField(field.id, {
-                          config: {
-                            ...field.config,
-                            validation: {
-                              ...field.config?.validation,
-                              minLength: numberOrUndefined(event.target.value),
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="block text-[10px] text-white/40">
+                      Min length
+                      <input
+                        type="number"
+                        min={0}
+                        value={field.config?.validation?.minLength ?? ""}
+                        onChange={(event) =>
+                          updateField(field.id, {
+                            config: {
+                              ...field.config,
+                              validation: {
+                                ...field.config?.validation,
+                                minLength: numberOrUndefined(event.target.value),
+                              },
                             },
-                          },
-                        })
-                      }
-                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
-                    />
-                  </label>
-                  <label className="block text-[10px] text-white/40">
-                    Max length
-                    <input
-                      type="number"
-                      min={1}
-                      value={field.config?.validation?.maxLength ?? ""}
-                      onChange={(event) =>
-                        updateField(field.id, {
-                          config: {
-                            ...field.config,
-                            validation: {
-                              ...field.config?.validation,
-                              maxLength: numberOrUndefined(event.target.value),
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </label>
+                    <label className="block text-[10px] text-white/40">
+                      Max length
+                      <input
+                        type="number"
+                        min={1}
+                        value={field.config?.validation?.maxLength ?? ""}
+                        onChange={(event) =>
+                          updateField(field.id, {
+                            config: {
+                              ...field.config,
+                              validation: {
+                                ...field.config?.validation,
+                                maxLength: numberOrUndefined(event.target.value),
+                              },
                             },
-                          },
-                        })
-                      }
-                      className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
-                    />
-                  </label>
-                </div>
-              )}
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/5 bg-white/2 px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </label>
+                  </div>
+                ))}
             </div>
           )}
 

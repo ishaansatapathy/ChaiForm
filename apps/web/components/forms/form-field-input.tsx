@@ -192,7 +192,6 @@ export function FormFieldInput({
           max={field.type === "number" ? field.config?.validation?.maxValue : undefined}
           minLength={field.type !== "number" ? field.config?.validation?.minLength : undefined}
           maxLength={field.type !== "number" ? field.config?.validation?.maxLength : undefined}
-          pattern={field.type !== "number" ? field.config?.validation?.pattern : undefined}
           className={inputClassName}
         />
       );

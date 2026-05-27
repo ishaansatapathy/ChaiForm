@@ -81,13 +81,15 @@ function isUniqueViolation(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
 }
 
-function isLikelyDangerousRegex(pattern: string) {
-  return (
-    pattern.length > 200 ||
-    /(\\[1-9])|(\(\?<?[=!])/.test(pattern) ||
-    /(\([^)]*[+*][^)]*\)[+*?])|(\[[^\]]+\][+*]\+)|(\.\*[+*?])/.test(pattern) ||
-    /(\{[^}]+,\}\s*[+*?])|([+*?]\s*[+*?])/.test(pattern)
-  );
+function normalizeValidationConfig(validation: FieldConfigJson["validation"] | undefined) {
+  if (!validation) return undefined;
+  const normalized = {
+    minLength: validation.minLength,
+    maxLength: validation.maxLength,
+    minValue: validation.minValue,
+    maxValue: validation.maxValue,
+  };
+  return Object.values(normalized).some((value) => value !== undefined) ? normalized : undefined;
 }
 
 function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
@@ -157,7 +159,7 @@ function mapFieldRow(row: typeof formFieldsTable.$inferSelect): FormField {
         config?.placeholder || config?.validation || config?.showWhen
           ? {
               ...(config.placeholder ? { placeholder: config.placeholder } : {}),
-              ...(config.validation ? { validation: config.validation } : {}),
+              ...(config.validation ? { validation: normalizeValidationConfig(config.validation) } : {}),
               ...(config.showWhen ? { showWhen: config.showWhen } : {}),
             }
           : undefined;
@@ -213,16 +215,6 @@ class FormService {
         throw new FormError("BAD_REQUEST", `"${field.label}" minimum value cannot exceed maximum value`);
       }
 
-      if (validation.pattern) {
-        if (isLikelyDangerousRegex(validation.pattern)) {
-          throw new FormError("BAD_REQUEST", `"${field.label}" validation pattern is too complex`);
-        }
-        try {
-          new RegExp(validation.pattern);
-        } catch {
-          throw new FormError("BAD_REQUEST", `"${field.label}" validation pattern is invalid`);
-        }
-      }
     });
   }
 
@@ -293,6 +285,9 @@ class FormService {
       const normalizedConfig = config
         ? {
             ...config,
+            ...("validation" in config && config.validation
+              ? { validation: normalizeValidationConfig(config.validation) }
+              : {}),
             ...(showWhen
               ? {
                   showWhen: {

@@ -285,7 +285,6 @@ describe("validateSubmissionAnswers", () => {
           validation: {
             minLength: 4,
             maxLength: 8,
-            pattern: "^[A-Z0-9-]+$",
           },
         },
       },
@@ -299,7 +298,7 @@ describe("validateSubmissionAnswers", () => {
 
     expect(() =>
       validateSubmissionAnswers(validationFields, [
-        { fieldId: validationFields[0]!.id, value: "bad value" },
+        { fieldId: validationFields[0]!.id, value: "A" },
       ]),
     ).toThrow();
   });
