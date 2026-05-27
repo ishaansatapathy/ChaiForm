@@ -31,6 +31,10 @@ const createInitialDraftFields = (): DraftField[] => [
 ];
 
 const CREATE_FORM_DRAFT_KEY = "chaiform:create-form-draft";
+const DEFAULT_FIELD_BLUEPRINT: Array<Pick<DraftField, "label" | "type" | "required">> = [
+  { label: "Full name", type: "text", required: true },
+  { label: "Email address", type: "email", required: true },
+];
 
 export default function CreateFormPage() {
   const router = useRouter();
@@ -183,6 +187,30 @@ export default function CreateFormPage() {
     }
   };
 
+  const hasNonDefaultFields =
+    fields.length !== DEFAULT_FIELD_BLUEPRINT.length ||
+    fields.some((field, index) => {
+      const blueprint = DEFAULT_FIELD_BLUEPRINT[index];
+      if (!blueprint) return true;
+      return (
+        field.label !== blueprint.label ||
+        field.type !== blueprint.type ||
+        field.required !== blueprint.required
+      );
+    });
+
+  const hasResettableChanges =
+    draftRecovered ||
+    Boolean(title.trim()) ||
+    Boolean(description.trim()) ||
+    visibility !== "public" ||
+    theme !== "default" ||
+    retention !== "forever" ||
+    !allowMultipleSubmissions ||
+    !allowAnonymousResponses ||
+    activeTemplateId !== null ||
+    hasNonDefaultFields;
+
   return (
     <section className="py-4">
       <div className="mb-10 flex flex-wrap items-end justify-between gap-4 pb-8">
@@ -201,10 +229,12 @@ export default function CreateFormPage() {
         </Link>
       </div>
 
-      {draftRecovered && (
+      {hasResettableChanges && (
         <div className="app-surface mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-lime-400/20 bg-lime-400/5 px-4 py-3">
           <p className="text-sm text-lime-100/85">
-            You&apos;re editing a recovered draft. Want a clean slate instead?
+            {draftRecovered
+              ? "You&apos;re editing a recovered draft. Want a clean slate instead?"
+              : "Changed your mind? Start a blank form anytime."}
           </p>
           <button
             type="button"
