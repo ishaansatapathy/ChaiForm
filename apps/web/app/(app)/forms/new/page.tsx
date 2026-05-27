@@ -196,20 +196,9 @@ export default function CreateFormPage() {
           </h1>
           <p className="mt-3 text-sm text-white/45">Build fields, publish, and share a public or unlisted link.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {(draftRecovered || title.trim() || description.trim()) && (
-            <button
-              type="button"
-              onClick={() => setResetConfirmOpen(true)}
-              className="rounded-full border border-white/15 px-4 py-2 text-[10px] font-bold tracking-[0.2em] text-white/55 uppercase transition-colors hover:border-lime-400/40 hover:text-lime-300"
-            >
-              Reset form
-            </button>
-          )}
-          <Link href="/dashboard" className="text-sm text-white/40 hover:text-white">
-            ← Back to dashboard
-          </Link>
-        </div>
+        <Link href="/dashboard" className="text-sm text-white/40 hover:text-white">
+          ← Back to dashboard
+        </Link>
       </div>
 
       {draftRecovered && (
