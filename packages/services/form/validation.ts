@@ -128,10 +128,6 @@ function fieldValueSchema(field: FormField) {
     schema = schema.max(validation.maxLength, `Must be at most ${validation.maxLength} characters`);
   }
 
-  if (validation?.pattern) {
-    schema = schema.regex(new RegExp(validation.pattern), "Invalid format");
-  }
-
   if (!field.required) {
     return z.union([z.literal(""), schema]).optional();
   }

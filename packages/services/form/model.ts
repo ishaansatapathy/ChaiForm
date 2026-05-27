@@ -17,7 +17,6 @@ const fieldValidationConfigSchema = z
   .object({
     minLength: z.number().int().min(0).max(5000).optional(),
     maxLength: z.number().int().min(1).max(10000).optional(),
-    pattern: z.string().max(500).optional(),
     minValue: z.number().optional(),
     maxValue: z.number().optional(),
   })
