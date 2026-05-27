@@ -82,7 +82,37 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
   const [fields, setFields] = useState<DraftField[]>((initialForm?.fields as DraftField[]) ?? []);
   const [hydratedFormId, setHydratedFormId] = useState<string | null>(initialForm?.id ?? null);
   const [draftHydrated, setDraftHydrated] = useState(false);
+  const [draftRecovered, setDraftRecovered] = useState(false);
   const resolvedForm = form ?? initialForm;
+
+  const applySavedForm = (source: FormDetail) => {
+    setTitle(source.title);
+    setDescription(source.description ?? "");
+    setSlug(source.slug ?? "");
+    setVisibility(source.visibility);
+    setTheme(source.theme as FormThemeId);
+    setRetention(presetFromExpiresAt(source.expiresAt, source.createdAt));
+    setRetentionDirty(false);
+    setAllowMultipleSubmissions(source.allowMultipleSubmissions ?? true);
+    setAllowAnonymousResponses(!(source.requireAuthentication ?? false));
+    setFields(source.fields as DraftField[]);
+  };
+
+  const resetToSaved = () => {
+    if (!resolvedForm) return;
+    if (
+      !window.confirm(
+        "Discard unsaved changes and restore the last saved version? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+
+    window.localStorage.removeItem(editDraftKey(formId));
+    applySavedForm(resolvedForm);
+    setDraftRecovered(false);
+    toast.success("Restored last saved version");
+  };
 
   useEffect(() => {
     if (!form || form.id === hydratedFormId) return;
@@ -130,6 +160,7 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
         setAllowAnonymousResponses(draft.allowAnonymousResponses);
       }
       if (draft.fields?.length) setFields(draft.fields);
+      setDraftRecovered(true);
       toast.info("Recovered unsaved edits");
     } catch {
       window.localStorage.removeItem(editDraftKey(formId));
@@ -273,10 +304,36 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
             <p className="mt-3 font-mono text-xs text-white/40">Slug: /f/s/{resolvedForm.slug}</p>
           )}
         </div>
-        <Link href="/dashboard" className="text-sm text-white/40 hover:text-white">
-          ← Back to dashboard
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          {(draftRecovered || title.trim() || description.trim()) && (
+            <button
+              type="button"
+              onClick={resetToSaved}
+              className="rounded-full border border-white/15 px-4 py-2 text-[10px] font-bold tracking-[0.2em] text-white/55 uppercase transition-colors hover:border-red-400/40 hover:text-red-300"
+            >
+              Reset to saved
+            </button>
+          )}
+          <Link href="/dashboard" className="text-sm text-white/40 hover:text-white">
+            ← Back to dashboard
+          </Link>
+        </div>
       </div>
+
+      {draftRecovered && (
+        <div className="app-surface mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3">
+          <p className="text-sm text-amber-100/85">
+            Unsaved draft recovered. Discard it to go back to your last saved form.
+          </p>
+          <button
+            type="button"
+            onClick={resetToSaved}
+            className="rounded-full border border-amber-400/35 px-4 py-1.5 text-[10px] font-bold tracking-[0.18em] text-amber-200 uppercase hover:bg-amber-400/10"
+          >
+            Restore saved version
+          </button>
+        </div>
+      )}
 
       {(resolvedForm.submissionCount ?? 0) > 0 ? (
         <div className="app-surface mb-8 rounded-2xl border border-amber-400/20 p-4">
