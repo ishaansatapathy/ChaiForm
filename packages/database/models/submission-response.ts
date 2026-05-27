@@ -1,4 +1,5 @@
 import { pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { uniqueIndex } from "drizzle-orm/pg-core";
 
 import { submissionsTable } from "./submission";
 
@@ -11,6 +12,9 @@ export const submissionResponsesTable = pgTable("submission_responses", {
   // historical normalized responses must survive those schema edits.
   fieldId: uuid("field_id").notNull(),
   value: text("value").notNull(),
-});
+}, (t) => ({
+  submissionFieldUniqueIdx: uniqueIndex("submission_responses_submission_field_unique_idx")
+    .on(t.submissionId, t.fieldId),
+}));
 
 export type SelectSubmissionResponse = typeof submissionResponsesTable.$inferSelect;

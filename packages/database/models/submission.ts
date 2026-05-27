@@ -1,4 +1,6 @@
 import { jsonb, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { formVersionsTable } from "./form-version";
 import { formsTable } from "./form";
@@ -22,7 +24,11 @@ export const submissionsTable = pgTable("submissions", {
   idempotencyKey: varchar("idempotency_key", { length: 64 }),
   answers: jsonb("answers").$type<SubmissionAnswerJson[]>().notNull(),
   submittedAt: timestamp("submitted_at").defaultNow(),
-});
+}, (t) => ({
+  submitterUniqueIdx: uniqueIndex("submissions_form_submitter_unique_idx")
+    .on(t.formId, t.submitterUserId)
+    .where(sql`${t.submitterUserId} is not null`),
+}));
 
 export type SelectSubmission = typeof submissionsTable.$inferSelect;
 export type InsertSubmission = typeof submissionsTable.$inferInsert;

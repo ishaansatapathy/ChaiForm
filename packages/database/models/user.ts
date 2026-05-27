@@ -6,6 +6,8 @@ import {
   boolean,
   text,
 } from "drizzle-orm/pg-core";
+import { check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const authProviderEnum = ["local", "google"] as const;
 export type AuthProvider = (typeof authProviderEnum)[number];
@@ -43,7 +45,13 @@ export const usersTable = pgTable("users", {
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
-});
+}, (t) => ({
+  authProviderCheck: check(
+    "users_auth_provider_check",
+    sql`${t.authProvider} in ('local', 'google')`,
+  ),
+  roleCheck: check("users_role_check", sql`${t.role} in ('user', 'admin')`),
+}));
 
 export type SelectUser = typeof usersTable.$inferSelect;
 export type InsertUser = typeof usersTable.$inferInsert;

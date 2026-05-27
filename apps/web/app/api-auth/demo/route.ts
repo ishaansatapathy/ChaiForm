@@ -13,8 +13,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  const email = process.env.DEMO_USER_EMAIL ?? process.env.SEED_USER_EMAIL ?? "demo@chaiform.dev";
-  const password = process.env.DEMO_USER_PASSWORD ?? process.env.SEED_DEMO_PASSWORD ?? "DemoPass123!";
+  const email = process.env.DEMO_USER_EMAIL ?? process.env.SEED_USER_EMAIL;
+  const password = process.env.DEMO_USER_PASSWORD ?? process.env.SEED_DEMO_PASSWORD;
+  if (!email || !password) {
+    signInUrl.searchParams.set("error", "Demo credentials are not configured.");
+    return NextResponse.redirect(signInUrl);
+  }
   const nextPath = sanitizeRedirectPath(request.nextUrl.searchParams.get("next"));
 
   try {
