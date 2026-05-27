@@ -430,7 +430,7 @@ export default function EditFormContent({ formId, initialForm }: EditFormContent
           <DeleteFormButton
             formId={formId}
             formTitle={title || resolvedForm.title}
-            className="w-full rounded-2xl border border-red-400/30 py-3 text-sm font-bold text-red-300 hover:bg-red-400/10 disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center rounded-2xl border border-red-400/30 py-3 text-sm font-bold text-red-300 hover:bg-red-400/10 disabled:opacity-50"
             label="Delete form"
           />
         </div>
