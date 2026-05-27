@@ -10,9 +10,6 @@ export const metadata: Metadata = {
 export default async function SignInPage() {
   const providers = await fetchAuthProviders();
   const googleEnabled = Boolean(getGoogleProvider(providers));
-  const demoLoginEnabled = process.env.DEMO_LOGIN_ENABLED === "true";
 
-  return (
-    <AuthShell mode="sign-in" googleEnabled={googleEnabled} demoLoginEnabled={demoLoginEnabled} />
-  );
+  return <AuthShell mode="sign-in" googleEnabled={googleEnabled} />;
 }
