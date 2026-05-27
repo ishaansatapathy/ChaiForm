@@ -63,6 +63,23 @@ jobs:
 
       - run: pnpm build
 
+      - name: API readiness gate
+        run: |
+          pnpm --filter @repo/api start &
+          API_PID=$!
+          trap "kill $API_PID" EXIT
+
+          for i in {1..45}; do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+
+          curl -fsS http://127.0.0.1:8000/health
+          curl -fsS http://127.0.0.1:8000/ready
+          curl -fsS http://127.0.0.1:8000/openapi.json >/dev/null
+
       - run: pnpm --filter web exec playwright install chromium --with-deps
 
       - run: pnpm --filter web test:e2e

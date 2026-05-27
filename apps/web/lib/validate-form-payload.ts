@@ -1,8 +1,6 @@
 import {
-  createFormInputSchema,
-  refineCreateFormInput,
-  refineUpdateFormInput,
-  updateFormInputSchema,
+  parseCreateFormInput as parseCreateFormInputModel,
+  parseUpdateFormInput as parseUpdateFormInputModel,
   type CreateFormInput,
   type UpdateFormInput,
 } from "@repo/services/form/model";
@@ -10,27 +8,11 @@ import {
 export function parseCreateFormInput(input: unknown):
   | { success: true; data: CreateFormInput }
   | { success: false; message: string } {
-  const parsed = createFormInputSchema.safeParse(input);
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid form data" };
-  }
-  try {
-    return { success: true, data: refineCreateFormInput(parsed.data) };
-  } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Invalid form data" };
-  }
+  return parseCreateFormInputModel(input);
 }
 
 export function parseUpdateFormInput(input: unknown):
   | { success: true; data: UpdateFormInput }
   | { success: false; message: string } {
-  const parsed = updateFormInputSchema.safeParse(input);
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid form data" };
-  }
-  try {
-    return { success: true, data: refineUpdateFormInput(parsed.data) };
-  } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Invalid form data" };
-  }
+  return parseUpdateFormInputModel(input);
 }

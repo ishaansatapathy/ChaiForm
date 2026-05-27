@@ -343,6 +343,50 @@ class AnalyticsService {
 
     return { fields: stats };
   }
+
+  async getTopForms(
+    userId: string,
+    options: { limit: number; visibility?: "public" | "unlisted" | "draft" },
+  ) {
+    const filters = [eq(formsTable.userId, userId), isNull(formsTable.deletedAt)];
+    if (options.visibility) {
+      filters.push(eq(formsTable.visibility, options.visibility));
+    }
+
+    const rows = await db
+      .select({
+        id: formsTable.id,
+        title: formsTable.title,
+        visibility: formsTable.visibility,
+        viewCount: formsTable.viewCount,
+        submissionCount: sql<number>`count(${submissionsTable.id})::int`,
+      })
+      .from(formsTable)
+      .leftJoin(submissionsTable, eq(submissionsTable.formId, formsTable.id))
+      .where(and(...filters))
+      .groupBy(formsTable.id)
+      .orderBy(
+        sql`count(${submissionsTable.id}) desc`,
+        sql`coalesce(${formsTable.viewCount}, 0) desc`,
+        sql`${formsTable.createdAt} desc`,
+      )
+      .limit(options.limit);
+
+    return {
+      items: rows.map((row) => {
+        const submissions = row.submissionCount ?? 0;
+        const views = row.viewCount ?? 0;
+        return {
+          id: row.id,
+          title: row.title,
+          visibility: row.visibility,
+          submissionCount: submissions,
+          viewCount: views,
+          completionRate: completionRate(submissions, views),
+        };
+      }),
+    };
+  }
 }
 
 export default AnalyticsService;

@@ -250,6 +250,72 @@ function isProduction() {
   return env.NODE_ENV === "production" || env.NODE_ENV === "prod";
 }
 
+async function getReadinessReport() {
+  const checks: Record<string, { ok: boolean; message: string }> = {};
+
+  try {
+    const { pingDatabase } = await import("@repo/database/health");
+    await pingDatabase();
+    checks.database = { ok: true, message: "Database reachable" };
+  } catch (error) {
+    checks.database = {
+      ok: false,
+      message: `Database unavailable: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  try {
+    const { isEmailConfigured, isGoogleOAuthConfigured } = await import("@repo/services/env");
+    checks.email = {
+      ok: isEmailConfigured(),
+      message: isEmailConfigured()
+        ? "Transactional email configured"
+        : "Transactional email not configured (BREVO_API_KEY + EMAIL_FROM missing)",
+    };
+    checks.googleOAuth = {
+      ok: isGoogleOAuthConfigured(),
+      message: isGoogleOAuthConfigured()
+        ? "Google OAuth configured"
+        : "Google OAuth not configured (client id/secret/redirect missing)",
+    };
+  } catch (error) {
+    checks.email = {
+      ok: false,
+      message: `Unable to inspect email config: ${error instanceof Error ? error.message : String(error)}`,
+    };
+    checks.googleOAuth = {
+      ok: false,
+      message: `Unable to inspect OAuth config: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  const turnstileRequired = Boolean(process.env.TURNSTILE_SECRET_KEY?.trim());
+  checks.turnstile = turnstileRequired
+    ? { ok: true, message: "Turnstile secret configured" }
+    : {
+        ok: process.env.REQUIRE_TURNSTILE_IN_PROD !== "true" || !isProduction(),
+        message:
+          process.env.REQUIRE_TURNSTILE_IN_PROD === "true" && isProduction()
+            ? "Turnstile required in production but secret is missing"
+            : "Turnstile optional (secret not configured)",
+      };
+
+  const requiredCoreEnvs = [
+    "DATABASE_URL",
+    "JWT_SECRET",
+    "JWT_REFRESH_SECRET",
+    "CLIENT_URL",
+    "BASE_URL",
+  ] as const;
+  const missingCoreEnvs = requiredCoreEnvs.filter((key) => !process.env[key]?.trim());
+  checks.coreEnv = missingCoreEnvs.length
+    ? { ok: false, message: `Missing core env vars: ${missingCoreEnvs.join(", ")}` }
+    : { ok: true, message: "Core env vars present" };
+
+  const ready = Object.values(checks).every((check) => check.ok);
+  return { ready, checks };
+}
+
 function requireOpenApiDocsAuth(req: Request, res: Response, next: NextFunction) {
   if (!isProduction()) return next();
 
@@ -307,6 +373,11 @@ app.get("/health", async (_req, res) => {
       database: "error",
     });
   }
+});
+
+app.get("/ready", async (_req, res) => {
+  const report = await getReadinessReport();
+  return res.status(report.ready ? 200 : 503).json(report);
 });
 
 app.post("/internal/purge-expired-forms", async (req, res) => {

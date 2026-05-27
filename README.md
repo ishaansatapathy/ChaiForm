@@ -132,6 +132,7 @@ pnpm dev
 |---------|-----|
 | Web | http://localhost:3000 |
 | API | http://localhost:8000/health |
+| API readiness | http://localhost:8000/ready |
 | Scalar docs | http://localhost:8000/docs |
 
 ## Scripts
@@ -167,6 +168,7 @@ See **[DEPLOY.md](./DEPLOY.md)** for **Neon + Railway (API) + Vercel (web)** set
 |---------|-----|
 | **Web app** | https://chai-form-web.vercel.app |
 | **API health** | https://chaiform-production.up.railway.app/health |
+| **API readiness** | https://chaiform-production.up.railway.app/ready |
 | **Scalar API docs** | https://chaiform-production.up.railway.app/docs |
 | **OpenAPI JSON** | https://chaiform-production.up.railway.app/openapi.json |
 

@@ -10,12 +10,22 @@ describe("ChaiForm API integration", () => {
     expect(response.body.healthy).toBe(true);
   });
 
+  it("returns readiness report with named checks", async () => {
+    const response = await request(app).get("/ready");
+    expect([200, 503]).toContain(response.status);
+    expect(typeof response.body.ready).toBe("boolean");
+    expect(response.body.checks?.database).toBeTruthy();
+    expect(response.body.checks?.coreEnv).toBeTruthy();
+    expect(response.body.checks?.turnstile).toBeTruthy();
+  });
+
   it("serves generated OpenAPI documentation", async () => {
     const response = await request(app).get("/openapi.json");
     expect(response.status).toBe(200);
     expect(response.body.info?.title).toBe("ChaiForm OpenAPI");
     expect(response.body.paths?.["/forms/submit"]).toBeTruthy();
     expect(response.body.paths?.["/authentication/google-oauth"]).toBeTruthy();
+    expect(response.body.paths?.["/analytics/top-forms"]).toBeTruthy();
   });
 
   it("rejects unauthenticated protected form list", async () => {
@@ -81,9 +91,14 @@ describe("ChaiForm API integration", () => {
       return;
     }
 
-    expect(signIn.body.user?.email ?? signIn.body.twoFactorRequired).toBeTruthy();
+    const needsTwoFactor = signIn.body.twoFactorRequired === true;
+    expect(signIn.body.user?.email ?? needsTwoFactor).toBeTruthy();
 
     const cookie = signIn.headers["set-cookie"];
+    if (needsTwoFactor) {
+      expect(cookie).toBeFalsy();
+      return;
+    }
     expect(cookie).toBeTruthy();
 
     const list = await request(app)

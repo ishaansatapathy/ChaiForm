@@ -23,7 +23,7 @@ import type {
   SubmitFormInput,
   UpdateFormInput,
 } from "./model";
-import { refineCreateFormInput, refineSubmitFormInput, refineUpdateFormInput } from "./model";
+import { parseCreateFormInput, parseSubmitFormInput, parseUpdateFormInput } from "./model";
 import { createUniqueSlug } from "./slug";
 import { notifyCreatorOfFormDeletion, notifyCreatorOfSubmission } from "./notifications";
 import { expiresAtFromRetention, expiresAtFromRetentionChange, isFormExpired } from "./retention";
@@ -456,7 +456,11 @@ class FormService {
   }
 
   async createForm(userId: string, input: CreateFormInput) {
-    refineCreateFormInput(input);
+    const parsedInput = parseCreateFormInput(input);
+    if (!parsedInput.success) {
+      throw new FormError("BAD_REQUEST", parsedInput.message);
+    }
+    input = parsedInput.data;
     const fields = this.normalizeInputFields(input.fields);
     const slug = await createUniqueSlug(input.title);
 
@@ -488,7 +492,11 @@ class FormService {
   }
 
   async updateForm(userId: string, input: UpdateFormInput, actorRole: UserRole = "user") {
-    refineUpdateFormInput(input);
+    const parsedInput = parseUpdateFormInput(input);
+    if (!parsedInput.success) {
+      throw new FormError("BAD_REQUEST", parsedInput.message);
+    }
+    input = parsedInput.data;
     const existing = await this.getOwnedForm(userId, input.formId, actorRole);
     const previousFields = await this.loadFields(input.formId);
     const fields = input.fields ? this.normalizeInputFields(input.fields, true) : undefined;
@@ -892,7 +900,11 @@ class FormService {
    * The two stores must remain in sync. Never update one without the other.
    */
   async submitForm(input: SubmitFormInput, submitterUserId?: string | null, remoteIp?: string | null) {
-    refineSubmitFormInput(input);
+    const parsedInput = parseSubmitFormInput(input);
+    if (!parsedInput.success) {
+      throw new FormError("BAD_REQUEST", parsedInput.message);
+    }
+    input = parsedInput.data;
     if (input.website.length > 0) {
       throw new FormError("BAD_REQUEST", "Submission rejected");
     }
