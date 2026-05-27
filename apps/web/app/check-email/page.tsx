@@ -12,7 +12,7 @@ function CheckEmailContent() {
   const email = searchParams.get("email") ?? "";
   const [sent, setSent] = useState(false);
 
-  const resend = trpc.auth.resendVerificationEmail.useMutation({
+  const sendAgain = trpc.auth.sendVerificationEmailAgain.useMutation({
     onSuccess: (data) => {
       setSent(true);
       toast.success(data.message);
@@ -33,16 +33,16 @@ function CheckEmailContent() {
         </p>
         <p className="mt-3 rounded-xl border border-white/10 bg-white/3 px-4 py-3 text-left text-xs leading-relaxed text-white/45">
           Dev tip: without <code className="text-lime-400/90">BREVO_API_KEY</code>, check the API server
-          logs for the verification link after sign-up or resend.
+          logs for the verification link after sign-up or request again.
         </p>
         {email && (
           <button
             type="button"
-            disabled={resend.isPending || sent}
-            onClick={() => resend.mutate({ email })}
+            disabled={sendAgain.isPending || sent}
+            onClick={() => sendAgain.mutate({ email })}
             className="btn-omni font-display mt-8 w-full rounded-2xl py-3 text-sm font-black tracking-[0.16em] uppercase disabled:opacity-50"
           >
-            {resend.isPending ? "Sending…" : sent ? "Link sent" : "Resend verification email"}
+            {sendAgain.isPending ? "Sending…" : sent ? "Link sent" : "Send verification email again"}
           </button>
         )}
         <Link href="/sign-in" className="font-mono mt-6 inline-block text-xs tracking-widest text-lime-400/80 hover:text-lime-400">

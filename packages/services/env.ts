@@ -28,15 +28,12 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   GOOGLE_OAUTH_REDIRECT_URI: z.string().optional(),
-  /** Brevo (recommended) — transactional email to any recipient */
+  /** Brevo (recommended) ? transactional email to any recipient */
   BREVO_API_KEY: z.string().optional(),
-  /** Legacy Resend — used when EMAIL_PROVIDER=resend */
-  RESEND_API_KEY: z.string().optional(),
-  /** e.g. ChaiForm <noreply@yourdomain.com> — sender must be verified in Brevo */
+  /** e.g. ChaiForm <noreply@yourdomain.com> ? sender must be verified in Brevo */
   EMAIL_FROM: z.string().optional(),
   EMAIL_SENDER_NAME: z.string().optional(),
-  /** brevo | resend — defaults to brevo when BREVO_API_KEY is set */
-  EMAIL_PROVIDER: z.enum(["brevo", "resend"]).optional(),
+  EMAIL_PROVIDER: z.literal("brevo").optional(),
   REDIS_URL: z.string().optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().optional(),
@@ -57,6 +54,5 @@ export function isGoogleOAuthConfigured() {
 export function isEmailConfigured() {
   const from = env.EMAIL_FROM?.trim();
   const brevo = env.BREVO_API_KEY?.trim();
-  const resend = env.RESEND_API_KEY?.trim();
-  return Boolean(from && (brevo || resend));
+  return Boolean(from && brevo);
 }

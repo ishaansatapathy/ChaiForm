@@ -68,7 +68,7 @@ export const verifyEmailInputSchema = z.object({
   token: z.string().min(1),
 });
 
-export const resendVerificationEmailInputSchema = z.object({
+export const sendVerificationEmailAgainInputSchema = z.object({
   email: z.string().trim().email("Invalid email"),
 });
 
@@ -100,5 +100,5 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordInputBaseSchema>;
 export type Verify2FAInput = z.infer<typeof verify2FAInputSchema>;
 export type Toggle2FAInput = z.infer<typeof toggle2FAInputSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailInputSchema>;
-export type ResendVerificationEmailInput = z.infer<typeof resendVerificationEmailInputSchema>;
+export type SendVerificationEmailAgainInput = z.infer<typeof sendVerificationEmailAgainInputSchema>;
 export type SetupProfileInput = z.infer<typeof setupProfileInputSchema>;

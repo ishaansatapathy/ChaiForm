@@ -13,7 +13,7 @@ import { AuthError, toAuthError } from "./errors";
 import type {
   ForgotPasswordInput,
   ResetPasswordInput,
-  ResendVerificationEmailInput,
+  SendVerificationEmailAgainInput,
   SignInInput,
   SignUpInput,
   Verify2FAInput,
@@ -518,8 +518,8 @@ class AuthService {
     return toPublicUser(updated);
   }
 
-  public async resendVerificationEmail(
-    input: ResendVerificationEmailInput,
+  public async sendVerificationEmailAgain(
+    input: SendVerificationEmailAgainInput,
   ): Promise<{ message: string }> {
     const user = await this.findUserByEmail(input.email);
     if (!user || user.emailVerified) {
@@ -537,7 +537,7 @@ class AuthService {
     return { message: GENERIC_VERIFY_MESSAGE };
   }
 
-  public async resendVerification(userId: string): Promise<{ message: string }> {
+  public async sendVerificationAgain(userId: string): Promise<{ message: string }> {
     const user = await this.findUserById(userId);
     if (!user) {
       throw new AuthError("NOT_FOUND", "User not found");
