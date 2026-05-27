@@ -1,4 +1,6 @@
 import { boolean, integer, jsonb, pgTable, uuid, varchar } from "drizzle-orm/pg-core";
+import { check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { formsTable } from "./form";
 
@@ -34,7 +36,12 @@ export const formFieldsTable = pgTable("form_fields", {
   required: boolean("required").default(false).notNull(),
   sortOrder: integer("sort_order").notNull(),
   config: jsonb("config").$type<FieldConfigJson>().default({}).notNull(),
-});
+}, (t) => ({
+  typeCheck: check(
+    "form_fields_type_check",
+    sql`${t.type} in ('text', 'textarea', 'email', 'number', 'date', 'select', 'rating', 'checkbox', 'description')`,
+  ),
+}));
 
 export type SelectFormField = typeof formFieldsTable.$inferSelect;
 export type InsertFormField = typeof formFieldsTable.$inferInsert;

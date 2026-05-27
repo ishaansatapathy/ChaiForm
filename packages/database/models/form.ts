@@ -1,4 +1,6 @@
 import { boolean, integer, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { usersTable } from "./user";
 
@@ -27,7 +29,16 @@ export const formsTable = pgTable("forms", {
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
-});
+}, (t) => ({
+  visibilityCheck: check(
+    "forms_visibility_check",
+    sql`${t.visibility} in ('public', 'unlisted', 'draft')`,
+  ),
+  themeCheck: check(
+    "forms_theme_check",
+    sql`${t.theme} in ('default', 'ben10', 'anime', 'startup', 'gaming', 'tech')`,
+  ),
+}));
 
 export type SelectForm = typeof formsTable.$inferSelect;
 export type InsertForm = typeof formsTable.$inferInsert;
