@@ -62,8 +62,8 @@ async function bootstrap() {
   const { isEmailConfigured } = await import("@repo/services/env");
   logger.info(
     isEmailConfigured()
-      ? "Email: Resend configured — real emails will be sent"
-      : "Email: not configured — links will only appear in API logs (set RESEND_API_KEY + EMAIL_FROM in .env)",
+      ? "Email: provider configured — transactional mail enabled for all users"
+      : "Email: not configured — links will only appear in API logs (set BREVO_API_KEY + EMAIL_FROM on Railway)",
   );
 }
 

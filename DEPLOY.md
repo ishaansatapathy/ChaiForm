@@ -40,8 +40,10 @@ Environment variables:
 | `CLIENT_URL` | `https://chai-form-web.vercel.app` |
 | `JWT_SECRET` | long random string (32+ chars) |
 | `JWT_REFRESH_SECRET` | another long random string |
-| `RESEND_API_KEY` | from Resend *(optional)* |
-| `EMAIL_FROM` | `ChaiForm <onboarding@resend.dev>` |
+| `BREVO_API_KEY` | from [Brevo](https://app.brevo.com) → SMTP & API → API keys |
+| `EMAIL_PROVIDER` | `brevo` |
+| `EMAIL_FROM` | `ChaiForm <your-sender@email.com>` *(same address you verified in Brevo — domain DNS not required)* |
+| `EMAIL_SENDER_NAME` | `ChaiForm` *(optional if name is in EMAIL_FROM)* |
 | `GOOGLE_OAUTH_CLIENT_ID` | Google Cloud Console |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google Cloud Console |
 | `GOOGLE_OAUTH_REDIRECT_URI` | `https://chai-form-web.vercel.app/api-auth/google/callback` |
@@ -143,4 +145,4 @@ Redirect URI must be the **Vercel** URL (`/api-auth/google/callback`), matching 
 Railway may need a few seconds to route traffic — retry `/health` (checks database connectivity).
 
 **Emails not sending**  
-Set `RESEND_API_KEY` + `EMAIL_FROM` on Railway. Without Resend, OTP/links appear in Railway logs only.
+Set `BREVO_API_KEY` + `EMAIL_FROM` on Railway. In Brevo, verify at least one **sender email** (Senders → Add a sender — no custom domain needed to start). Use that same address in `EMAIL_FROM`. Without email configured, OTP/links appear in Railway logs only.
